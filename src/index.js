@@ -89,7 +89,7 @@ function validateUrl(input) {
   return { url: parsed.href };
 }
 
-async function handleShorten(request, env) {
+async function handleShorten(request, env, session) {
   let body;
   try {
     body = await request.json();
@@ -107,13 +107,15 @@ async function handleShorten(request, env) {
     return jsonResponse({ error: validation.error }, 400);
   }
 
+  const createdBy = await getOrCreateIdentityId(env, session.provider, session.email);
+
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const code = generateCode();
     try {
       await env.DB.prepare(
-        "INSERT INTO urls (code, original_url, created_at) VALUES (?, ?, ?)"
+        "INSERT INTO urls (code, original_url, created_at, created_by) VALUES (?, ?, ?, ?)"
       )
-        .bind(code, validation.url, Date.now())
+        .bind(code, validation.url, Date.now(), createdBy)
         .run();
       return jsonResponse({
         code,
@@ -156,24 +158,30 @@ function handleAuthStart(provider, url, env) {
   });
 }
 
+async function getOrCreateIdentityId(env, provider, username) {
+  await env.DB.prepare(
+    "INSERT INTO login_identities (provider, username) VALUES (?, ?) ON CONFLICT (provider, username) DO NOTHING"
+  )
+    .bind(provider, username)
+    .run();
+
+  const identity = await env.DB.prepare(
+    "SELECT id FROM login_identities WHERE provider = ? AND username = ?"
+  )
+    .bind(provider, username)
+    .first();
+
+  return identity.id;
+}
+
 async function recordLogin(env, provider, username, ipAddress) {
   try {
-    await env.DB.prepare(
-      "INSERT INTO login_identities (provider, username) VALUES (?, ?) ON CONFLICT (provider, username) DO NOTHING"
-    )
-      .bind(provider, username)
-      .run();
-
-    const identity = await env.DB.prepare(
-      "SELECT id FROM login_identities WHERE provider = ? AND username = ?"
-    )
-      .bind(provider, username)
-      .first();
+    const identityId = await getOrCreateIdentityId(env, provider, username);
 
     await env.DB.prepare(
       "INSERT INTO login_events (identity_id, logged_in_at, ip_address) VALUES (?, ?, ?)"
     )
-      .bind(identity.id, Date.now(), ipAddress)
+      .bind(identityId, Date.now(), ipAddress)
       .run();
   } catch {
     // login tracking is best-effort; never block sign-in over it
@@ -243,7 +251,7 @@ export default {
     if (request.method === "POST" && url.pathname === "/api/shorten") {
       const session = await getSession(request, env.SESSION_SECRET);
       if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
-      return handleShorten(request, env);
+      return handleShorten(request, env, session);
     }
 
     if (url.pathname === "/") {

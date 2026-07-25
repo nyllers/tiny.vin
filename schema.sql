@@ -1,14 +1,15 @@
-CREATE TABLE IF NOT EXISTS urls (
-  code TEXT PRIMARY KEY,
-  original_url TEXT NOT NULL,
-  created_at INTEGER NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS login_identities (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   provider TEXT NOT NULL,
   username TEXT NOT NULL,
   UNIQUE (provider, username)
+);
+
+CREATE TABLE IF NOT EXISTS urls (
+  code TEXT PRIMARY KEY,
+  original_url TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  created_by INTEGER REFERENCES login_identities(id)
 );
 
 CREATE TABLE IF NOT EXISTS login_events (
