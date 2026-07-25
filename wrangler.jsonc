@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tiny-vin",
+  "compatibility_date": "2026-07-25",
+  "main": "src/index.js",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "public",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tiny-vin-db",
+      "database_id": "80934f84-32e3-480d-91b7-c1c2bd3d6144"
+    }
+  ],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}
