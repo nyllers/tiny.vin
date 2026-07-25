@@ -1,8 +1,5 @@
 CREATE TABLE IF NOT EXISTS urls (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  code TEXT NOT NULL UNIQUE,
+  code TEXT PRIMARY KEY,
   original_url TEXT NOT NULL,
   created_at INTEGER NOT NULL
 );
-
-CREATE INDEX IF NOT EXISTS idx_urls_code ON urls(code);
