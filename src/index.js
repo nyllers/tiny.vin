@@ -18,6 +18,37 @@ function generateCode() {
   return code;
 }
 
+function validateUrl(input) {
+  if (!input.includes("://")) {
+    if (/\s/.test(input)) {
+      return { error: "That doesn't look like a URL. Try a format like: https://example.com" };
+    }
+    return { error: `Missing "https://" at the start. Try: https://${input}` };
+  }
+
+  const scheme = input.slice(0, input.indexOf("://")).toLowerCase();
+  if (scheme !== "http" && scheme !== "https") {
+    return {
+      error: `"${scheme}://" links aren't supported, only http:// and https://. Try: https://example.com`,
+    };
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(input);
+  } catch {
+    return { error: "That doesn't look like a valid URL. Try a format like: https://example.com/page" };
+  }
+
+  if (!parsed.hostname || (!parsed.hostname.includes(".") && parsed.hostname !== "localhost")) {
+    return {
+      error: `"${parsed.hostname}" doesn't look like a real domain. Try a format like: https://example.com`,
+    };
+  }
+
+  return { url: parsed.href };
+}
+
 async function handleShorten(request, env) {
   let body;
   try {
@@ -31,10 +62,9 @@ async function handleShorten(request, env) {
     return jsonResponse({ error: "Missing url" }, 400);
   }
 
-  try {
-    new URL(url);
-  } catch {
-    return jsonResponse({ error: "Invalid URL" }, 400);
+  const validation = validateUrl(url);
+  if (validation.error) {
+    return jsonResponse({ error: validation.error }, 400);
   }
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -43,11 +73,11 @@ async function handleShorten(request, env) {
       await env.DB.prepare(
         "INSERT INTO urls (code, original_url, created_at) VALUES (?, ?, ?)"
       )
-        .bind(code, url, Date.now())
+        .bind(code, validation.url, Date.now())
         .run();
       return jsonResponse({
         code,
-        originalUrl: url,
+        originalUrl: validation.url,
         shortUrl: `https://tiny.vin/${code}`,
       });
     } catch {
