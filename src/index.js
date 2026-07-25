@@ -156,6 +156,30 @@ function handleAuthStart(provider, url, env) {
   });
 }
 
+async function recordLogin(env, provider, username) {
+  try {
+    await env.DB.prepare(
+      "INSERT INTO login_identities (provider, username) VALUES (?, ?) ON CONFLICT (provider, username) DO NOTHING"
+    )
+      .bind(provider, username)
+      .run();
+
+    const identity = await env.DB.prepare(
+      "SELECT id FROM login_identities WHERE provider = ? AND username = ?"
+    )
+      .bind(provider, username)
+      .first();
+
+    await env.DB.prepare(
+      "INSERT INTO login_events (identity_id, logged_in_at) VALUES (?, ?)"
+    )
+      .bind(identity.id, Date.now())
+      .run();
+  } catch {
+    // login tracking is best-effort; never block sign-in over it
+  }
+}
+
 async function handleAuthCallback(provider, url, request, env) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
@@ -171,6 +195,8 @@ async function handleAuthCallback(provider, url, request, env) {
     const user = await fetchUserInfo(provider, accessToken);
 
     if (!user.email) throw new Error("No email returned by provider");
+
+    await recordLogin(env, provider, user.email);
 
     const sessionCookie = await createSessionCookie(user, env.SESSION_SECRET);
 

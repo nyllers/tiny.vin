@@ -1,9 +1,3 @@
-CREATE TABLE IF NOT EXISTS urls (
-  code TEXT PRIMARY KEY,
-  original_url TEXT NOT NULL,
-  created_at INTEGER NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS login_identities (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   provider TEXT NOT NULL,

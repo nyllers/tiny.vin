@@ -31,3 +31,5 @@ Required secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_I
 4. **Production**: set each secret with `wrangler secret put NAME` (prompts for the value, doesn't touch any file).
 
 Sign out via `/auth/logout` (linked at the bottom of the homepage).
+
+Every successful login is recorded in D1: `login_identities` holds one row per (provider, username) pair, and `login_events` holds a timestamped row per login, referencing that identity. This is on top of the base schema — if the database was created before this branch existed, apply `migrations/0002_add_login_tracking.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0002_add_login_tracking.sql --remote`) in addition to `schema.sql`.
