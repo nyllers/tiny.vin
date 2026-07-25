@@ -3,9 +3,11 @@ let currentShortUrl = "";
 async function generateUrl() {
   const input = document.getElementById("url-input");
   const result = document.getElementById("url-result");
+  const copyBtn = document.getElementById("copy-btn");
   const url = input.value.trim();
 
   currentShortUrl = "";
+  copyBtn.hidden = true;
 
   if (!url) {
     result.textContent = "Enter a URL first.";
@@ -30,6 +32,7 @@ async function generateUrl() {
     currentShortUrl = data.shortUrl;
     result.textContent = data.shortUrl;
     result.title = "Click to copy";
+    copyBtn.hidden = false;
   } catch {
     result.textContent = "Network error, try again.";
   }
@@ -52,6 +55,7 @@ async function copyResult() {
 
 document.getElementById("generate-btn").addEventListener("click", generateUrl);
 document.getElementById("url-result").addEventListener("click", copyResult);
+document.getElementById("copy-btn").addEventListener("click", copyResult);
 document.addEventListener("keydown", (event) => {
   if (event.key === "Enter") generateUrl();
 });

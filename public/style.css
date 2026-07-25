@@ -50,11 +50,32 @@ h1 {
   background: #3730a3;
 }
 
-#url-result {
+.result-row {
   margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+#url-result {
+  margin: 0;
   font-size: 1.1rem;
   word-break: break-all;
   cursor: pointer;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem;
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  color: #4338ca;
 }
 
 footer {

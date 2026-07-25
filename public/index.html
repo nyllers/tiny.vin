@@ -12,7 +12,15 @@
       <input type="text" id="url-input" placeholder="Paste a URL, then press Enter or click Generate URL">
       <button id="generate-btn">Generate URL</button>
     </div>
-    <p id="url-result"></p>
+    <div class="result-row">
+      <p id="url-result"></p>
+      <button id="copy-btn" class="icon-btn" title="Copy to clipboard" aria-label="Copy to clipboard" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+      </button>
+    </div>
   </main>
   <footer>Simple project by Anders &amp; Claude</footer>
   <script src="script.js"></script>
