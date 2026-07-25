@@ -5,7 +5,7 @@ function validateUrl(input) {
     if (/\s/.test(input)) {
       return { error: "That doesn't look like a URL. Try a format like: https://example.com" };
     }
-    return { error: `Missing "https://" at the start. Try: https://${input}` };
+    return { error: `Missing "http://" or "https://" at the start. Try: https://${input}` };
   }
 
   const scheme = input.slice(0, input.indexOf("://")).toLowerCase();
