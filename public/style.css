@@ -78,6 +78,10 @@ h1 {
   color: #4338ca;
 }
 
+.icon-btn[hidden] {
+  display: none;
+}
+
 footer {
   margin-top: 1.5rem;
   color: rgba(255, 255, 255, 0.85);
