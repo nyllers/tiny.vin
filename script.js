@@ -5,7 +5,7 @@ function generateUrl() {
   for (let i = 0; i < 12; i++) {
     code += CHARS[Math.floor(Math.random() * CHARS.length)];
   }
-  document.getElementById("url-output").value = `https://tiny.vin/${code}`;
+  document.getElementById("url-result").textContent = `https://tiny.vin/${code}`;
 }
 
 document.getElementById("generate-btn").addEventListener("click", generateUrl);
