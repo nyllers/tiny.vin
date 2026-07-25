@@ -105,3 +105,61 @@ footer {
   color: rgba(255, 255, 255, 0.85);
   font-size: 0.7rem;
 }
+
+.signout-row {
+  margin: 1rem 0 0;
+  text-align: center;
+}
+
+.signout-row a {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.8rem;
+}
+
+.login-subtitle {
+  margin: 0 0 1.5rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+.login-error {
+  margin: 0 0 1rem;
+  text-align: center;
+  color: #dc2626;
+  font-size: 0.9rem;
+}
+
+.login-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.provider-btn {
+  display: block;
+  padding: 0.6rem 1rem;
+  font-size: 1rem;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 0.375rem;
+  border: 1px solid #d1d5db;
+}
+
+.google-btn {
+  color: #1f2937;
+  background: #fff;
+}
+
+.google-btn:hover {
+  background: #f3f4f6;
+}
+
+.facebook-btn {
+  color: #fff;
+  background: #1877f2;
+  border-color: #1877f2;
+}
+
+.facebook-btn:hover {
+  background: #145dbf;
+}

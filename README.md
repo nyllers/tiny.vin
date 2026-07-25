@@ -18,3 +18,16 @@ This repo is connected to a Cloudflare Workers project (`tiny-vin`) via GitHub, 
 5. If using the custom domain, point tiny.vin's DNS at Cloudflare and remove the `CNAME` file, which currently points at GitHub Pages.
 
 Local dev (optional, needs Wrangler): `wrangler dev`.
+
+## Login (feature/oauth-login branch)
+
+The homepage and `POST /api/shorten` require signing in with Google or Facebook; `GET /<code>` redirects stay public so shared links keep working for anyone. There's no email allowlist — any Google or Facebook account can sign in.
+
+Required secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET`, `SESSION_SECRET` (any long random string, used to sign the session cookie).
+
+1. **Google**: Google Cloud Console → APIs & Services → Credentials → Create OAuth client ID (Web application). Add Authorized redirect URIs for every origin you'll use this from, e.g. `https://tiny.vin/auth/google/callback` and `http://localhost:8787/auth/google/callback` for local dev.
+2. **Facebook**: developers.facebook.com → Create App (type: Consumer) → add the Facebook Login product → Settings → Valid OAuth Redirect URIs, same list of callback URLs as above.
+3. **Local dev**: copy `.dev.vars.example` to `.dev.vars` and fill in the values (this file is gitignored, never commit real secrets). Run `wrangler dev` as usual.
+4. **Production**: set each secret with `wrangler secret put NAME` (prompts for the value, doesn't touch any file).
+
+Sign out via `/auth/logout` (linked at the bottom of the homepage).
