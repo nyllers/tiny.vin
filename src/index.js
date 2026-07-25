@@ -5,7 +5,7 @@ const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 const CODE_LENGTH = 12;
 const MAX_ATTEMPTS = 5;
 const CODE_PATTERN = /^\/([A-Za-z0-9]{12})$/;
-const AUTH_PATTERN = /^\/auth\/(google|facebook)\/(start|callback)$/;
+const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
 
 const LOGIN_ERRORS = {
   oauth_failed: "Something went wrong signing in. Please try again.",
@@ -51,12 +51,6 @@ function loginPage(errorCode) {
           <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
         </svg>
         <span>Continue with Google</span>
-      </a>
-      <a class="provider-btn" href="/auth/facebook/start">
-        <svg class="provider-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-        </svg>
-        <span>Continue with Facebook</span>
       </a>
     </div>
   </main>
@@ -157,10 +151,10 @@ async function handleRedirect(code, env) {
   return Response.redirect(row.original_url, 302);
 }
 
-function handleAuthStart(provider, url, env) {
+function handleAuthStart(url, env) {
   const state = randomState();
-  const redirectUri = `${url.origin}/auth/${provider}/callback`;
-  const authorizeUrl = buildAuthorizeUrl(provider, env, redirectUri, state);
+  const redirectUri = `${url.origin}/auth/google/callback`;
+  const authorizeUrl = buildAuthorizeUrl(env, redirectUri, state);
 
   return new Response(null, {
     status: 302,
@@ -201,7 +195,7 @@ async function recordLogin(env, provider, username, ipAddress) {
   }
 }
 
-async function handleAuthCallback(provider, url, request, env) {
+async function handleAuthCallback(url, request, env) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const cookies = parseCookies(request);
@@ -211,14 +205,14 @@ async function handleAuthCallback(provider, url, request, env) {
   }
 
   try {
-    const redirectUri = `${url.origin}/auth/${provider}/callback`;
-    const accessToken = await exchangeCodeForToken(provider, env, redirectUri, code);
-    const user = await fetchUserInfo(provider, accessToken);
+    const redirectUri = `${url.origin}/auth/google/callback`;
+    const accessToken = await exchangeCodeForToken(env, redirectUri, code);
+    const user = await fetchUserInfo(accessToken);
 
     if (!user.email) throw new Error("No email returned by provider");
 
     const ipAddress = request.headers.get("CF-Connecting-IP");
-    await recordLogin(env, provider, user.email, ipAddress);
+    await recordLogin(env, user.provider, user.email, ipAddress);
 
     const sessionCookie = await createSessionCookie(user, env.SESSION_SECRET);
 
@@ -251,9 +245,9 @@ export default {
 
     const authMatch = url.pathname.match(AUTH_PATTERN);
     if (authMatch && request.method === "GET") {
-      const [, provider, step] = authMatch;
-      if (step === "start") return handleAuthStart(provider, url, env);
-      return handleAuthCallback(provider, url, request, env);
+      const [, step] = authMatch;
+      if (step === "start") return handleAuthStart(url, env);
+      return handleAuthCallback(url, request, env);
     }
 
     const codeMatch = url.pathname.match(CODE_PATTERN);
