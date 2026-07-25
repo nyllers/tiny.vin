@@ -136,30 +136,26 @@ footer {
 }
 
 .provider-btn {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
   padding: 0.6rem 1rem;
   font-size: 1rem;
   text-align: center;
   text-decoration: none;
   border-radius: 0.375rem;
   border: 1px solid #d1d5db;
-}
-
-.google-btn {
   color: #1f2937;
   background: #fff;
 }
 
-.google-btn:hover {
+.provider-btn:hover {
   background: #f3f4f6;
 }
 
-.facebook-btn {
-  color: #fff;
-  background: #1877f2;
-  border-color: #1877f2;
-}
-
-.facebook-btn:hover {
-  background: #145dbf;
+.provider-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
 }
