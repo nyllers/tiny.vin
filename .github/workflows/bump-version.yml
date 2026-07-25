@@ -1,13 +1,12 @@
 name: Bump version
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
 
 jobs:
   bump-version:
-    if: github.event.pull_request.merged == true
+    if: "!contains(github.event.head_commit.message, 'Bump version')"
     runs-on: ubuntu-latest
     permissions:
       contents: write
