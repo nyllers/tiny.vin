@@ -65,6 +65,68 @@ function htmlResponse(body, extraHeaders = {}) {
   });
 }
 
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function historyPage(rows) {
+  const tableRows = rows
+    .map((row) => {
+      const shortUrl = `https://tiny.vin/${row.code}`;
+      const original = escapeHtml(row.original_url);
+      return `
+        <tr>
+          <td title="${original}"><a href="${original}" target="_blank" rel="noopener noreferrer">${original}</a></td>
+          <td><a href="${shortUrl}" target="_blank" rel="noopener noreferrer">${shortUrl}</a></td>
+          <td class="created-at" data-timestamp="${row.created_at}"></td>
+        </tr>`;
+    })
+    .join("");
+
+  const tableOrEmpty = rows.length
+    ? `<div class="table-wrap">
+      <table class="url-table">
+        <thead>
+          <tr><th>Original URL</th><th>Short URL</th><th>Created at</th></tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>`
+    : `<p class="login-subtitle">You haven't created any short URLs yet.</p>`;
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tiny.vin — Your URLs</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="history-main">
+    <h1>Your URLs</h1>
+    <nav class="page-nav">
+      <a class="nav-link" href="/">Generate URL</a>
+      <a class="nav-link active" href="/history">Your URLs</a>
+    </nav>
+    ${tableOrEmpty}
+  </main>
+  <p class="signout-row"><a href="/auth/logout">Sign out</a></p>
+  <footer>Simple project by Anders &amp; Claude</footer>
+  <script>
+    document.querySelectorAll(".created-at").forEach((el) => {
+      el.textContent = new Date(Number(el.dataset.timestamp)).toLocaleString();
+    });
+  </script>
+</body>
+</html>`;
+}
+
 function validateUrl(input) {
   if (!input.includes("://")) {
     if (/\s/.test(input)) {
@@ -135,6 +197,28 @@ async function handleShorten(request, env, session) {
   }
 
   return jsonResponse({ error: "Could not generate a unique code, try again" }, 500);
+}
+
+async function getIdentityId(env, provider, username) {
+  const identity = await env.DB.prepare(
+    "SELECT id FROM login_identities WHERE provider = ? AND username = ?"
+  )
+    .bind(provider, username)
+    .first();
+
+  return identity ? identity.id : null;
+}
+
+async function handleHistory(env, session) {
+  const identityId = await getIdentityId(env, session.provider, session.email);
+
+  const { results } = await env.DB.prepare(
+    "SELECT code, original_url, created_at FROM urls WHERE created_by = ? ORDER BY created_at DESC"
+  )
+    .bind(identityId)
+    .all();
+
+  return htmlResponse(historyPage(results));
 }
 
 async function handleRedirect(code, env) {
@@ -259,6 +343,12 @@ export default {
       const session = await getSession(request, env.SESSION_SECRET);
       if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
       return handleShorten(request, env, session);
+    }
+
+    if (url.pathname === "/history") {
+      const session = await getSession(request, env.SESSION_SECRET);
+      if (!session) return Response.redirect(`${url.origin}/login`, 302);
+      return handleHistory(env, session);
     }
 
     if (url.pathname === "/") {
