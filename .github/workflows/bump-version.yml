@@ -1,0 +1,32 @@
+name: Bump version
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  bump-version:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Bump version in footer
+        run: |
+          CURRENT=$(grep -oP '(?<=&middot; v)\d+(?=</footer>)' public/index.html)
+          NEXT=$((CURRENT + 1))
+          sed -i "s/\&middot; v${CURRENT}<\/footer>/\&middot; v${NEXT}<\/footer>/" public/index.html
+          echo "Bumped version from v${CURRENT} to v${NEXT}"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/index.html
+          git commit -m "Bump version"
+          git push
