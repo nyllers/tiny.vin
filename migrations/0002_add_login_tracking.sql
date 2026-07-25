@@ -5,18 +5,10 @@ CREATE TABLE IF NOT EXISTS login_identities (
   UNIQUE (provider, username)
 );
 
-CREATE TABLE IF NOT EXISTS urls (
-  code TEXT PRIMARY KEY,
-  original_url TEXT NOT NULL,
-  created_at INTEGER NOT NULL,
-  created_by INTEGER REFERENCES login_identities(id)
-);
-
 CREATE TABLE IF NOT EXISTS login_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   identity_id INTEGER NOT NULL REFERENCES login_identities(id),
-  logged_in_at INTEGER NOT NULL,
-  ip_address TEXT
+  logged_in_at INTEGER NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_login_events_identity ON login_events(identity_id);
