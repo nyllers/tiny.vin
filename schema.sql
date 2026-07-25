@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS login_identities (
 CREATE TABLE IF NOT EXISTS login_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   identity_id INTEGER NOT NULL REFERENCES login_identities(id),
-  logged_in_at INTEGER NOT NULL
+  logged_in_at INTEGER NOT NULL,
+  ip_address TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_login_events_identity ON login_events(identity_id);

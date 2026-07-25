@@ -156,7 +156,7 @@ function handleAuthStart(provider, url, env) {
   });
 }
 
-async function recordLogin(env, provider, username) {
+async function recordLogin(env, provider, username, ipAddress) {
   try {
     await env.DB.prepare(
       "INSERT INTO login_identities (provider, username) VALUES (?, ?) ON CONFLICT (provider, username) DO NOTHING"
@@ -171,9 +171,9 @@ async function recordLogin(env, provider, username) {
       .first();
 
     await env.DB.prepare(
-      "INSERT INTO login_events (identity_id, logged_in_at) VALUES (?, ?)"
+      "INSERT INTO login_events (identity_id, logged_in_at, ip_address) VALUES (?, ?, ?)"
     )
-      .bind(identity.id, Date.now())
+      .bind(identity.id, Date.now(), ipAddress)
       .run();
   } catch {
     // login tracking is best-effort; never block sign-in over it
@@ -196,7 +196,8 @@ async function handleAuthCallback(provider, url, request, env) {
 
     if (!user.email) throw new Error("No email returned by provider");
 
-    await recordLogin(env, provider, user.email);
+    const ipAddress = request.headers.get("CF-Connecting-IP");
+    await recordLogin(env, provider, user.email, ipAddress);
 
     const sessionCookie = await createSessionCookie(user, env.SESSION_SECRET);
 
