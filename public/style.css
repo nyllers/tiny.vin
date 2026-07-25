@@ -159,3 +159,71 @@ footer {
   height: 1.25rem;
   flex-shrink: 0;
 }
+
+.page-nav {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.nav-link {
+  color: #6b7280;
+  text-decoration: none;
+  font-weight: 500;
+  padding-bottom: 0.25rem;
+  border-bottom: 2px solid transparent;
+}
+
+.nav-link:hover {
+  color: #4338ca;
+}
+
+.nav-link.active {
+  color: #4338ca;
+  border-bottom-color: #4338ca;
+}
+
+.history-main {
+  max-width: 40rem;
+}
+
+.url-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.url-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+}
+
+.url-card-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.url-card-label {
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.url-card-row a,
+.url-card-row .created-at {
+  color: #4338ca;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.url-card-row a:hover {
+  text-decoration: underline;
+}
