@@ -75,28 +75,30 @@ function escapeHtml(str) {
 }
 
 function historyPage(rows) {
-  const tableRows = rows
+  const cards = rows
     .map((row) => {
       const shortUrl = `https://tiny.vin/${row.code}`;
       const original = escapeHtml(row.original_url);
       return `
-        <tr>
-          <td title="${original}"><a href="${original}" target="_blank" rel="noopener noreferrer">${original}</a></td>
-          <td><a href="${shortUrl}" target="_blank" rel="noopener noreferrer">${shortUrl}</a></td>
-          <td class="created-at" data-timestamp="${row.created_at}"></td>
-        </tr>`;
+        <div class="url-card">
+          <div class="url-card-row">
+            <span class="url-card-label">Original URL</span>
+            <a href="${original}" title="${original}" target="_blank" rel="noopener noreferrer">${original}</a>
+          </div>
+          <div class="url-card-row">
+            <span class="url-card-label">Short URL</span>
+            <a href="${shortUrl}" target="_blank" rel="noopener noreferrer">${shortUrl}</a>
+          </div>
+          <div class="url-card-row">
+            <span class="url-card-label">Created at</span>
+            <span class="created-at" data-timestamp="${row.created_at}"></span>
+          </div>
+        </div>`;
     })
     .join("");
 
-  const tableOrEmpty = rows.length
-    ? `<div class="table-wrap">
-      <table class="url-table">
-        <thead>
-          <tr><th>Original URL</th><th>Short URL</th><th>Created at</th></tr>
-        </thead>
-        <tbody>${tableRows}</tbody>
-      </table>
-    </div>`
+  const cardsOrEmpty = rows.length
+    ? `<div class="url-cards">${cards}</div>`
     : `<p class="login-subtitle">You haven't created any short URLs yet.</p>`;
 
   return `<!doctype html>
@@ -114,7 +116,7 @@ function historyPage(rows) {
       <a class="nav-link" href="/">Generate URL</a>
       <a class="nav-link active" href="/history">Your URLs</a>
     </nav>
-    ${tableOrEmpty}
+    ${cardsOrEmpty}
   </main>
   <p class="signout-row"><a href="/auth/logout">Sign out</a></p>
   <footer>Simple project by Anders &amp; Claude</footer>
