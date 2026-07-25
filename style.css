@@ -4,3 +4,26 @@ body {
   margin: 4rem auto;
   padding: 0 1rem;
 }
+
+.controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+#url-input {
+  flex: 1;
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+
+#generate-btn {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+#url-result {
+  margin-top: 1rem;
+  font-size: 1.1rem;
+  word-break: break-all;
+}
