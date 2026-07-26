@@ -55,6 +55,7 @@ function loginPage(errorCode) {
       </a>
     </div>
   </main>
+  <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
   <footer>Simple project by Anders &amp; Claude</footer>
 </body>
 </html>`;

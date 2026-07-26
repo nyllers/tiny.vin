@@ -115,6 +115,16 @@ footer {
   font-size: 0.8rem;
 }
 
+.legal-links {
+  margin: 0.5rem 0 0;
+  text-align: center;
+}
+
+.legal-links a {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.7rem;
+}
+
 .login-subtitle {
   margin: 0 0 1.5rem;
   text-align: center;
