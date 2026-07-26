@@ -35,13 +35,13 @@ function loginPage(errorCode) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tiny URL</title>
+  <title>Tiny VIN</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <main>
-    <h1>Tiny URL</h1>
-    <p class="login-subtitle">Tiny URL is a simple link shortener. Sign in with your Google account to create short links and manage the ones you've made — anyone can follow a shortened link without needing an account.</p>
+    <h1>Tiny VIN</h1>
+    <p class="login-subtitle">Tiny VIN is a simple link shortener. Sign in with your Google account to create short links and manage the ones you've made — anyone can follow a shortened link without needing an account.</p>
     ${message ? `<p class="login-error">${message}</p>` : ""}
     <div class="login-buttons">
       <a class="provider-btn" href="/auth/google/start">
