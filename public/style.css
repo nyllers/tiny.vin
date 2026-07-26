@@ -182,7 +182,7 @@ footer {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 1rem 2.25rem 1rem 1rem;
+  padding: 1rem 1rem 2.25rem 1rem;
   background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 0.5rem;
@@ -191,8 +191,8 @@ footer {
 
 .url-card-delete {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
+  bottom: 0.5rem;
+  left: 0.5rem;
 }
 
 .icon-btn.delete-btn:hover {
