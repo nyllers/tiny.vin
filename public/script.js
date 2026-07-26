@@ -70,8 +70,81 @@ async function generateUrl() {
     result.textContent = data.shortUrl;
     result.title = "Click to copy";
     copyBtn.hidden = false;
+    loadHistory();
   } catch {
     result.textContent = "Network error, try again.";
+  }
+}
+
+function createUrlCard(item) {
+  const card = document.createElement("div");
+  card.className = "url-card";
+
+  const originalRow = document.createElement("div");
+  originalRow.className = "url-card-row";
+  const originalLabel = document.createElement("span");
+  originalLabel.className = "url-card-label";
+  originalLabel.textContent = "Original URL";
+  const originalLink = document.createElement("a");
+  originalLink.href = item.originalUrl;
+  originalLink.title = item.originalUrl;
+  originalLink.target = "_blank";
+  originalLink.rel = "noopener noreferrer";
+  originalLink.textContent = item.originalUrl;
+  originalRow.append(originalLabel, originalLink);
+
+  const shortRow = document.createElement("div");
+  shortRow.className = "url-card-row";
+  const shortLabel = document.createElement("span");
+  shortLabel.className = "url-card-label";
+  shortLabel.textContent = "Short URL";
+  const shortLink = document.createElement("a");
+  shortLink.href = item.shortUrl;
+  shortLink.target = "_blank";
+  shortLink.rel = "noopener noreferrer";
+  shortLink.textContent = item.shortUrl;
+  shortRow.append(shortLabel, shortLink);
+
+  const createdRow = document.createElement("div");
+  createdRow.className = "url-card-row";
+  const createdLabel = document.createElement("span");
+  createdLabel.className = "url-card-label";
+  createdLabel.textContent = "Created at";
+  const createdValue = document.createElement("span");
+  createdValue.className = "created-at";
+  createdValue.textContent = new Date(item.createdAt).toLocaleString();
+  createdRow.append(createdLabel, createdValue);
+
+  card.append(originalRow, shortRow, createdRow);
+  return card;
+}
+
+async function loadHistory() {
+  const container = document.getElementById("history-list");
+
+  try {
+    const response = await fetch("/api/history");
+    if (!response.ok) return;
+    const data = await response.json();
+
+    container.textContent = "";
+
+    if (data.urls.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "login-subtitle";
+      empty.textContent = "You haven't created any short URLs yet.";
+      container.appendChild(empty);
+      return;
+    }
+
+    const list = document.createElement("div");
+    list.className = "url-cards";
+    for (const item of data.urls) {
+      list.appendChild(createUrlCard(item));
+    }
+    container.appendChild(list);
+  } catch {
+    // history is a nice-to-have; a failed fetch shouldn't break the page
   }
 }
 
@@ -96,3 +169,5 @@ document.getElementById("copy-btn").addEventListener("click", copyResult);
 document.addEventListener("keydown", (event) => {
   if (event.key === "Enter") generateUrl();
 });
+
+loadHistory();
