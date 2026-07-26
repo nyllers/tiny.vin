@@ -214,7 +214,7 @@ footer {
 }
 
 .icon-btn.delete-btn {
-  color: #ff0000;
+  color: #ff3333;
   background: #ffcccc;
   gap: 0.3rem;
   padding: 0.25rem 0.5rem;
@@ -222,7 +222,7 @@ footer {
 }
 
 .icon-btn.delete-btn:hover {
-  color: #ff0000;
+  color: #ff3333;
   background: #ffb3b3;
 }
 
