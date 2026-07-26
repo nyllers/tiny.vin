@@ -2,9 +2,9 @@ import { buildAuthorizeUrl, exchangeCodeForToken, fetchUserInfo } from "./provid
 import { parseCookies, createSessionCookie, clearSessionCookie, getSession, randomState } from "./session.js";
 
 const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-const CODE_LENGTH = 12;
+const CODE_LENGTH = 8;
 const MAX_ATTEMPTS = 5;
-const CODE_PATTERN = /^\/([A-Za-z0-9]{12})$/;
+const CODE_PATTERN = /^\/([A-Za-z0-9]{8}|[A-Za-z0-9]{12})$/;
 const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
 
 const LOGIN_ERRORS = {
