@@ -7,8 +7,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main>
-    <h1>Tiny VIN</h1>
+  <main class="panel">
     <div class="controls">
       <input type="text" id="url-input" placeholder="Paste or write the long URL">
       <button id="generate-btn">Generate URL</button>
@@ -22,10 +21,11 @@
         </svg>
       </button>
     </div>
-    <hr class="section-divider">
+  </main>
+  <section class="panel history-panel">
     <h2 class="section-heading">Previously generated</h2>
     <div id="history-list"></div>
-  </main>
+  </section>
   <p class="signout-row"><a href="/auth/logout">Sign out</a></p>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
   <footer>Simple project by Anders &amp; Claude &middot; v12</footer>
