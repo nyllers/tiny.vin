@@ -160,32 +160,16 @@ footer {
   flex-shrink: 0;
 }
 
-.page-nav {
-  display: flex;
-  justify-content: center;
-  gap: 1.5rem;
-  margin-bottom: 1.5rem;
+.section-divider {
+  margin: 2rem 0 0;
+  border: none;
+  border-top: 1px solid #e5e7eb;
 }
 
-.nav-link {
-  color: #6b7280;
-  text-decoration: none;
-  font-weight: 500;
-  padding-bottom: 0.25rem;
-  border-bottom: 2px solid transparent;
-}
-
-.nav-link:hover {
-  color: #4338ca;
-}
-
-.nav-link.active {
-  color: #4338ca;
-  border-bottom-color: #4338ca;
-}
-
-.history-main {
-  max-width: 40rem;
+.section-heading {
+  margin: 1.5rem 0 1rem;
+  font-size: 1rem;
+  color: #1f2937;
 }
 
 .url-cards {
@@ -217,13 +201,17 @@ footer {
   text-transform: uppercase;
 }
 
-.url-card-row a,
-.url-card-row .created-at {
+.url-card-value {
   color: #4338ca;
-  text-decoration: none;
   word-break: break-all;
 }
 
-.url-card-row a:hover {
-  text-decoration: underline;
+.url-card-copy-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.url-card-copy-text {
+  cursor: pointer;
 }

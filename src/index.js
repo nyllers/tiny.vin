@@ -2,9 +2,9 @@ import { buildAuthorizeUrl, exchangeCodeForToken, fetchUserInfo } from "./provid
 import { parseCookies, createSessionCookie, clearSessionCookie, getSession, randomState } from "./session.js";
 
 const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-const CODE_LENGTH = 12;
+const CODE_LENGTH = 8;
 const MAX_ATTEMPTS = 5;
-const CODE_PATTERN = /^\/([A-Za-z0-9]{12})$/;
+const CODE_PATTERN = /^\/([A-Za-z0-9]{8}|[A-Za-z0-9]{12})$/;
 const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
 
 const LOGIN_ERRORS = {
@@ -63,70 +63,6 @@ function htmlResponse(body, extraHeaders = {}) {
   return new Response(body, {
     headers: { "content-type": "text/html; charset=utf-8", ...extraHeaders },
   });
-}
-
-function escapeHtml(str) {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function historyPage(rows) {
-  const cards = rows
-    .map((row) => {
-      const shortUrl = `https://tiny.vin/${row.code}`;
-      const original = escapeHtml(row.original_url);
-      return `
-        <div class="url-card">
-          <div class="url-card-row">
-            <span class="url-card-label">Original URL</span>
-            <a href="${original}" title="${original}" target="_blank" rel="noopener noreferrer">${original}</a>
-          </div>
-          <div class="url-card-row">
-            <span class="url-card-label">Short URL</span>
-            <a href="${shortUrl}" target="_blank" rel="noopener noreferrer">${shortUrl}</a>
-          </div>
-          <div class="url-card-row">
-            <span class="url-card-label">Created at</span>
-            <span class="created-at" data-timestamp="${row.created_at}"></span>
-          </div>
-        </div>`;
-    })
-    .join("");
-
-  const cardsOrEmpty = rows.length
-    ? `<div class="url-cards">${cards}</div>`
-    : `<p class="login-subtitle">You haven't created any short URLs yet.</p>`;
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>tiny.vin — Your URLs</title>
-  <link rel="stylesheet" href="/style.css">
-</head>
-<body>
-  <main class="history-main">
-    <h1>Your URLs</h1>
-    <nav class="page-nav">
-      <a class="nav-link" href="/">Generate URL</a>
-      <a class="nav-link active" href="/history">Your URLs</a>
-    </nav>
-    ${cardsOrEmpty}
-  </main>
-  <p class="signout-row"><a href="/auth/logout">Sign out</a></p>
-  <footer>Simple project by Anders &amp; Claude</footer>
-  <script>
-    document.querySelectorAll(".created-at").forEach((el) => {
-      el.textContent = new Date(Number(el.dataset.timestamp)).toLocaleString();
-    });
-  </script>
-</body>
-</html>`;
 }
 
 function validateUrl(input) {
@@ -220,7 +156,13 @@ async function handleHistory(env, session) {
     .bind(identityId)
     .all();
 
-  return htmlResponse(historyPage(results));
+  return jsonResponse({
+    urls: results.map((row) => ({
+      originalUrl: row.original_url,
+      shortUrl: `https://tiny.vin/${row.code}`,
+      createdAt: row.created_at,
+    })),
+  });
 }
 
 async function handleRedirect(code, env) {
@@ -347,9 +289,9 @@ export default {
       return handleShorten(request, env, session);
     }
 
-    if (url.pathname === "/history") {
+    if (request.method === "GET" && url.pathname === "/api/history") {
       const session = await getSession(request, env.SESSION_SECRET);
-      if (!session) return Response.redirect(`${url.origin}/login`, 302);
+      if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
       return handleHistory(env, session);
     }
 
