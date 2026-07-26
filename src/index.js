@@ -6,6 +6,7 @@ const CODE_LENGTH = 8;
 const MAX_ATTEMPTS = 5;
 const CODE_PATTERN = /^\/([A-Za-z0-9]{8}|[A-Za-z0-9]{12})$/;
 const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
+const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9]+)$/;
 
 const LOGIN_ERRORS = {
   oauth_failed: "Something went wrong signing in. Please try again.",
@@ -158,11 +159,28 @@ async function handleHistory(env, session) {
 
   return jsonResponse({
     urls: results.map((row) => ({
+      code: row.code,
       originalUrl: row.original_url,
       shortUrl: `https://tiny.vin/${row.code}`,
       createdAt: row.created_at,
     })),
   });
+}
+
+async function handleDeleteUrl(code, env, session) {
+  const identityId = await getIdentityId(env, session.provider, session.email);
+
+  const result = await env.DB.prepare(
+    "DELETE FROM urls WHERE code = ? AND created_by = ?"
+  )
+    .bind(code, identityId)
+    .run();
+
+  if (!result.meta.changes) {
+    return jsonResponse({ error: "Not found" }, 404);
+  }
+
+  return jsonResponse({ ok: true });
 }
 
 async function handleRedirect(code, env) {
@@ -293,6 +311,13 @@ export default {
       const session = await getSession(request, env.SESSION_SECRET);
       if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
       return handleHistory(env, session);
+    }
+
+    const deleteMatch = url.pathname.match(DELETE_URL_PATTERN);
+    if (request.method === "DELETE" && deleteMatch) {
+      const session = await getSession(request, env.SESSION_SECRET);
+      if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
+      return handleDeleteUrl(deleteMatch[1], env, session);
     }
 
     if (url.pathname === "/") {
