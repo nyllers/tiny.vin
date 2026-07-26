@@ -134,17 +134,11 @@ function createUrlCard(item) {
   shortCopyRow.append(shortValue, shortCopyBtn);
   shortRow.append(shortLabel, shortCopyRow);
 
-  const createdRow = document.createElement("div");
-  createdRow.className = "url-card-row";
-  const createdLabel = document.createElement("span");
-  createdLabel.className = "url-card-label";
-  createdLabel.textContent = "Created at";
   const createdValue = document.createElement("span");
-  createdValue.className = "url-card-value";
+  createdValue.className = "url-card-timestamp";
   createdValue.textContent = new Date(item.createdAt).toLocaleString();
-  createdRow.append(createdLabel, createdValue);
 
-  card.append(originalRow, shortRow, createdRow);
+  card.append(originalRow, shortRow, createdValue);
   return card;
 }
 

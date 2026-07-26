@@ -215,3 +215,9 @@ footer {
 .url-card-copy-text {
   cursor: pointer;
 }
+
+.url-card-timestamp {
+  align-self: flex-end;
+  font-size: 0.75rem;
+  color: #4b5563;
+}
