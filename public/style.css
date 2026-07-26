@@ -15,8 +15,7 @@ body {
 }
 
 main {
-  width: 100%;
-  max-width: 40rem;
+  width: 90%;  
   background: #fff;
   border-radius: 1rem;
   padding: 2rem;
@@ -186,6 +185,7 @@ footer {
   background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 0.5rem;
+  max-width: 30rem;
 }
 
 .url-card-row {
