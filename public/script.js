@@ -76,6 +76,31 @@ async function generateUrl() {
   }
 }
 
+async function copyCardShortUrl(shortUrl, displayEl) {
+  try {
+    await navigator.clipboard.writeText(shortUrl);
+    displayEl.textContent = "Copied!";
+    setTimeout(() => {
+      displayEl.textContent = shortUrl;
+    }, 1000);
+  } catch {
+    displayEl.textContent = "Could not copy, select the text manually.";
+  }
+}
+
+function createCopyIconButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-btn";
+  button.title = "Copy to clipboard";
+  button.setAttribute("aria-label", "Copy to clipboard");
+  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+  </svg>`;
+  return button;
+}
+
 function createUrlCard(item) {
   const card = document.createElement("div");
   card.className = "url-card";
@@ -85,25 +110,29 @@ function createUrlCard(item) {
   const originalLabel = document.createElement("span");
   originalLabel.className = "url-card-label";
   originalLabel.textContent = "Original URL";
-  const originalLink = document.createElement("a");
-  originalLink.href = item.originalUrl;
-  originalLink.title = item.originalUrl;
-  originalLink.target = "_blank";
-  originalLink.rel = "noopener noreferrer";
-  originalLink.textContent = item.originalUrl;
-  originalRow.append(originalLabel, originalLink);
+  const originalValue = document.createElement("span");
+  originalValue.className = "url-card-value";
+  originalValue.title = item.originalUrl;
+  originalValue.textContent = item.originalUrl;
+  originalRow.append(originalLabel, originalValue);
 
   const shortRow = document.createElement("div");
   shortRow.className = "url-card-row";
   const shortLabel = document.createElement("span");
   shortLabel.className = "url-card-label";
   shortLabel.textContent = "Short URL";
-  const shortLink = document.createElement("a");
-  shortLink.href = item.shortUrl;
-  shortLink.target = "_blank";
-  shortLink.rel = "noopener noreferrer";
-  shortLink.textContent = item.shortUrl;
-  shortRow.append(shortLabel, shortLink);
+  const shortCopyRow = document.createElement("div");
+  shortCopyRow.className = "url-card-copy-row";
+  const shortValue = document.createElement("span");
+  shortValue.className = "url-card-value url-card-copy-text";
+  shortValue.title = "Click to copy";
+  shortValue.textContent = item.shortUrl;
+  const shortCopyBtn = createCopyIconButton();
+  const copyShort = () => copyCardShortUrl(item.shortUrl, shortValue);
+  shortValue.addEventListener("click", copyShort);
+  shortCopyBtn.addEventListener("click", copyShort);
+  shortCopyRow.append(shortValue, shortCopyBtn);
+  shortRow.append(shortLabel, shortCopyRow);
 
   const createdRow = document.createElement("div");
   createdRow.className = "url-card-row";
@@ -111,7 +140,7 @@ function createUrlCard(item) {
   createdLabel.className = "url-card-label";
   createdLabel.textContent = "Created at";
   const createdValue = document.createElement("span");
-  createdValue.className = "created-at";
+  createdValue.className = "url-card-value";
   createdValue.textContent = new Date(item.createdAt).toLocaleString();
   createdRow.append(createdLabel, createdValue);
 

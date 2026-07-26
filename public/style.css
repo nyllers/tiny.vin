@@ -201,13 +201,17 @@ footer {
   text-transform: uppercase;
 }
 
-.url-card-row a,
-.url-card-row .created-at {
+.url-card-value {
   color: #4338ca;
-  text-decoration: none;
   word-break: break-all;
 }
 
-.url-card-row a:hover {
-  text-decoration: underline;
+.url-card-copy-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.url-card-copy-text {
+  cursor: pointer;
 }
