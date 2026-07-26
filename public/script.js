@@ -101,9 +101,46 @@ function createCopyIconButton() {
   return button;
 }
 
+function createDeleteIconButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-btn delete-btn";
+  button.title = "Delete";
+  button.setAttribute("aria-label", "Delete this URL");
+  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="3 6 5 6 21 6"></polyline>
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+    <path d="M10 11v6"></path>
+    <path d="M14 11v6"></path>
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+  </svg>`;
+  return button;
+}
+
+async function deleteUrl(code, shortUrl) {
+  const confirmed = confirm(`Are you sure you want to delete the redirected URL ${shortUrl}?`);
+  if (!confirmed) return;
+
+  try {
+    const response = await fetch(`/api/urls/${code}`, { method: "DELETE" });
+    if (!response.ok) {
+      alert("Could not delete that URL, try again.");
+      return;
+    }
+    loadHistory();
+  } catch {
+    alert("Network error, try again.");
+  }
+}
+
 function createUrlCard(item) {
   const card = document.createElement("div");
   card.className = "url-card";
+
+  const deleteBtn = createDeleteIconButton();
+  deleteBtn.classList.add("url-card-delete");
+  deleteBtn.addEventListener("click", () => deleteUrl(item.code, item.shortUrl));
+  card.appendChild(deleteBtn);
 
   const originalRow = document.createElement("div");
   originalRow.className = "url-card-row";
