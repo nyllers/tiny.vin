@@ -14,16 +14,26 @@ body {
   background: linear-gradient(135deg, #6366f1, #8b5cf6 50%, #ec4899);
 }
 
-main {
-  width: 90%;  
+.panel {
+  width: 100%;
   background: #fff;
   border-radius: 1rem;
   padding: 2rem;
   box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.25);
 }
 
+@media (min-width: 48rem) {
+  .panel {
+    width: 80%;
+  }
+}
+
+.history-panel {
+  margin-top: 1.5rem;
+}
+
 @media (max-width: 30rem) {
-  main {
+  .panel {
     padding: 1.25rem;
   }
 
@@ -169,14 +179,8 @@ footer {
   flex-shrink: 0;
 }
 
-.section-divider {
-  margin: 2rem 0 0;
-  border: none;
-  border-top: 1px solid #e5e7eb;
-}
-
 .section-heading {
-  margin: 1.5rem 0 1rem;
+  margin: 0 0 1rem;
   font-size: 1rem;
   color: #1f2937;
   text-align: center;
