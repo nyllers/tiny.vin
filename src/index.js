@@ -35,13 +35,13 @@ function loginPage(errorCode) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>tiny.vin — Sign in</title>
+  <title>Tiny VIN</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <main>
-    <h1>Tiny URL</h1>
-    <p class="login-subtitle">Sign in to create short URLs</p>
+    <h1>Tiny VIN</h1>
+    <p class="login-subtitle">Tiny VIN is a simple link shortener. Sign in with your Google account to create short links and manage the ones you've made — anyone can follow a shortened link without needing an account.</p>
     ${message ? `<p class="login-error">${message}</p>` : ""}
     <div class="login-buttons">
       <a class="provider-btn" href="/auth/google/start">
@@ -322,7 +322,7 @@ export default {
 
     if (url.pathname === "/") {
       const session = await getSession(request, env.SESSION_SECRET);
-      if (!session) return Response.redirect(`${url.origin}/login`, 302);
+      if (!session) return htmlResponse(loginPage());
     }
 
     return env.ASSETS.fetch(request);
