@@ -137,11 +137,6 @@ function createUrlCard(item) {
   const card = document.createElement("div");
   card.className = "url-card";
 
-  const deleteBtn = createDeleteIconButton();
-  deleteBtn.classList.add("url-card-delete");
-  deleteBtn.addEventListener("click", () => deleteUrl(item.code, item.shortUrl));
-  card.appendChild(deleteBtn);
-
   const originalRow = document.createElement("div");
   originalRow.className = "url-card-row";
   const originalLabel = document.createElement("span");
@@ -171,11 +166,16 @@ function createUrlCard(item) {
   shortCopyRow.append(shortValue, shortCopyBtn);
   shortRow.append(shortLabel, shortCopyRow);
 
+  const footerRow = document.createElement("div");
+  footerRow.className = "url-card-footer";
+  const deleteBtn = createDeleteIconButton();
+  deleteBtn.addEventListener("click", () => deleteUrl(item.code, item.shortUrl));
   const createdValue = document.createElement("span");
   createdValue.className = "url-card-timestamp";
   createdValue.textContent = new Date(item.createdAt).toLocaleString();
+  footerRow.append(deleteBtn, createdValue);
 
-  card.append(originalRow, shortRow, createdValue);
+  card.append(originalRow, shortRow, footerRow);
   return card;
 }
 
