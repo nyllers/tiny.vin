@@ -47,8 +47,6 @@ function loginPage(errorCode) {
 <body>
   <main class="panel">
     <h1>Tiny VIN</h1>
-    <p class="login-subtitle">Tiny VIN is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.</p>
-    ${message ? `<p class="login-error">${message}</p>` : ""}
     <div class="login-buttons">
       <a class="provider-btn" href="/auth/google/start">
         <svg class="provider-icon" viewBox="0 0 48 48" aria-hidden="true">
@@ -57,9 +55,11 @@ function loginPage(errorCode) {
           <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
           <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
         </svg>
-        <span>Continue with Google</span>
+        <span>Sign in with Google</span>
       </a>
     </div>
+    ${message ? `<p class="login-error">${message}</p>` : ""}
+    <p class="login-subtitle">Tiny VIN is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.</p>
   </main>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
   <footer>Simple project by Anders &amp; Claude</footer>
