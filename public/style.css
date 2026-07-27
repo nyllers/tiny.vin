@@ -328,6 +328,11 @@ footer {
   gap: 0.15rem;
 }
 
+.url-card-row--tiny {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 0.5rem;
+}
+
 .url-card-label {
   color: #6b7280;
   font-weight: 600;

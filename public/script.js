@@ -267,7 +267,7 @@ function createUrlCard(group, justCreatedCode) {
   originalRow.append(originalHeader, originalValue);
 
   const shortRow = document.createElement("div");
-  shortRow.className = "url-card-row";
+  shortRow.className = "url-card-row url-card-row--tiny";
   const shortLabel = document.createElement("span");
   shortLabel.className = "url-card-label";
   shortLabel.textContent = "Tiny URL";
