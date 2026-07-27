@@ -103,7 +103,7 @@ function validateUrl(input) {
   }
 
   if (input.length <= 25) {
-    return { error: "Your already is teeny-weeny!" };
+    return { error: "The given URL is already teeny-weeny!" };
   }
 
   return { url: parsed.href };
