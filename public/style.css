@@ -198,7 +198,7 @@ footer {
 
 .url-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 30rem));
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 22rem));
   justify-content: center;
   gap: 5px;
 }
@@ -211,7 +211,7 @@ footer {
   background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 0.5rem;
-  max-width: 30rem;
+  max-width: 22rem;
 }
 
 .url-card--new {
@@ -243,7 +243,7 @@ footer {
 .url-card-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.4rem;
 }
 
@@ -265,6 +265,7 @@ footer {
 .url-card-footer {
   margin-top: auto;
   padding-top: 0.5rem;
+  border-top: 1px solid #e5e7eb;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -289,16 +290,22 @@ footer {
   gap: 0.15rem;
 }
 
-.url-card-label {
-  color: #6b7280;
-  font-weight: 600;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-}
-
 .url-card-value {
   color: #4338ca;
   word-break: break-all;
+}
+
+.url-card-value-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.url-icon {
+  display: inline-flex;
+  align-items: center;
+  color: #9ca3af;
+  flex-shrink: 0;
 }
 
 .url-card-copy-row {
