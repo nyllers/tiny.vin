@@ -26,7 +26,7 @@ function validateUrl(input) {
     };
   }
 
-  if (input.length <= 25) {
+  if (input.length <= 20) {
     return { error: "The given URL is already teeny-weeny!" };
   }
 
