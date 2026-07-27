@@ -106,7 +106,7 @@ function validateUrl(input) {
     return { error: "The given URL is already teeny-weeny!" };
   }
 
-  return { url: parsed.href };
+  return { url: input };
 }
 
 function validateSuffix(input) {
