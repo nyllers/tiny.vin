@@ -4,9 +4,10 @@ import { parseCookies, createSessionCookie, clearSessionCookie, getSession, rand
 const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 const CODE_LENGTH = 8;
 const MAX_ATTEMPTS = 5;
-const CODE_PATTERN = /^\/([A-Za-z0-9]{8}|[A-Za-z0-9]{12})$/;
+const CODE_PATTERN = /^\/([A-Za-z0-9]{1,32})$/;
 const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
 const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9]+)$/;
+const RESERVED_CODES = new Set(["login"]);
 
 const LOGIN_ERRORS = {
   oauth_failed: "Something went wrong signing in. Please try again.",
@@ -104,6 +105,18 @@ function validateUrl(input) {
   return { url: parsed.href };
 }
 
+function validateSuffix(input) {
+  if (!/^[A-Za-z0-9]{1,32}$/.test(input)) {
+    return { error: "Custom short URLs can only contain letters and numbers (1-32 characters)." };
+  }
+
+  if (RESERVED_CODES.has(input.toLowerCase())) {
+    return { error: `"${input}" is reserved, try another.` };
+  }
+
+  return { code: input };
+}
+
 async function handleShorten(request, env, session) {
   let body;
   try {
@@ -122,7 +135,34 @@ async function handleShorten(request, env, session) {
     return jsonResponse({ error: validation.error }, 400);
   }
 
+  const customSuffix = typeof body.code === "string" ? body.code.trim() : "";
+  let customCode = null;
+  if (customSuffix) {
+    const suffixValidation = validateSuffix(customSuffix);
+    if (suffixValidation.error) {
+      return jsonResponse({ error: suffixValidation.error }, 400);
+    }
+    customCode = suffixValidation.code;
+  }
+
   const createdBy = await getOrCreateIdentityId(env, session.provider, session.email);
+
+  if (customCode) {
+    try {
+      await env.DB.prepare(
+        "INSERT INTO urls (code, original_url, created_at, created_by) VALUES (?, ?, ?, ?)"
+      )
+        .bind(customCode, validation.url, Date.now(), createdBy)
+        .run();
+      return jsonResponse({
+        code: customCode,
+        originalUrl: validation.url,
+        shortUrl: `https://tiny.vin/${customCode}`,
+      });
+    } catch {
+      return jsonResponse({ error: `"${customCode}" is already taken, try another.` }, 409);
+    }
+  }
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const code = generateCode();

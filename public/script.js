@@ -94,6 +94,19 @@ function createCopyIconButton() {
   return button;
 }
 
+function createEditIconButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-btn edit-btn";
+  button.title = "Edit";
+  button.setAttribute("aria-label", "Edit this URL");
+  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+  </svg><span>Edit</span>`;
+  return button;
+}
+
 function createDeleteIconButton() {
   const button = document.createElement("button");
   button.type = "button";
@@ -183,9 +196,11 @@ function createUrlCard(item, shouldFlash) {
 
   const footerRow = document.createElement("div");
   footerRow.className = "url-card-footer";
+  const editBtn = createEditIconButton();
+  editBtn.addEventListener("click", () => openEditModal(item));
   const deleteBtn = createDeleteIconButton();
   deleteBtn.addEventListener("click", () => deleteUrl(item.code, item.shortUrl));
-  footerRow.append(deleteBtn);
+  footerRow.append(editBtn, deleteBtn);
 
   card.append(originalRow, shortRow, footerRow);
   return card;
@@ -230,6 +245,69 @@ document.getElementById("generate-btn").addEventListener("click", generateUrl);
 document.getElementById("url-input").addEventListener("input", updateGenerateButtonState);
 document.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !document.getElementById("generate-btn").disabled) generateUrl();
+});
+
+let editingItem = null;
+
+function openEditModal(item) {
+  editingItem = item;
+  document.getElementById("edit-modal-original").textContent = item.originalUrl;
+  document.getElementById("edit-modal-short").textContent = item.shortUrl;
+  document.getElementById("edit-modal-suffix").value = "";
+  document.getElementById("edit-modal-error").textContent = "";
+  document.getElementById("edit-modal-backdrop").hidden = false;
+}
+
+function closeEditModal() {
+  editingItem = null;
+  document.getElementById("edit-modal-backdrop").hidden = true;
+}
+
+async function saveEditModal() {
+  const suffixInput = document.getElementById("edit-modal-suffix");
+  const errorEl = document.getElementById("edit-modal-error");
+  const suffix = suffixInput.value.trim();
+
+  if (!suffix) {
+    closeEditModal();
+    return;
+  }
+
+  const saveBtn = document.getElementById("edit-modal-save");
+  saveBtn.disabled = true;
+  errorEl.textContent = "";
+
+  try {
+    const response = await fetch("/api/shorten", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: editingItem.originalUrl, code: suffix }),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      errorEl.textContent = data.error || "Something went wrong.";
+      return;
+    }
+
+    closeEditModal();
+    loadHistory(data.code);
+  } catch {
+    errorEl.textContent = "Network error, try again.";
+  } finally {
+    saveBtn.disabled = false;
+  }
+}
+
+document.getElementById("edit-modal-cancel").addEventListener("click", closeEditModal);
+document.getElementById("edit-modal-save").addEventListener("click", saveEditModal);
+document.getElementById("edit-modal-backdrop").addEventListener("click", (event) => {
+  if (event.target.id === "edit-modal-backdrop") closeEditModal();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !document.getElementById("edit-modal-backdrop").hidden) {
+    closeEditModal();
+  }
 });
 
 updateGenerateButtonState();
