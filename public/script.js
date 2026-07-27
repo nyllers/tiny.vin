@@ -184,7 +184,7 @@ function createSuffixInputRow(group, onCancel) {
   const input = document.createElement("input");
   input.type = "text";
   input.className = "url-card-suffix-input";
-  input.placeholder = "banana";
+  input.placeholder = "path";
   const saveBtn = createSaveSuffixButton();
 
   const error = document.createElement("p");
@@ -230,9 +230,8 @@ function createSuffixInputRow(group, onCancel) {
 }
 
 function createUrlCard(group, justCreatedCode) {
-  const latestCreatedAt = group.shortUrls[0].createdAt;
   const oldestCreatedAt = group.shortUrls[group.shortUrls.length - 1].createdAt;
-  const isNew = Date.now() - latestCreatedAt < NEW_BADGE_WINDOW_MS;
+  const isNew = Date.now() - oldestCreatedAt < NEW_BADGE_WINDOW_MS;
   const shouldFlash = group.shortUrls.some((shortUrlItem) => shortUrlItem.code === justCreatedCode);
 
   const card = document.createElement("div");
