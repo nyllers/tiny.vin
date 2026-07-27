@@ -263,21 +263,58 @@ footer {
   border-radius: 999px;
 }
 
-.url-card-footer {
-  margin-top: auto;
-  padding-top: 0.5rem;
-  border-top: 1px solid #e5e7eb;
+.url-card-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  margin-top: -0.35rem;
+}
+
+.icon-btn.card-action-btn {
+  color: #4338ca;
+  background: #e0e7ff;
+  border: 1px solid #4338ca;
+  gap: 0.25rem;
+  padding: 1px 0.35rem;
+  font-size: 0.75rem;
+  border-radius: 0.25rem;
+}
+
+.icon-btn.card-action-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.icon-btn.card-action-btn:hover {
+  color: #4338ca;
+  background: #c7d2fe;
+}
+
+.icon-btn.card-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .icon-btn.delete-btn {
   color: #ff3333;
   background: #ffcccc;
-  gap: 0.3rem;
-  padding: 0.25rem 0.5rem;
+  border: 1px solid #ff3333;
+  gap: 0.25rem;
+  padding: 1px 0.35rem;
+  font-size: 0.75rem;
   border-radius: 0.25rem;
+}
+
+.icon-btn.delete-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.icon-btn.delete-btn,
+.icon-btn.save-suffix-btn {
+  width: 4.5rem;
+  justify-content: center;
 }
 
 .icon-btn.delete-btn:hover {
@@ -289,6 +326,11 @@ footer {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
+}
+
+.url-card-row--tiny {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 0.5rem;
 }
 
 .url-card-label {
@@ -303,17 +345,59 @@ footer {
   word-break: break-all;
 }
 
+.url-card-value--original {
+  color: #6b7280;
+}
+
 .url-card-copy-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.4rem;
+}
+
+.url-card-copy-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .url-card-copy-text {
   cursor: pointer;
+  min-width: 0;
 }
 
 .url-card-timestamp {
   font-size: 0.75rem;
   color: #4b5563;
+}
+
+.url-card-suffix-wrapper {
+  width: 100%;
+}
+
+.url-card-suffix-prefix {
+  color: #6b7280;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.url-card-suffix-input {
+  flex: 1;
+  min-width: 0;
+  padding: 1px 0.25rem;
+  font-size: 0.75rem;
+  border: 1px solid #d1d5db;
+}
+
+.url-card-suffix-error {
+  margin: 0.25rem 0 0;
+  color: #dc2626;
+  font-size: 0.75rem;
+}
+
+.url-card-suffix-error:empty {
+  display: none;
 }

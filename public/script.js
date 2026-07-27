@@ -94,6 +94,27 @@ function createCopyIconButton() {
   return button;
 }
 
+function createAddPathButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-btn card-action-btn";
+  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"></line>
+    <line x1="5" y1="12" x2="19" y2="12"></line>
+  </svg><span>Add path</span>`;
+  return button;
+}
+
+function createSaveSuffixButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-btn card-action-btn save-suffix-btn";
+  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="20 6 9 17 4 12"></polyline>
+  </svg><span>Save</span>`;
+  return button;
+}
+
 function createDeleteIconButton() {
   const button = document.createElement("button");
   button.type = "button";
@@ -128,8 +149,90 @@ async function deleteUrl(code, shortUrl) {
 
 const NEW_BADGE_WINDOW_MS = 5 * 60 * 1000;
 
-function createUrlCard(item, shouldFlash) {
-  const isNew = Date.now() - item.createdAt < NEW_BADGE_WINDOW_MS;
+function createShortUrlRow(shortUrlItem) {
+  const shortCopyRow = document.createElement("div");
+  shortCopyRow.className = "url-card-copy-row";
+
+  const shortUrlGroup = document.createElement("span");
+  shortUrlGroup.className = "url-card-copy-group";
+  const shortValue = document.createElement("span");
+  shortValue.className = "url-card-value url-card-copy-text";
+  shortValue.title = "Click to copy";
+  shortValue.textContent = shortUrlItem.shortUrl;
+  const shortCopyBtn = createCopyIconButton();
+  const copyShort = () => copyCardShortUrl(shortUrlItem.shortUrl, shortValue);
+  shortValue.addEventListener("click", copyShort);
+  shortCopyBtn.addEventListener("click", copyShort);
+  shortUrlGroup.append(shortValue, shortCopyBtn);
+
+  const deleteBtn = createDeleteIconButton();
+  deleteBtn.addEventListener("click", () => deleteUrl(shortUrlItem.code, shortUrlItem.shortUrl));
+
+  shortCopyRow.append(shortUrlGroup, deleteBtn);
+  return shortCopyRow;
+}
+
+function createSuffixInputRow(group, onCancel) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "url-card-suffix-wrapper";
+
+  const row = document.createElement("div");
+  row.className = "url-card-copy-row";
+  const prefix = document.createElement("span");
+  prefix.className = "url-card-suffix-prefix";
+  prefix.textContent = "tiny.vin/";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "url-card-suffix-input";
+  input.placeholder = "path";
+  const saveBtn = createSaveSuffixButton();
+
+  const error = document.createElement("p");
+  error.className = "url-card-suffix-error";
+
+  async function submitSuffix() {
+    const suffix = input.value.trim();
+    if (!suffix) return;
+
+    saveBtn.disabled = true;
+    error.textContent = "";
+
+    try {
+      const response = await fetch("/api/shorten", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: group.originalUrl, code: suffix }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        error.textContent = data.error || "Something went wrong.";
+        saveBtn.disabled = false;
+        return;
+      }
+
+      loadHistory(data.code);
+    } catch {
+      error.textContent = "Network error, try again.";
+      saveBtn.disabled = false;
+    }
+  }
+
+  saveBtn.addEventListener("click", submitSuffix);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") submitSuffix();
+    if (event.key === "Escape") onCancel();
+  });
+
+  row.append(prefix, input, saveBtn);
+  wrapper.append(row, error);
+  return wrapper;
+}
+
+function createUrlCard(group, justCreatedCode) {
+  const oldestCreatedAt = group.shortUrls[group.shortUrls.length - 1].createdAt;
+  const isNew = Date.now() - oldestCreatedAt < NEW_BADGE_WINDOW_MS;
+  const shouldFlash = group.shortUrls.some((shortUrlItem) => shortUrlItem.code === justCreatedCode);
 
   const card = document.createElement("div");
   card.className = isNew ? "url-card url-card--new" : "url-card";
@@ -154,40 +257,41 @@ function createUrlCard(item, shouldFlash) {
   }
   const createdValue = document.createElement("span");
   createdValue.className = "url-card-timestamp";
-  createdValue.textContent = new Date(item.createdAt).toLocaleString();
+  createdValue.textContent = new Date(oldestCreatedAt).toLocaleString();
   meta.appendChild(createdValue);
   originalHeader.append(originalLabel, meta);
   const originalValue = document.createElement("span");
-  originalValue.className = "url-card-value";
-  originalValue.title = item.originalUrl;
-  originalValue.textContent = item.originalUrl;
+  originalValue.className = "url-card-value url-card-value--original";
+  originalValue.title = group.originalUrl;
+  originalValue.textContent = group.originalUrl;
   originalRow.append(originalHeader, originalValue);
 
   const shortRow = document.createElement("div");
-  shortRow.className = "url-card-row";
+  shortRow.className = "url-card-row url-card-row--tiny";
   const shortLabel = document.createElement("span");
   shortLabel.className = "url-card-label";
   shortLabel.textContent = "Tiny URL";
-  const shortCopyRow = document.createElement("div");
-  shortCopyRow.className = "url-card-copy-row";
-  const shortValue = document.createElement("span");
-  shortValue.className = "url-card-value url-card-copy-text";
-  shortValue.title = "Click to copy";
-  shortValue.textContent = item.shortUrl;
-  const shortCopyBtn = createCopyIconButton();
-  const copyShort = () => copyCardShortUrl(item.shortUrl, shortValue);
-  shortValue.addEventListener("click", copyShort);
-  shortCopyBtn.addEventListener("click", copyShort);
-  shortCopyRow.append(shortValue, shortCopyBtn);
-  shortRow.append(shortLabel, shortCopyRow);
+  shortRow.append(shortLabel);
+  for (const shortUrlItem of group.shortUrls) {
+    shortRow.append(createShortUrlRow(shortUrlItem));
+  }
 
-  const footerRow = document.createElement("div");
-  footerRow.className = "url-card-footer";
-  const deleteBtn = createDeleteIconButton();
-  deleteBtn.addEventListener("click", () => deleteUrl(item.code, item.shortUrl));
-  footerRow.append(deleteBtn);
+  const actionsContainer = document.createElement("div");
+  actionsContainer.className = "url-card-actions";
+  const addPathBtn = createAddPathButton();
+  function closeSuffixRow() {
+    actionsContainer.textContent = "";
+    actionsContainer.appendChild(addPathBtn);
+  }
+  addPathBtn.addEventListener("click", () => {
+    actionsContainer.textContent = "";
+    const inputRow = createSuffixInputRow(group, closeSuffixRow);
+    actionsContainer.appendChild(inputRow);
+    inputRow.querySelector("input").focus();
+  });
+  actionsContainer.appendChild(addPathBtn);
 
-  card.append(originalRow, shortRow, footerRow);
+  card.append(originalRow, shortRow, actionsContainer);
   return card;
 }
 
@@ -211,8 +315,8 @@ async function loadHistory(justCreatedCode) {
 
     const list = document.createElement("div");
     list.className = "url-cards";
-    for (const item of data.urls) {
-      list.appendChild(createUrlCard(item, item.code === justCreatedCode));
+    for (const group of data.urls) {
+      list.appendChild(createUrlCard(group, justCreatedCode));
     }
     container.appendChild(list);
   } catch {
