@@ -273,7 +273,7 @@ footer {
 
 .icon-btn.add-suffix-btn {
   color: #4338ca;
-  background: #e0e7ff;
+  background: transparent;
   border: 1px solid #4338ca;
   gap: 0.25rem;
   padding: 1px 0.35rem;
@@ -330,7 +330,7 @@ footer {
 }
 
 .url-card-value--original {
-  color: #000;
+  color: #6b7280;
 }
 
 .url-card-copy-row {
