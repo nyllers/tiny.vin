@@ -216,13 +216,15 @@ async function handleHistory(env, session) {
     });
   }
 
-  return jsonResponse({
-    urls: Array.from(groups, ([originalUrl, shortUrls]) => ({
-      originalUrl,
-      createdAt: shortUrls[0].createdAt,
-      shortUrls,
-    })),
-  });
+  const urls = Array.from(groups, ([originalUrl, shortUrls]) => ({
+    originalUrl,
+    createdAt: shortUrls[shortUrls.length - 1].createdAt,
+    shortUrls,
+  }));
+
+  urls.sort((a, b) => b.createdAt - a.createdAt);
+
+  return jsonResponse({ urls });
 }
 
 async function handleDeleteUrl(code, env, session) {
