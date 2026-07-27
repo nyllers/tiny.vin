@@ -113,7 +113,7 @@ function createDeleteIconButton() {
     <path d="M10 11v6"></path>
     <path d="M14 11v6"></path>
     <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
-  </svg>`;
+  </svg><span>Delete</span>`;
   return button;
 }
 

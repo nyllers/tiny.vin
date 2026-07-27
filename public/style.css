@@ -213,8 +213,17 @@ footer {
   justify-content: space-between;
 }
 
+.icon-btn.delete-btn {
+  color: #ff3333;
+  background: #ffcccc;
+  gap: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
 .icon-btn.delete-btn:hover {
-  color: #dc2626;
+  color: #ff3333;
+  background: #ffb3b3;
 }
 
 .url-card-row {
