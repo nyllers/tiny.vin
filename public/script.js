@@ -94,29 +94,6 @@ function createCopyIconButton() {
   return button;
 }
 
-function createLinkIcon() {
-  const icon = document.createElement("span");
-  icon.className = "url-icon";
-  icon.setAttribute("aria-hidden", "true");
-  icon.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-  </svg>`;
-  return icon;
-}
-
-function createShortLinkIcon() {
-  const icon = document.createElement("span");
-  icon.className = "url-icon";
-  icon.setAttribute("aria-hidden", "true");
-  icon.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-    <polyline points="15 3 21 3 21 9"></polyline>
-    <line x1="10" y1="14" x2="21" y2="3"></line>
-  </svg>`;
-  return icon;
-}
-
 function createDeleteIconButton() {
   const button = document.createElement("button");
   button.type = "button";
@@ -164,6 +141,9 @@ function createUrlCard(item, shouldFlash) {
   originalRow.className = "url-card-row";
   const originalHeader = document.createElement("div");
   originalHeader.className = "url-card-header";
+  const originalLabel = document.createElement("span");
+  originalLabel.className = "url-card-label";
+  originalLabel.textContent = "Original URL";
   const meta = document.createElement("div");
   meta.className = "url-card-meta";
   if (isNew) {
@@ -176,18 +156,18 @@ function createUrlCard(item, shouldFlash) {
   createdValue.className = "url-card-timestamp";
   createdValue.textContent = new Date(item.createdAt).toLocaleString();
   meta.appendChild(createdValue);
-  originalHeader.append(meta);
-  const originalValueRow = document.createElement("div");
-  originalValueRow.className = "url-card-value-row";
+  originalHeader.append(originalLabel, meta);
   const originalValue = document.createElement("span");
   originalValue.className = "url-card-value";
   originalValue.title = item.originalUrl;
   originalValue.textContent = item.originalUrl;
-  originalValueRow.append(createLinkIcon(), originalValue);
-  originalRow.append(originalHeader, originalValueRow);
+  originalRow.append(originalHeader, originalValue);
 
   const shortRow = document.createElement("div");
   shortRow.className = "url-card-row";
+  const shortLabel = document.createElement("span");
+  shortLabel.className = "url-card-label";
+  shortLabel.textContent = "Short URL";
   const shortCopyRow = document.createElement("div");
   shortCopyRow.className = "url-card-copy-row";
   const shortValue = document.createElement("span");
@@ -198,8 +178,8 @@ function createUrlCard(item, shouldFlash) {
   const copyShort = () => copyCardShortUrl(item.shortUrl, shortValue);
   shortValue.addEventListener("click", copyShort);
   shortCopyBtn.addEventListener("click", copyShort);
-  shortCopyRow.append(createShortLinkIcon(), shortValue, shortCopyBtn);
-  shortRow.append(shortCopyRow);
+  shortCopyRow.append(shortValue, shortCopyBtn);
+  shortRow.append(shortLabel, shortCopyRow);
 
   const footerRow = document.createElement("div");
   footerRow.className = "url-card-footer";
