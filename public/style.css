@@ -266,14 +266,13 @@ footer {
 .url-card-footer {
   margin-top: auto;
   padding-top: 0.5rem;
-  border-top: 1px solid #e5e7eb;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
 }
 
-.icon-btn.edit-btn {
+.icon-btn.add-suffix-btn {
   color: #4338ca;
   background: #e0e7ff;
   gap: 0.3rem;
@@ -281,14 +280,14 @@ footer {
   border-radius: 0.25rem;
 }
 
-.icon-btn.edit-btn:hover {
+.icon-btn.add-suffix-btn:hover {
   color: #4338ca;
   background: #c7d2fe;
 }
 
 .icon-btn.delete-btn {
   color: #ff3333;
-  background: #ffcccc;
+  background: transparent;
   border: 1px solid #ff3333;
   gap: 0.25rem;
   padding: 1px 0.35rem;
@@ -303,7 +302,7 @@ footer {
 
 .icon-btn.delete-btn:hover {
   color: #ff3333;
-  background: #ffb3b3;
+  background: #ffe5e5;
 }
 
 .url-card-row {
@@ -349,106 +348,37 @@ footer {
   color: #4b5563;
 }
 
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  z-index: 100;
+.url-card-suffix-wrapper {
+  margin-top: 0.4rem;
 }
 
-.modal-backdrop[hidden] {
-  display: none;
-}
-
-.modal {
-  background: #fff;
-  border-radius: 0.75rem;
-  padding: 1.5rem;
-  width: 100%;
-  max-width: 26rem;
-  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.25);
-}
-
-.modal-title {
-  margin: 0 0 1rem;
-  font-size: 1.1rem;
-  color: #1f2937;
-  text-align: center;
-}
-
-.modal-field {
-  margin-bottom: 1rem;
-}
-
-.modal-value {
-  margin: 0.15rem 0 0;
-  color: #4338ca;
-  word-break: break-all;
-}
-
-.modal-suffix-row {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  margin-top: 0.3rem;
-}
-
-.modal-suffix-prefix {
+.url-card-suffix-prefix {
   color: #6b7280;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   white-space: nowrap;
 }
 
-#edit-modal-suffix {
+.url-card-suffix-input {
   flex: 1;
   min-width: 0;
-  padding: 0.4rem;
-  font-size: 0.95rem;
-}
-
-.modal-error {
-  margin: 0.5rem 0 0;
-  color: #dc2626;
+  padding: 0.25rem;
   font-size: 0.85rem;
 }
 
-.modal-error:empty {
+.icon-btn.confirm-suffix-btn {
+  color: #059669;
+}
+
+.icon-btn.confirm-suffix-btn:hover {
+  color: #047857;
+}
+
+.url-card-suffix-error {
+  margin: 0.25rem 0 0;
+  color: #dc2626;
+  font-size: 0.75rem;
+}
+
+.url-card-suffix-error:empty {
   display: none;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 1rem;
-}
-
-.modal-btn {
-  padding: 0.5rem 1rem;
-  font-size: 0.95rem;
-  cursor: pointer;
-  border-radius: 0.375rem;
-  border: none;
-}
-
-.modal-btn-secondary {
-  background: #e5e7eb;
-  color: #1f2937;
-}
-
-.modal-btn-secondary:hover {
-  background: #d1d5db;
-}
-
-.modal-btn-primary {
-  background: #4338ca;
-  color: #fff;
-}
-
-.modal-btn-primary:hover {
-  background: #3730a3;
 }

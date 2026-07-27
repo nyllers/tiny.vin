@@ -94,16 +94,26 @@ function createCopyIconButton() {
   return button;
 }
 
-function createEditIconButton() {
+function createAddSuffixButton() {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "icon-btn edit-btn";
-  button.title = "Edit";
-  button.setAttribute("aria-label", "Edit this URL");
+  button.className = "icon-btn add-suffix-btn";
   button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-  </svg><span>Edit</span>`;
+    <line x1="12" y1="5" x2="12" y2="19"></line>
+    <line x1="5" y1="12" x2="19" y2="12"></line>
+  </svg><span>Add suffix</span>`;
+  return button;
+}
+
+function createConfirmSuffixButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-btn confirm-suffix-btn";
+  button.title = "Add this short URL";
+  button.setAttribute("aria-label", "Add this short URL");
+  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="20 6 9 17 4 12"></polyline>
+  </svg>`;
   return button;
 }
 
@@ -164,6 +174,62 @@ function createShortUrlRow(shortUrlItem) {
   return shortCopyRow;
 }
 
+function createSuffixInputRow(group) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "url-card-suffix-wrapper";
+
+  const row = document.createElement("div");
+  row.className = "url-card-copy-row";
+  const prefix = document.createElement("span");
+  prefix.className = "url-card-suffix-prefix";
+  prefix.textContent = "tiny.vin/";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "url-card-suffix-input";
+  input.placeholder = "banana";
+  const confirmBtn = createConfirmSuffixButton();
+
+  const error = document.createElement("p");
+  error.className = "url-card-suffix-error";
+
+  async function submitSuffix() {
+    const suffix = input.value.trim();
+    if (!suffix) return;
+
+    confirmBtn.disabled = true;
+    error.textContent = "";
+
+    try {
+      const response = await fetch("/api/shorten", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: group.originalUrl, code: suffix }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        error.textContent = data.error || "Something went wrong.";
+        confirmBtn.disabled = false;
+        return;
+      }
+
+      loadHistory(data.code);
+    } catch {
+      error.textContent = "Network error, try again.";
+      confirmBtn.disabled = false;
+    }
+  }
+
+  confirmBtn.addEventListener("click", submitSuffix);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") submitSuffix();
+  });
+
+  row.append(prefix, input, confirmBtn);
+  wrapper.append(row, error);
+  return wrapper;
+}
+
 function createUrlCard(group, justCreatedCode) {
   const latestCreatedAt = group.shortUrls[0].createdAt;
   const isNew = Date.now() - latestCreatedAt < NEW_BADGE_WINDOW_MS;
@@ -211,13 +277,24 @@ function createUrlCard(group, justCreatedCode) {
     shortRow.append(createShortUrlRow(shortUrlItem));
   }
 
+  const suffixContainer = document.createElement("div");
+  suffixContainer.className = "url-card-suffix-container";
+
   const footerRow = document.createElement("div");
   footerRow.className = "url-card-footer";
-  const editBtn = createEditIconButton();
-  editBtn.addEventListener("click", () => openEditModal(group));
-  footerRow.append(editBtn);
+  const addSuffixBtn = createAddSuffixButton();
+  addSuffixBtn.addEventListener("click", () => {
+    if (suffixContainer.childElementCount > 0) {
+      suffixContainer.textContent = "";
+      return;
+    }
+    const inputRow = createSuffixInputRow(group);
+    suffixContainer.appendChild(inputRow);
+    inputRow.querySelector("input").focus();
+  });
+  footerRow.append(addSuffixBtn);
 
-  card.append(originalRow, shortRow, footerRow);
+  card.append(originalRow, shortRow, suffixContainer, footerRow);
   return card;
 }
 
@@ -260,78 +337,6 @@ document.getElementById("generate-btn").addEventListener("click", generateUrl);
 document.getElementById("url-input").addEventListener("input", updateGenerateButtonState);
 document.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !document.getElementById("generate-btn").disabled) generateUrl();
-});
-
-let editingGroup = null;
-
-function openEditModal(group) {
-  editingGroup = group;
-  document.getElementById("edit-modal-original").textContent = group.originalUrl;
-
-  const shortList = document.getElementById("edit-modal-short-list");
-  shortList.textContent = "";
-  for (const shortUrlItem of group.shortUrls) {
-    const shortUrlLine = document.createElement("p");
-    shortUrlLine.className = "modal-value";
-    shortUrlLine.textContent = shortUrlItem.shortUrl;
-    shortList.appendChild(shortUrlLine);
-  }
-
-  document.getElementById("edit-modal-suffix").value = "";
-  document.getElementById("edit-modal-error").textContent = "";
-  document.getElementById("edit-modal-backdrop").hidden = false;
-}
-
-function closeEditModal() {
-  editingGroup = null;
-  document.getElementById("edit-modal-backdrop").hidden = true;
-}
-
-async function saveEditModal() {
-  const suffixInput = document.getElementById("edit-modal-suffix");
-  const errorEl = document.getElementById("edit-modal-error");
-  const suffix = suffixInput.value.trim();
-
-  if (!suffix) {
-    closeEditModal();
-    return;
-  }
-
-  const saveBtn = document.getElementById("edit-modal-save");
-  saveBtn.disabled = true;
-  errorEl.textContent = "";
-
-  try {
-    const response = await fetch("/api/shorten", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ url: editingGroup.originalUrl, code: suffix }),
-    });
-    const data = await response.json();
-
-    if (!response.ok) {
-      errorEl.textContent = data.error || "Something went wrong.";
-      return;
-    }
-
-    closeEditModal();
-    loadHistory(data.code);
-  } catch {
-    errorEl.textContent = "Network error, try again.";
-  } finally {
-    saveBtn.disabled = false;
-  }
-}
-
-document.getElementById("edit-modal-cancel").addEventListener("click", closeEditModal);
-document.getElementById("edit-modal-save").addEventListener("click", saveEditModal);
-document.getElementById("edit-modal-backdrop").addEventListener("click", (event) => {
-  if (event.target.id === "edit-modal-backdrop") closeEditModal();
-});
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !document.getElementById("edit-modal-backdrop").hidden) {
-    closeEditModal();
-  }
 });
 
 updateGenerateButtonState();
