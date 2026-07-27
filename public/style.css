@@ -34,6 +34,7 @@ main.panel {
 
 .history-panel {
   margin-top: 1.5rem;
+  padding-top: 1rem;
 }
 
 @media (max-width: 30rem) {
@@ -207,7 +208,7 @@ footer {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 1rem;
+  padding: 0.5rem 1rem;
   background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 0.5rem;
