@@ -264,7 +264,6 @@ footer {
 }
 
 .url-card-footer {
-  padding-top: 0.5rem;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -375,12 +374,23 @@ footer {
   font-size: 0.85rem;
 }
 
-.icon-btn.confirm-suffix-btn {
-  color: #059669;
+.save-suffix-btn {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  background: #4338ca;
+  color: #fff;
+  border: none;
+  border-radius: 0.25rem;
 }
 
-.icon-btn.confirm-suffix-btn:hover {
-  color: #047857;
+.save-suffix-btn:hover {
+  background: #3730a3;
+}
+
+.save-suffix-btn:disabled {
+  background: #c7c7f5;
+  cursor: not-allowed;
 }
 
 .url-card-suffix-error {

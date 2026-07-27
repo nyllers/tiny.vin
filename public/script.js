@@ -105,15 +105,11 @@ function createAddSuffixButton() {
   return button;
 }
 
-function createConfirmSuffixButton() {
+function createSaveSuffixButton() {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "icon-btn confirm-suffix-btn";
-  button.title = "Add this short URL";
-  button.setAttribute("aria-label", "Add this short URL");
-  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="20 6 9 17 4 12"></polyline>
-  </svg>`;
+  button.className = "save-suffix-btn";
+  button.textContent = "Save";
   return button;
 }
 
@@ -174,7 +170,7 @@ function createShortUrlRow(shortUrlItem) {
   return shortCopyRow;
 }
 
-function createSuffixInputRow(group) {
+function createSuffixInputRow(group, onCancel) {
   const wrapper = document.createElement("div");
   wrapper.className = "url-card-suffix-wrapper";
 
@@ -187,7 +183,7 @@ function createSuffixInputRow(group) {
   input.type = "text";
   input.className = "url-card-suffix-input";
   input.placeholder = "banana";
-  const confirmBtn = createConfirmSuffixButton();
+  const saveBtn = createSaveSuffixButton();
 
   const error = document.createElement("p");
   error.className = "url-card-suffix-error";
@@ -196,7 +192,7 @@ function createSuffixInputRow(group) {
     const suffix = input.value.trim();
     if (!suffix) return;
 
-    confirmBtn.disabled = true;
+    saveBtn.disabled = true;
     error.textContent = "";
 
     try {
@@ -209,23 +205,24 @@ function createSuffixInputRow(group) {
 
       if (!response.ok) {
         error.textContent = data.error || "Something went wrong.";
-        confirmBtn.disabled = false;
+        saveBtn.disabled = false;
         return;
       }
 
       loadHistory(data.code);
     } catch {
       error.textContent = "Network error, try again.";
-      confirmBtn.disabled = false;
+      saveBtn.disabled = false;
     }
   }
 
-  confirmBtn.addEventListener("click", submitSuffix);
+  saveBtn.addEventListener("click", submitSuffix);
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") submitSuffix();
+    if (event.key === "Escape") onCancel();
   });
 
-  row.append(prefix, input, confirmBtn);
+  row.append(prefix, input, saveBtn);
   wrapper.append(row, error);
   return wrapper;
 }
@@ -283,12 +280,13 @@ function createUrlCard(group, justCreatedCode) {
   const footerRow = document.createElement("div");
   footerRow.className = "url-card-footer";
   const addSuffixBtn = createAddSuffixButton();
+  function closeSuffixRow() {
+    suffixContainer.textContent = "";
+    addSuffixBtn.hidden = false;
+  }
   addSuffixBtn.addEventListener("click", () => {
-    if (suffixContainer.childElementCount > 0) {
-      suffixContainer.textContent = "";
-      return;
-    }
-    const inputRow = createSuffixInputRow(group);
+    addSuffixBtn.hidden = true;
+    const inputRow = createSuffixInputRow(group, closeSuffixRow);
     suffixContainer.appendChild(inputRow);
     inputRow.querySelector("input").focus();
   });
