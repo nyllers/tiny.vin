@@ -262,7 +262,7 @@ function createUrlCard(group, justCreatedCode) {
   meta.appendChild(createdValue);
   originalHeader.append(originalLabel, meta);
   const originalValue = document.createElement("span");
-  originalValue.className = "url-card-value";
+  originalValue.className = "url-card-value url-card-value--original";
   originalValue.title = group.originalUrl;
   originalValue.textContent = group.originalUrl;
   originalRow.append(originalHeader, originalValue);

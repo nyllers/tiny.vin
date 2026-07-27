@@ -264,7 +264,6 @@ footer {
 }
 
 .url-card-footer {
-  margin-top: auto;
   padding-top: 0.5rem;
   display: flex;
   align-items: center;
@@ -328,6 +327,10 @@ footer {
 .url-card-value {
   color: #4338ca;
   word-break: break-all;
+}
+
+.url-card-value--original {
+  color: #000;
 }
 
 .url-card-copy-row {
