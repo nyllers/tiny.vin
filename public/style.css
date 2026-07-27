@@ -273,7 +273,7 @@ footer {
 
 .icon-btn.add-suffix-btn {
   color: #4338ca;
-  background: transparent;
+  background: #e0e7ff;
   border: 1px solid #4338ca;
   gap: 0.25rem;
   padding: 1px 0.35rem;
@@ -293,7 +293,7 @@ footer {
 
 .icon-btn.delete-btn {
   color: #ff3333;
-  background: transparent;
+  background: #ffcccc;
   border: 1px solid #ff3333;
   gap: 0.25rem;
   padding: 1px 0.35rem;
@@ -308,7 +308,7 @@ footer {
 
 .icon-btn.delete-btn:hover {
   color: #ff3333;
-  background: #ffe5e5;
+  background: #ffb3b3;
 }
 
 .url-card-row {

@@ -294,7 +294,7 @@ function createUrlCard(group, justCreatedCode) {
   });
   footerRow.append(addSuffixBtn);
 
-  card.append(originalRow, shortRow, suffixContainer, footerRow);
+  card.append(originalRow, shortRow, footerRow, suffixContainer);
   return card;
 }
 
