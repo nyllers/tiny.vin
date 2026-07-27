@@ -214,15 +214,24 @@ footer {
 }
 
 .url-card--flash {
-  animation: card-flash 2s ease-out;
+  animation: card-flash 2s ease-in-out;
 }
 
 @keyframes card-flash {
-  from {
-    filter: brightness(1.8);
+  0% {
+    background-color: #ffffff;
   }
-  to {
-    filter: brightness(1);
+  25% {
+    background-color: #eeffee;
+  }
+  50% {
+    background-color: #ffffff;
+  }
+  75% {
+    background-color: #eeffee;
+  }
+  100% {
+    background-color: #eeffee;
   }
 }
 
