@@ -1,5 +1,3 @@
-let currentShortUrl = "";
-
 function validateUrl(input) {
   if (!input.includes("://")) {
     if (/\s/.test(input)) {
@@ -34,11 +32,7 @@ function validateUrl(input) {
 async function generateUrl() {
   const input = document.getElementById("url-input");
   const result = document.getElementById("url-result");
-  const copyBtn = document.getElementById("copy-btn");
   const url = input.value.trim();
-
-  currentShortUrl = "";
-  copyBtn.hidden = true;
 
   if (!url) {
     result.textContent = "Enter a URL first.";
@@ -66,11 +60,10 @@ async function generateUrl() {
       return;
     }
 
-    currentShortUrl = data.shortUrl;
-    result.textContent = data.shortUrl;
-    result.title = "Click to copy";
-    copyBtn.hidden = false;
-    loadHistory();
+    input.value = "";
+    result.textContent = "";
+    updateGenerateButtonState();
+    loadHistory(data.code);
   } catch {
     result.textContent = "Network error, try again.";
   }
@@ -133,20 +126,42 @@ async function deleteUrl(code, shortUrl) {
   }
 }
 
-function createUrlCard(item) {
+const NEW_BADGE_WINDOW_MS = 5 * 60 * 1000;
+
+function createUrlCard(item, shouldFlash) {
+  const isNew = Date.now() - item.createdAt < NEW_BADGE_WINDOW_MS;
+
   const card = document.createElement("div");
-  card.className = "url-card";
+  card.className = isNew ? "url-card url-card--new" : "url-card";
+  if (shouldFlash) {
+    card.classList.add("url-card--flash");
+  }
 
   const originalRow = document.createElement("div");
   originalRow.className = "url-card-row";
+  const originalHeader = document.createElement("div");
+  originalHeader.className = "url-card-header";
   const originalLabel = document.createElement("span");
   originalLabel.className = "url-card-label";
   originalLabel.textContent = "Original URL";
+  const meta = document.createElement("div");
+  meta.className = "url-card-meta";
+  if (isNew) {
+    const newBadge = document.createElement("span");
+    newBadge.className = "new-badge";
+    newBadge.textContent = "NEW!";
+    meta.appendChild(newBadge);
+  }
+  const createdValue = document.createElement("span");
+  createdValue.className = "url-card-timestamp";
+  createdValue.textContent = new Date(item.createdAt).toLocaleString();
+  meta.appendChild(createdValue);
+  originalHeader.append(originalLabel, meta);
   const originalValue = document.createElement("span");
   originalValue.className = "url-card-value";
   originalValue.title = item.originalUrl;
   originalValue.textContent = item.originalUrl;
-  originalRow.append(originalLabel, originalValue);
+  originalRow.append(originalHeader, originalValue);
 
   const shortRow = document.createElement("div");
   shortRow.className = "url-card-row";
@@ -170,16 +185,13 @@ function createUrlCard(item) {
   footerRow.className = "url-card-footer";
   const deleteBtn = createDeleteIconButton();
   deleteBtn.addEventListener("click", () => deleteUrl(item.code, item.shortUrl));
-  const createdValue = document.createElement("span");
-  createdValue.className = "url-card-timestamp";
-  createdValue.textContent = new Date(item.createdAt).toLocaleString();
-  footerRow.append(deleteBtn, createdValue);
+  footerRow.append(deleteBtn);
 
   card.append(originalRow, shortRow, footerRow);
   return card;
 }
 
-async function loadHistory() {
+async function loadHistory(justCreatedCode) {
   const container = document.getElementById("history-list");
 
   try {
@@ -200,7 +212,7 @@ async function loadHistory() {
     const list = document.createElement("div");
     list.className = "url-cards";
     for (const item of data.urls) {
-      list.appendChild(createUrlCard(item));
+      list.appendChild(createUrlCard(item, item.code === justCreatedCode));
     }
     container.appendChild(list);
   } catch {
@@ -208,26 +220,17 @@ async function loadHistory() {
   }
 }
 
-async function copyResult() {
-  const result = document.getElementById("url-result");
-  if (!currentShortUrl || result.textContent !== currentShortUrl) return;
-
-  try {
-    await navigator.clipboard.writeText(currentShortUrl);
-    result.textContent = "Copied!";
-    setTimeout(() => {
-      result.textContent = currentShortUrl;
-    }, 1000);
-  } catch {
-    result.textContent = "Could not copy, select the text manually.";
-  }
+function updateGenerateButtonState() {
+  const input = document.getElementById("url-input");
+  const generateBtn = document.getElementById("generate-btn");
+  generateBtn.disabled = input.value.trim() === "";
 }
 
 document.getElementById("generate-btn").addEventListener("click", generateUrl);
-document.getElementById("url-result").addEventListener("click", copyResult);
-document.getElementById("copy-btn").addEventListener("click", copyResult);
+document.getElementById("url-input").addEventListener("input", updateGenerateButtonState);
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") generateUrl();
+  if (event.key === "Enter" && !document.getElementById("generate-btn").disabled) generateUrl();
 });
 
+updateGenerateButtonState();
 loadHistory();
