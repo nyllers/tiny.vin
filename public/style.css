@@ -291,7 +291,7 @@ footer {
   background: #ffcccc;
   border: 1px solid #ff3333;
   gap: 0.25rem;
-  padding: 0.15rem 0.35rem;
+  padding: 1px 0.35rem;
   font-size: 0.75rem;
   border-radius: 0.25rem;
 }
