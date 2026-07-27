@@ -141,8 +141,27 @@ async function deleteUrl(code, shortUrl) {
 
 const NEW_BADGE_WINDOW_MS = 5 * 60 * 1000;
 
-function createUrlCard(item, shouldFlash) {
-  const isNew = Date.now() - item.createdAt < NEW_BADGE_WINDOW_MS;
+function createShortUrlRow(shortUrlItem) {
+  const shortCopyRow = document.createElement("div");
+  shortCopyRow.className = "url-card-copy-row";
+  const shortValue = document.createElement("span");
+  shortValue.className = "url-card-value url-card-copy-text";
+  shortValue.title = "Click to copy";
+  shortValue.textContent = shortUrlItem.shortUrl;
+  const shortCopyBtn = createCopyIconButton();
+  const copyShort = () => copyCardShortUrl(shortUrlItem.shortUrl, shortValue);
+  shortValue.addEventListener("click", copyShort);
+  shortCopyBtn.addEventListener("click", copyShort);
+  const deleteBtn = createDeleteIconButton();
+  deleteBtn.addEventListener("click", () => deleteUrl(shortUrlItem.code, shortUrlItem.shortUrl));
+  shortCopyRow.append(shortValue, shortCopyBtn, deleteBtn);
+  return shortCopyRow;
+}
+
+function createUrlCard(group, justCreatedCode) {
+  const latestCreatedAt = group.shortUrls[0].createdAt;
+  const isNew = Date.now() - latestCreatedAt < NEW_BADGE_WINDOW_MS;
+  const shouldFlash = group.shortUrls.some((shortUrlItem) => shortUrlItem.code === justCreatedCode);
 
   const card = document.createElement("div");
   card.className = isNew ? "url-card url-card--new" : "url-card";
@@ -167,13 +186,13 @@ function createUrlCard(item, shouldFlash) {
   }
   const createdValue = document.createElement("span");
   createdValue.className = "url-card-timestamp";
-  createdValue.textContent = new Date(item.createdAt).toLocaleString();
+  createdValue.textContent = new Date(latestCreatedAt).toLocaleString();
   meta.appendChild(createdValue);
   originalHeader.append(originalLabel, meta);
   const originalValue = document.createElement("span");
   originalValue.className = "url-card-value";
-  originalValue.title = item.originalUrl;
-  originalValue.textContent = item.originalUrl;
+  originalValue.title = group.originalUrl;
+  originalValue.textContent = group.originalUrl;
   originalRow.append(originalHeader, originalValue);
 
   const shortRow = document.createElement("div");
@@ -181,26 +200,16 @@ function createUrlCard(item, shouldFlash) {
   const shortLabel = document.createElement("span");
   shortLabel.className = "url-card-label";
   shortLabel.textContent = "Tiny URL";
-  const shortCopyRow = document.createElement("div");
-  shortCopyRow.className = "url-card-copy-row";
-  const shortValue = document.createElement("span");
-  shortValue.className = "url-card-value url-card-copy-text";
-  shortValue.title = "Click to copy";
-  shortValue.textContent = item.shortUrl;
-  const shortCopyBtn = createCopyIconButton();
-  const copyShort = () => copyCardShortUrl(item.shortUrl, shortValue);
-  shortValue.addEventListener("click", copyShort);
-  shortCopyBtn.addEventListener("click", copyShort);
-  shortCopyRow.append(shortValue, shortCopyBtn);
-  shortRow.append(shortLabel, shortCopyRow);
+  shortRow.append(shortLabel);
+  for (const shortUrlItem of group.shortUrls) {
+    shortRow.append(createShortUrlRow(shortUrlItem));
+  }
 
   const footerRow = document.createElement("div");
   footerRow.className = "url-card-footer";
   const editBtn = createEditIconButton();
-  editBtn.addEventListener("click", () => openEditModal(item));
-  const deleteBtn = createDeleteIconButton();
-  deleteBtn.addEventListener("click", () => deleteUrl(item.code, item.shortUrl));
-  footerRow.append(editBtn, deleteBtn);
+  editBtn.addEventListener("click", () => openEditModal(group));
+  footerRow.append(editBtn);
 
   card.append(originalRow, shortRow, footerRow);
   return card;
@@ -226,8 +235,8 @@ async function loadHistory(justCreatedCode) {
 
     const list = document.createElement("div");
     list.className = "url-cards";
-    for (const item of data.urls) {
-      list.appendChild(createUrlCard(item, item.code === justCreatedCode));
+    for (const group of data.urls) {
+      list.appendChild(createUrlCard(group, justCreatedCode));
     }
     container.appendChild(list);
   } catch {
@@ -247,19 +256,28 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !document.getElementById("generate-btn").disabled) generateUrl();
 });
 
-let editingItem = null;
+let editingGroup = null;
 
-function openEditModal(item) {
-  editingItem = item;
-  document.getElementById("edit-modal-original").textContent = item.originalUrl;
-  document.getElementById("edit-modal-short").textContent = item.shortUrl;
+function openEditModal(group) {
+  editingGroup = group;
+  document.getElementById("edit-modal-original").textContent = group.originalUrl;
+
+  const shortList = document.getElementById("edit-modal-short-list");
+  shortList.textContent = "";
+  for (const shortUrlItem of group.shortUrls) {
+    const shortUrlLine = document.createElement("p");
+    shortUrlLine.className = "modal-value";
+    shortUrlLine.textContent = shortUrlItem.shortUrl;
+    shortList.appendChild(shortUrlLine);
+  }
+
   document.getElementById("edit-modal-suffix").value = "";
   document.getElementById("edit-modal-error").textContent = "";
   document.getElementById("edit-modal-backdrop").hidden = false;
 }
 
 function closeEditModal() {
-  editingItem = null;
+  editingGroup = null;
   document.getElementById("edit-modal-backdrop").hidden = true;
 }
 
@@ -281,7 +299,7 @@ async function saveEditModal() {
     const response = await fetch("/api/shorten", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ url: editingItem.originalUrl, code: suffix }),
+      body: JSON.stringify({ url: editingGroup.originalUrl, code: suffix }),
     });
     const data = await response.json();
 

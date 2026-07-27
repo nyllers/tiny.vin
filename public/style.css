@@ -325,6 +325,8 @@ footer {
 
 .url-card-copy-text {
   cursor: pointer;
+  flex: 1;
+  min-width: 0;
 }
 
 .url-card-timestamp {

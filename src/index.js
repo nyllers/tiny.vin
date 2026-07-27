@@ -204,12 +204,23 @@ async function handleHistory(env, session) {
     .bind(identityId)
     .all();
 
-  return jsonResponse({
-    urls: results.map((row) => ({
+  const groups = new Map();
+  for (const row of results) {
+    if (!groups.has(row.original_url)) {
+      groups.set(row.original_url, []);
+    }
+    groups.get(row.original_url).push({
       code: row.code,
-      originalUrl: row.original_url,
       shortUrl: `https://tiny.vin/${row.code}`,
       createdAt: row.created_at,
+    });
+  }
+
+  return jsonResponse({
+    urls: Array.from(groups, ([originalUrl, shortUrls]) => ({
+      originalUrl,
+      createdAt: shortUrls[0].createdAt,
+      shortUrls,
     })),
   });
 }
