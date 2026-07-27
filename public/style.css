@@ -268,16 +268,23 @@ footer {
   padding-top: 0.5rem;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 0.5rem;
 }
 
 .icon-btn.add-suffix-btn {
   color: #4338ca;
   background: #e0e7ff;
-  gap: 0.3rem;
-  padding: 0.25rem 0.5rem;
+  border: 1px solid #4338ca;
+  gap: 0.25rem;
+  padding: 1px 0.35rem;
+  font-size: 0.75rem;
   border-radius: 0.25rem;
+}
+
+.icon-btn.add-suffix-btn svg {
+  width: 12px;
+  height: 12px;
 }
 
 .icon-btn.add-suffix-btn:hover {
