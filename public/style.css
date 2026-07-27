@@ -214,7 +214,7 @@ footer {
 }
 
 .url-card--flash {
-  animation: card-flash 2s ease-in-out;
+  animation: card-flash 5s ease-in-out;
 }
 
 @keyframes card-flash {
