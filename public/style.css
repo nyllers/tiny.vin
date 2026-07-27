@@ -327,12 +327,20 @@ footer {
 .url-card-copy-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.4rem;
+}
+
+.url-card-copy-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .url-card-copy-text {
   cursor: pointer;
-  flex: 1;
   min-width: 0;
 }
 

@@ -144,6 +144,9 @@ const NEW_BADGE_WINDOW_MS = 5 * 60 * 1000;
 function createShortUrlRow(shortUrlItem) {
   const shortCopyRow = document.createElement("div");
   shortCopyRow.className = "url-card-copy-row";
+
+  const shortUrlGroup = document.createElement("span");
+  shortUrlGroup.className = "url-card-copy-group";
   const shortValue = document.createElement("span");
   shortValue.className = "url-card-value url-card-copy-text";
   shortValue.title = "Click to copy";
@@ -152,9 +155,12 @@ function createShortUrlRow(shortUrlItem) {
   const copyShort = () => copyCardShortUrl(shortUrlItem.shortUrl, shortValue);
   shortValue.addEventListener("click", copyShort);
   shortCopyBtn.addEventListener("click", copyShort);
+  shortUrlGroup.append(shortValue, shortCopyBtn);
+
   const deleteBtn = createDeleteIconButton();
   deleteBtn.addEventListener("click", () => deleteUrl(shortUrlItem.code, shortUrlItem.shortUrl));
-  shortCopyRow.append(shortValue, shortCopyBtn, deleteBtn);
+
+  shortCopyRow.append(shortUrlGroup, deleteBtn);
   return shortCopyRow;
 }
 
