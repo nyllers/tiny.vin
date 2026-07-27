@@ -26,6 +26,10 @@ function validateUrl(input) {
     };
   }
 
+  if (input.length <= 25) {
+    return { error: "Your already is teeny-weeny!" };
+  }
+
   return { url: parsed.href };
 }
 
@@ -270,7 +274,7 @@ function createUrlCard(group, justCreatedCode) {
   shortRow.className = "url-card-row url-card-row--tiny";
   const shortLabel = document.createElement("span");
   shortLabel.className = "url-card-label";
-  shortLabel.textContent = "Tiny URL";
+  shortLabel.textContent = "Teeny-Weeny URL";
   shortRow.append(shortLabel);
   for (const shortUrlItem of group.shortUrls) {
     shortRow.append(createShortUrlRow(shortUrlItem));

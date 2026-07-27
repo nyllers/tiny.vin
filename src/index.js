@@ -102,6 +102,10 @@ function validateUrl(input) {
     };
   }
 
+  if (input.length <= 25) {
+    return { error: "Your already is teeny-weeny!" };
+  }
+
   return { url: parsed.href };
 }
 
