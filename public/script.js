@@ -167,7 +167,7 @@ function createUrlCard(item, shouldFlash) {
   shortRow.className = "url-card-row";
   const shortLabel = document.createElement("span");
   shortLabel.className = "url-card-label";
-  shortLabel.textContent = "Short URL";
+  shortLabel.textContent = "Tiny URL";
   const shortCopyRow = document.createElement("div");
   shortCopyRow.className = "url-card-copy-row";
   const shortValue = document.createElement("span");

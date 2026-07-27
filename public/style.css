@@ -22,6 +22,10 @@ body {
   box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.25);
 }
 
+main.panel {
+  padding: 1.25rem 2rem;
+}
+
 @media (min-width: 48rem) {
   .panel {
     width: 80%;
@@ -30,11 +34,16 @@ body {
 
 .history-panel {
   margin-top: 1.5rem;
+  padding-top: 1rem;
 }
 
 @media (max-width: 30rem) {
   .panel {
     padding: 1.25rem;
+  }
+
+  main.panel {
+    padding: 1rem 1.25rem;
   }
 
   .controls {
@@ -82,17 +91,14 @@ h1 {
   cursor: not-allowed;
 }
 
-.result-row {
-  margin-top: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
 #url-result {
-  margin: 0;
+  margin: 1rem 0 0;
   font-size: 1.1rem;
   word-break: break-all;
+}
+
+#url-result:empty {
+  display: none;
 }
 
 .icon-btn {
@@ -193,7 +199,7 @@ footer {
 
 .url-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 30rem));
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 22rem));
   justify-content: center;
   gap: 5px;
 }
@@ -202,11 +208,11 @@ footer {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 1rem;
+  padding: 0.5rem 1rem;
   background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 0.5rem;
-  max-width: 30rem;
+  max-width: 22rem;
 }
 
 .url-card--new {
@@ -260,9 +266,10 @@ footer {
 .url-card-footer {
   margin-top: auto;
   padding-top: 0.5rem;
+  border-top: 1px solid #e5e7eb;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
 }
 
 .icon-btn.delete-btn {
