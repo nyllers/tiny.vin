@@ -102,7 +102,7 @@ function validateUrl(input) {
     };
   }
 
-  return { url: parsed.href };
+  return { url: input };
 }
 
 function validateSuffix(input) {
