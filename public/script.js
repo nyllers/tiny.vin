@@ -61,7 +61,8 @@ async function generateUrl() {
     }
 
     input.value = "";
-    result.textContent = "Short URL created — see below.";
+    result.textContent = "";
+    updateGenerateButtonState();
     loadHistory();
   } catch {
     result.textContent = "Network error, try again.";
@@ -128,32 +129,36 @@ async function deleteUrl(code, shortUrl) {
 const NEW_BADGE_WINDOW_MS = 5 * 60 * 1000;
 
 function createUrlCard(item) {
-  const card = document.createElement("div");
-  card.className = "url-card";
+  const isNew = Date.now() - item.createdAt < NEW_BADGE_WINDOW_MS;
 
-  const topRow = document.createElement("div");
-  topRow.className = "url-card-top";
-  if (Date.now() - item.createdAt < NEW_BADGE_WINDOW_MS) {
+  const card = document.createElement("div");
+  card.className = isNew ? "url-card url-card--new" : "url-card";
+
+  const originalRow = document.createElement("div");
+  originalRow.className = "url-card-row";
+  const originalHeader = document.createElement("div");
+  originalHeader.className = "url-card-header";
+  const originalLabel = document.createElement("span");
+  originalLabel.className = "url-card-label";
+  originalLabel.textContent = "Original URL";
+  const meta = document.createElement("div");
+  meta.className = "url-card-meta";
+  if (isNew) {
     const newBadge = document.createElement("span");
     newBadge.className = "new-badge";
     newBadge.textContent = "NEW!";
-    topRow.appendChild(newBadge);
+    meta.appendChild(newBadge);
   }
   const createdValue = document.createElement("span");
   createdValue.className = "url-card-timestamp";
   createdValue.textContent = new Date(item.createdAt).toLocaleString();
-  topRow.appendChild(createdValue);
-
-  const originalRow = document.createElement("div");
-  originalRow.className = "url-card-row";
-  const originalLabel = document.createElement("span");
-  originalLabel.className = "url-card-label";
-  originalLabel.textContent = "Original URL";
+  meta.appendChild(createdValue);
+  originalHeader.append(originalLabel, meta);
   const originalValue = document.createElement("span");
   originalValue.className = "url-card-value";
   originalValue.title = item.originalUrl;
   originalValue.textContent = item.originalUrl;
-  originalRow.append(originalLabel, originalValue);
+  originalRow.append(originalHeader, originalValue);
 
   const shortRow = document.createElement("div");
   shortRow.className = "url-card-row";
@@ -179,7 +184,7 @@ function createUrlCard(item) {
   deleteBtn.addEventListener("click", () => deleteUrl(item.code, item.shortUrl));
   footerRow.append(deleteBtn);
 
-  card.append(topRow, originalRow, shortRow, footerRow);
+  card.append(originalRow, shortRow, footerRow);
   return card;
 }
 
@@ -212,9 +217,17 @@ async function loadHistory() {
   }
 }
 
+function updateGenerateButtonState() {
+  const input = document.getElementById("url-input");
+  const generateBtn = document.getElementById("generate-btn");
+  generateBtn.disabled = input.value.trim() === "";
+}
+
 document.getElementById("generate-btn").addEventListener("click", generateUrl);
+document.getElementById("url-input").addEventListener("input", updateGenerateButtonState);
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") generateUrl();
+  if (event.key === "Enter" && !document.getElementById("generate-btn").disabled) generateUrl();
 });
 
+updateGenerateButtonState();
 loadHistory();

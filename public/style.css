@@ -77,6 +77,11 @@ h1 {
   background: #3730a3;
 }
 
+#generate-btn:disabled {
+  background: #c7c7f5;
+  cursor: not-allowed;
+}
+
 .result-row {
   margin-top: 1rem;
   display: flex;
@@ -204,10 +209,20 @@ footer {
   max-width: 30rem;
 }
 
-.url-card-top {
+.url-card--new {
+  background: #eeffee;
+}
+
+.url-card-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.url-card-meta {
+  display: flex;
+  align-items: center;
   gap: 0.4rem;
 }
 
