@@ -94,22 +94,24 @@ function createCopyIconButton() {
   return button;
 }
 
-function createAddSuffixButton() {
+function createAddPathButton() {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "icon-btn add-suffix-btn";
+  button.className = "icon-btn card-action-btn";
   button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <line x1="12" y1="5" x2="12" y2="19"></line>
     <line x1="5" y1="12" x2="19" y2="12"></line>
-  </svg><span>Add suffix</span>`;
+  </svg><span>Add path</span>`;
   return button;
 }
 
 function createSaveSuffixButton() {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "save-suffix-btn";
-  button.textContent = "Save";
+  button.className = "icon-btn card-action-btn";
+  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="20 6 9 17 4 12"></polyline>
+  </svg><span>Save</span>`;
   return button;
 }
 
@@ -274,25 +276,22 @@ function createUrlCard(group, justCreatedCode) {
     shortRow.append(createShortUrlRow(shortUrlItem));
   }
 
-  const suffixContainer = document.createElement("div");
-  suffixContainer.className = "url-card-suffix-container";
-
-  const footerRow = document.createElement("div");
-  footerRow.className = "url-card-footer";
-  const addSuffixBtn = createAddSuffixButton();
+  const actionsContainer = document.createElement("div");
+  actionsContainer.className = "url-card-actions";
+  const addPathBtn = createAddPathButton();
   function closeSuffixRow() {
-    suffixContainer.textContent = "";
-    addSuffixBtn.hidden = false;
+    actionsContainer.textContent = "";
+    actionsContainer.appendChild(addPathBtn);
   }
-  addSuffixBtn.addEventListener("click", () => {
-    addSuffixBtn.hidden = true;
+  addPathBtn.addEventListener("click", () => {
+    actionsContainer.textContent = "";
     const inputRow = createSuffixInputRow(group, closeSuffixRow);
-    suffixContainer.appendChild(inputRow);
+    actionsContainer.appendChild(inputRow);
     inputRow.querySelector("input").focus();
   });
-  footerRow.append(addSuffixBtn);
+  actionsContainer.appendChild(addPathBtn);
 
-  card.append(originalRow, shortRow, footerRow, suffixContainer);
+  card.append(originalRow, shortRow, actionsContainer);
   return card;
 }
 
