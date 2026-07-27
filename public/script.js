@@ -63,7 +63,7 @@ async function generateUrl() {
     input.value = "";
     result.textContent = "";
     updateGenerateButtonState();
-    loadHistory();
+    loadHistory(data.code);
   } catch {
     result.textContent = "Network error, try again.";
   }
@@ -128,11 +128,14 @@ async function deleteUrl(code, shortUrl) {
 
 const NEW_BADGE_WINDOW_MS = 5 * 60 * 1000;
 
-function createUrlCard(item) {
+function createUrlCard(item, shouldFlash) {
   const isNew = Date.now() - item.createdAt < NEW_BADGE_WINDOW_MS;
 
   const card = document.createElement("div");
   card.className = isNew ? "url-card url-card--new" : "url-card";
+  if (shouldFlash) {
+    card.classList.add("url-card--flash");
+  }
 
   const originalRow = document.createElement("div");
   originalRow.className = "url-card-row";
@@ -188,7 +191,7 @@ function createUrlCard(item) {
   return card;
 }
 
-async function loadHistory() {
+async function loadHistory(justCreatedCode) {
   const container = document.getElementById("history-list");
 
   try {
@@ -209,7 +212,7 @@ async function loadHistory() {
     const list = document.createElement("div");
     list.className = "url-cards";
     for (const item of data.urls) {
-      list.appendChild(createUrlCard(item));
+      list.appendChild(createUrlCard(item, item.code === justCreatedCode));
     }
     container.appendChild(list);
   } catch {

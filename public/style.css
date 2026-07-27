@@ -213,6 +213,19 @@ footer {
   background: #eeffee;
 }
 
+.url-card--flash {
+  animation: card-flash 200ms ease-out;
+}
+
+@keyframes card-flash {
+  from {
+    filter: brightness(1.8);
+  }
+  to {
+    filter: brightness(1);
+  }
+}
+
 .url-card-header {
   display: flex;
   align-items: center;
