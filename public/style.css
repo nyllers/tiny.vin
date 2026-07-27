@@ -310,6 +310,12 @@ footer {
   height: 12px;
 }
 
+.icon-btn.delete-btn,
+.icon-btn.save-suffix-btn {
+  width: 4.5rem;
+  justify-content: center;
+}
+
 .icon-btn.delete-btn:hover {
   color: #ff3333;
   background: #ffb3b3;
@@ -362,6 +368,10 @@ footer {
   color: #4b5563;
 }
 
+.url-card-suffix-wrapper {
+  width: 100%;
+}
+
 .url-card-suffix-prefix {
   color: #6b7280;
   font-size: 0.85rem;
@@ -371,8 +381,9 @@ footer {
 .url-card-suffix-input {
   flex: 1;
   min-width: 0;
-  padding: 2px 0.25rem;
-  font-size: 0.85rem;
+  padding: 1px 0.25rem;
+  font-size: 0.75rem;
+  border: 1px solid #d1d5db;
 }
 
 .url-card-suffix-error {

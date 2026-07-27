@@ -108,7 +108,7 @@ function createAddPathButton() {
 function createSaveSuffixButton() {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "icon-btn card-action-btn";
+  button.className = "icon-btn card-action-btn save-suffix-btn";
   button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <polyline points="20 6 9 17 4 12"></polyline>
   </svg><span>Save</span>`;
@@ -231,6 +231,7 @@ function createSuffixInputRow(group, onCancel) {
 
 function createUrlCard(group, justCreatedCode) {
   const latestCreatedAt = group.shortUrls[0].createdAt;
+  const oldestCreatedAt = group.shortUrls[group.shortUrls.length - 1].createdAt;
   const isNew = Date.now() - latestCreatedAt < NEW_BADGE_WINDOW_MS;
   const shouldFlash = group.shortUrls.some((shortUrlItem) => shortUrlItem.code === justCreatedCode);
 
@@ -257,7 +258,7 @@ function createUrlCard(group, justCreatedCode) {
   }
   const createdValue = document.createElement("span");
   createdValue.className = "url-card-timestamp";
-  createdValue.textContent = new Date(latestCreatedAt).toLocaleString();
+  createdValue.textContent = new Date(oldestCreatedAt).toLocaleString();
   meta.appendChild(createdValue);
   originalHeader.append(originalLabel, meta);
   const originalValue = document.createElement("span");
