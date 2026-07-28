@@ -55,7 +55,7 @@ body {
 
 .panel {
   width: 100%;
-  max-width: 740px;
+  max-width: 380px;
   background: var(--panel-bg);
   border-radius: 1rem;
   padding: 2rem;
@@ -262,10 +262,8 @@ footer {
 }
 
 .url-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 22rem));
-  justify-content: center;
-  gap: 5px;
+  column-width: 22rem;
+  column-gap: 5px;
 }
 
 .url-card {
@@ -273,10 +271,11 @@ footer {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
+  margin-bottom: 5px;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 0.5rem;
-  max-width: 22rem;
+  break-inside: avoid;
 }
 
 .url-card--new {
@@ -334,6 +333,11 @@ footer {
   margin-top: -0.35rem;
 }
 
+.url-card-actions-separator {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
 .icon-btn.card-action-btn {
   color: #4338ca;
   background: #e0e7ff;
@@ -342,11 +346,6 @@ footer {
   padding: 1px 0.35rem;
   font-size: 0.75rem;
   border-radius: 0.25rem;
-}
-
-.icon-btn.card-action-btn svg {
-  width: 12px;
-  height: 12px;
 }
 
 .icon-btn.card-action-btn:hover {
@@ -410,6 +409,11 @@ footer {
   align-items: center;
   justify-content: space-between;
   gap: 0.4rem;
+}
+
+.url-card-copy-row:not(:last-child) {
+  padding-bottom: 0.15rem;
+  border-bottom: 1px solid var(--card-border);
 }
 
 .url-card-copy-group {

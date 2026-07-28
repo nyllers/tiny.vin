@@ -71,10 +71,7 @@ function createAddButton(label) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "icon-btn card-action-btn";
-  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19"></line>
-    <line x1="5" y1="12" x2="19" y2="12"></line>
-  </svg><span>${label}</span>`;
+  button.innerHTML = `<span>${label}</span>`;
   return button;
 }
 
@@ -290,12 +287,15 @@ function createUrlCard(group, justCreatedCode) {
 
   const actionsContainer = document.createElement("div");
   actionsContainer.className = "url-card-actions";
-  const addPathBtn = createAddButton("Path");
-  const addSubdomainBtn = createAddButton("Subdomain");
+  const addPathBtn = createAddButton("Add Path");
+  const addSubdomainBtn = createAddButton("Add Subdomain");
 
   function showActionButtons() {
     actionsContainer.textContent = "";
-    actionsContainer.append(addPathBtn, addSubdomainBtn);
+    const separator = document.createElement("span");
+    separator.className = "url-card-actions-separator";
+    separator.textContent = "or";
+    actionsContainer.append(addPathBtn, separator, addSubdomainBtn);
   }
 
   addPathBtn.addEventListener("click", () => {
@@ -335,12 +335,15 @@ async function loadHistory(justCreatedCode) {
     }
 
     panel.hidden = false;
+    const heading = document.createElement("h2");
+    heading.className = "section-heading";
+    heading.textContent = "YOUR LINKS";
     const list = document.createElement("div");
     list.className = "url-cards";
     for (const group of data.urls) {
       list.appendChild(createUrlCard(group, justCreatedCode));
     }
-    container.appendChild(list);
+    container.append(heading, list);
   } catch {
     // history is a nice-to-have; a failed fetch shouldn't break the page
   }
