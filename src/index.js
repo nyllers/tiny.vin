@@ -161,7 +161,7 @@ async function handleShorten(request, env, session) {
       return jsonResponse({
         code: customCode,
         originalUrl: validation.url,
-        shortUrl: `https://tiny.vin/${customCode}`,
+        shortUrl: `tiny.vin/${customCode}`,
       });
     } catch {
       return jsonResponse({ error: `"${customCode}" is already taken, try another.` }, 409);
@@ -179,7 +179,7 @@ async function handleShorten(request, env, session) {
       return jsonResponse({
         code,
         originalUrl: validation.url,
-        shortUrl: `https://tiny.vin/${code}`,
+        shortUrl: `tiny.vin/${code}`,
       });
     } catch {
       // code collision, retry with a new random code
@@ -215,7 +215,7 @@ async function handleHistory(env, session) {
     }
     groups.get(row.original_url).push({
       code: row.code,
-      shortUrl: `https://tiny.vin/${row.code}`,
+      shortUrl: `tiny.vin/${row.code}`,
       createdAt: row.created_at,
     });
   }
