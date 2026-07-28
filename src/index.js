@@ -2,6 +2,7 @@ import { buildAuthorizeUrl, exchangeCodeForToken, fetchUserInfo } from "./provid
 import { parseCookies, createSessionCookie, clearSessionCookie, getSession, randomState } from "./session.js";
 
 const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+const UPPERCASE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const CODE_LENGTH = 8;
 const MAX_ATTEMPTS = 5;
 const CODE_PATTERN = /^\/([A-Za-z0-9]{1,32})$/;
@@ -22,9 +23,14 @@ function jsonResponse(data, status = 200) {
 }
 
 function generateCode() {
+  const forcedUppercaseIndex = Math.floor(Math.random() * CODE_LENGTH);
   let code = "";
   for (let i = 0; i < CODE_LENGTH; i++) {
-    code += CHARS[Math.floor(Math.random() * CHARS.length)];
+    if (i === forcedUppercaseIndex) {
+      code += UPPERCASE_CHARS[Math.floor(Math.random() * UPPERCASE_CHARS.length)];
+    } else {
+      code += CHARS[Math.floor(Math.random() * CHARS.length)];
+    }
   }
   return code;
 }
