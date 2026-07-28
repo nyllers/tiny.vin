@@ -3,6 +3,9 @@
   "name": "tiny-vin",
   "compatibility_date": "2026-07-25",
   "main": "src/index.js",
+  "vars": {
+    "SITE_URL": "https://tiny.vin"
+  },
   "observability": {
     "enabled": true
   },
