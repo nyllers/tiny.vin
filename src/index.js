@@ -80,12 +80,59 @@ function htmlResponse(body, extraHeaders = {}) {
   });
 }
 
-function validateUrl(input) {
+function isValidHostname(hostname) {
+  return Boolean(hostname) && (hostname.includes(".") || hostname === "localhost");
+}
+
+async function urlExists(url) {
+  const headers = { "user-agent": "Mozilla/5.0 (compatible; TinyVINBot/1.0; +https://tiny.vin)" };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const headResponse = await fetch(url, { method: "HEAD", redirect: "follow", headers, signal: controller.signal });
+    if (headResponse.ok) return true;
+
+    const getResponse = await fetch(url, { method: "GET", redirect: "follow", headers, signal: controller.signal });
+    return getResponse.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function validateUrl(input) {
   if (!input.includes("://")) {
     if (/\s/.test(input)) {
       return { error: "That doesn't look like a URL. Try a format like: https://example.com" };
     }
-    return { error: `Missing "http://" or "https://" at the start. Try: https://${input}` };
+
+    let parsed;
+    try {
+      parsed = new URL(`https://${input}`);
+    } catch {
+      return { error: "That doesn't look like a valid URL. Try a format like: https://example.com/page" };
+    }
+
+    if (!isValidHostname(parsed.hostname)) {
+      return {
+        error: `"${parsed.hostname}" doesn't look like a real domain. Try a format like: https://example.com`,
+      };
+    }
+
+    const httpsUrl = `https://${input}`;
+    const httpUrl = `http://${input}`;
+    const foundUrl = (await urlExists(httpsUrl)) ? httpsUrl : (await urlExists(httpUrl)) ? httpUrl : null;
+
+    if (!foundUrl) {
+      return { error: `We couldn't find a live webpage at "${input}". Double check the address and try again.` };
+    }
+
+    if (foundUrl.length <= 20) {
+      return { error: "The given URL is already teeny-weeny!" };
+    }
+
+    return { url: foundUrl };
   }
 
   const scheme = input.slice(0, input.indexOf("://")).toLowerCase();
@@ -102,7 +149,7 @@ function validateUrl(input) {
     return { error: "That doesn't look like a valid URL. Try a format like: https://example.com/page" };
   }
 
-  if (!parsed.hostname || (!parsed.hostname.includes(".") && parsed.hostname !== "localhost")) {
+  if (!isValidHostname(parsed.hostname)) {
     return {
       error: `"${parsed.hostname}" doesn't look like a real domain. Try a format like: https://example.com`,
     };
@@ -110,6 +157,10 @@ function validateUrl(input) {
 
   if (input.length <= 20) {
     return { error: "The given URL is already teeny-weeny!" };
+  }
+
+  if (!(await urlExists(input))) {
+    return { error: "We couldn't find a live webpage at that address. Double check it and try again." };
   }
 
   return { url: input };
@@ -140,7 +191,7 @@ async function handleShorten(request, env, session) {
     return jsonResponse({ error: "Missing url" }, 400);
   }
 
-  const validation = validateUrl(url);
+  const validation = await validateUrl(url);
   if (validation.error) {
     return jsonResponse({ error: validation.error }, 400);
   }
