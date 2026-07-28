@@ -119,18 +119,18 @@ h1 {
   padding: 0.5rem 1rem;
   font-size: 1rem;
   cursor: pointer;
-  background: #4338ca;
+  background: var(--heading);
   color: #fff;
   border: none;
   border-radius: 0.375rem;
 }
 
 #generate-btn:hover {
-  background: #3730a3;
+  opacity: 0.75;
 }
 
 #generate-btn:disabled {
-  background: #6b7280;
+  opacity: 0.25;
   cursor: not-allowed;
 }
 
