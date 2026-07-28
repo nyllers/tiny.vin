@@ -129,7 +129,7 @@ async function validateUrl(input) {
       return { error: `We couldn't find a live webpage at "${input}". Double check the address and try again.` };
     }
 
-    if (foundUrl.length <= 20) {
+    if (foundUrl.length <= 10) {
       return { error: "The given URL is already teeny-weeny!" };
     }
 
@@ -156,7 +156,7 @@ async function validateUrl(input) {
     };
   }
 
-  if (input.length <= 20) {
+  if (input.length <= 10) {
     return { error: "The given URL is already teeny-weeny!" };
   }
 

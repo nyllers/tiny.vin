@@ -101,6 +101,10 @@ h1 {
   display: none;
 }
 
+#url-result.url-result-error {
+  color: #dc2626;
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;
