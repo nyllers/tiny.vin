@@ -263,7 +263,7 @@ footer {
 
 .url-cards {
   column-width: 22rem;
-  column-gap: 5px;
+  column-gap: 10px;
 }
 
 .url-card {
@@ -271,7 +271,7 @@ footer {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  margin-bottom: 5px;
+  margin-bottom: 10px;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 0.5rem;
@@ -330,9 +330,7 @@ footer {
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: 0.5rem;
-  margin-top: 0.15rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--card-border);
+  margin-top: 0.35rem;
 }
 
 .url-card-actions-separator {
@@ -414,7 +412,7 @@ footer {
   gap: 0.4rem;
 }
 
-.url-card-row--tiny > .url-card-copy-row:not(:last-child) {
+.url-card-row--tiny > .url-card-copy-row {
   padding-bottom: 0.15rem;
   border-bottom: 1px solid var(--card-border);
 }
