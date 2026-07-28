@@ -6,3 +6,6 @@
 !.env.example
 
 .claude
+
+# local DB backups/dumps, never commit production data
+backup_*.sql
