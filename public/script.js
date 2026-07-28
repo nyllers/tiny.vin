@@ -78,7 +78,7 @@ async function copyCardShortUrl(shortUrl, displayEl) {
     await navigator.clipboard.writeText(shortUrl);
     displayEl.textContent = "Copied!";
     setTimeout(() => {
-      displayEl.textContent = shortUrl;
+      displayEl.textContent = shortUrl.replace(/^https:\/\//, "");
     }, 1000);
   } catch {
     displayEl.textContent = "Could not copy, select the text manually.";
@@ -162,7 +162,7 @@ function createShortUrlRow(shortUrlItem) {
   const shortValue = document.createElement("span");
   shortValue.className = "url-card-value url-card-copy-text";
   shortValue.title = "Click to copy";
-  shortValue.textContent = shortUrlItem.shortUrl;
+  shortValue.textContent = shortUrlItem.shortUrl.replace(/^https:\/\//, "");
   const shortCopyBtn = createCopyIconButton();
   const copyShort = () => copyCardShortUrl(shortUrlItem.shortUrl, shortValue);
   shortValue.addEventListener("click", copyShort);
