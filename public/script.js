@@ -1,38 +1,3 @@
-function validateUrl(input) {
-  if (!input.includes("://")) {
-    if (/\s/.test(input)) {
-      return { error: "That doesn't look like a URL. Try a format like: https://example.com" };
-    }
-    return { error: `Missing "http://" or "https://" at the start. Try: https://${input}` };
-  }
-
-  const scheme = input.slice(0, input.indexOf("://")).toLowerCase();
-  if (scheme !== "http" && scheme !== "https") {
-    return {
-      error: `"${scheme}://" links aren't supported, only http:// and https://. Try: https://example.com`,
-    };
-  }
-
-  let parsed;
-  try {
-    parsed = new URL(input);
-  } catch {
-    return { error: "That doesn't look like a valid URL. Try a format like: https://example.com/page" };
-  }
-
-  if (!parsed.hostname || (!parsed.hostname.includes(".") && parsed.hostname !== "localhost")) {
-    return {
-      error: `"${parsed.hostname}" doesn't look like a real domain. Try a format like: https://example.com`,
-    };
-  }
-
-  if (input.length <= 20) {
-    return { error: "The given URL is already teeny-weeny!" };
-  }
-
-  return { url: parsed.href };
-}
-
 async function generateUrl() {
   const input = document.getElementById("url-input");
   const result = document.getElementById("url-result");
@@ -43,13 +8,7 @@ async function generateUrl() {
     return;
   }
 
-  const validation = validateUrl(url);
-  if (validation.error) {
-    result.textContent = validation.error;
-    return;
-  }
-
-  result.textContent = "Generating...";
+  result.textContent = "Checking that page exists...";
 
   try {
     const response = await fetch("/api/shorten", {
