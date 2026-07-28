@@ -74,11 +74,12 @@ async function generateUrl() {
 }
 
 async function copyCardShortUrl(shortUrl, displayEl) {
+  const strippedUrl = shortUrl.replace(/^https:\/\//, "");
   try {
-    await navigator.clipboard.writeText(shortUrl);
+    await navigator.clipboard.writeText(strippedUrl);
     displayEl.textContent = "Copied!";
     setTimeout(() => {
-      displayEl.textContent = shortUrl.replace(/^https:\/\//, "");
+      displayEl.textContent = strippedUrl;
     }, 1000);
   } catch {
     displayEl.textContent = "Could not copy, select the text manually.";
