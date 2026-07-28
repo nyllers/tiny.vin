@@ -63,6 +63,10 @@ function createCopyIconButton() {
   button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="9" y="9" width="13" height="13" rx="2"></rect>
     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+    <g transform="translate(6.7 6.7) scale(0.76)" stroke-width="2">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+    </g>
   </svg>`;
   return button;
 }
@@ -264,7 +268,7 @@ function createUrlCard(group, justCreatedCode) {
   }
   const createdValue = document.createElement("span");
   createdValue.className = "url-card-timestamp";
-  createdValue.textContent = new Date(oldestCreatedAt).toLocaleString();
+  createdValue.textContent = `Created: ${new Date(oldestCreatedAt).toLocaleString()}`;
   meta.appendChild(createdValue);
   metaRow.appendChild(meta);
   const originalValue = document.createElement("span");

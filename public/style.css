@@ -130,7 +130,7 @@ h1 {
 }
 
 #generate-btn:disabled {
-  background: #c7c7f5;
+  background: #6b7280;
   cursor: not-allowed;
 }
 
@@ -414,7 +414,7 @@ footer {
   gap: 0.4rem;
 }
 
-.url-card-copy-row:not(:last-child) {
+.url-card-row--tiny > .url-card-copy-row:not(:last-child) {
   padding-bottom: 0.15rem;
   border-bottom: 1px solid var(--card-border);
 }
