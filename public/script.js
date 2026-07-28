@@ -79,9 +79,7 @@ function createSaveSuffixButton() {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "icon-btn card-action-btn save-suffix-btn";
-  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="20 6 9 17 4 12"></polyline>
-  </svg><span>Save</span>`;
+  button.innerHTML = `<span>Save</span>`;
   return button;
 }
 
@@ -91,13 +89,7 @@ function createDeleteIconButton() {
   button.className = "icon-btn delete-btn";
   button.title = "Delete";
   button.setAttribute("aria-label", "Delete this URL");
-  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="3 6 5 6 21 6"></polyline>
-    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-    <path d="M10 11v6"></path>
-    <path d="M14 11v6"></path>
-    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
-  </svg><span>Delete</span>`;
+  button.innerHTML = `<span>Delete</span>`;
   return button;
 }
 
@@ -177,7 +169,9 @@ function createInlineCodeInputRow({ group, bodyKey, prefixText, suffixText, plac
   error.className = "url-card-suffix-error";
 
   function updateSaveButtonLabel() {
-    saveBtnLabel.textContent = input.value.trim() ? "Save" : "Cancel";
+    const hasValue = Boolean(input.value.trim());
+    saveBtnLabel.textContent = hasValue ? "Save" : "Cancel";
+    saveBtn.classList.toggle("save-suffix-btn--cancel", !hasValue);
   }
 
   async function submitValue() {

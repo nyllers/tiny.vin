@@ -330,7 +330,9 @@ footer {
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: 0.5rem;
-  margin-top: -0.35rem;
+  margin-top: 0.15rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--card-border);
 }
 
 .url-card-actions-separator {
@@ -339,9 +341,9 @@ footer {
 }
 
 .icon-btn.card-action-btn {
-  color: #4338ca;
-  background: #e0e7ff;
-  border: 1px solid #4338ca;
+  color: var(--heading);
+  background: none;
+  border: 1px solid var(--heading);
   gap: 0.25rem;
   padding: 1px 0.35rem;
   font-size: 0.75rem;
@@ -349,8 +351,9 @@ footer {
 }
 
 .icon-btn.card-action-btn:hover {
-  color: #4338ca;
-  background: #c7d2fe;
+  color: var(--heading);
+  background: none;
+  opacity: 0.75;
 }
 
 .icon-btn.card-action-btn:disabled {
@@ -358,19 +361,19 @@ footer {
   cursor: not-allowed;
 }
 
+.save-suffix-btn.save-suffix-btn--cancel {
+  color: #6b7280;
+  border-color: #6b7280;
+}
+
 .icon-btn.delete-btn {
   color: #ff3333;
-  background: #ffcccc;
+  background: none;
   border: 1px solid #ff3333;
   gap: 0.25rem;
   padding: 1px 0.35rem;
   font-size: 0.75rem;
   border-radius: 0.25rem;
-}
-
-.icon-btn.delete-btn svg {
-  width: 12px;
-  height: 12px;
 }
 
 .icon-btn.delete-btn,
@@ -381,7 +384,8 @@ footer {
 
 .icon-btn.delete-btn:hover {
   color: #ff3333;
-  background: #ffb3b3;
+  background: none;
+  opacity: 0.75;
 }
 
 .url-card-row {
@@ -391,7 +395,6 @@ footer {
 }
 
 .url-card-row--tiny {
-  border-top: 1px solid var(--card-border);
   padding-top: 0.5rem;
 }
 
@@ -450,6 +453,7 @@ footer {
   padding: 1px 0.25rem;
   font-size: 0.75rem;
   border: 1px solid var(--input-border);
+  border-radius: 0.25rem;
   background: var(--input-bg);
   color: var(--text);
 }
