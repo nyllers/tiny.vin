@@ -351,7 +351,7 @@ async function handleDeleteUrl(code, kind, env, session) {
   return jsonResponse({ ok: true });
 }
 
-async function recordRedirectEvent(env, { code, kind, originalUrl, request }) {
+async function recordRedirectEvent(env, { code, kind, request }) {
   try {
     const headers = JSON.stringify(Object.fromEntries(request.headers.entries()));
     const cfData = JSON.stringify(request.cf || {});
@@ -362,10 +362,10 @@ async function recordRedirectEvent(env, { code, kind, originalUrl, request }) {
 
     await env.DB.prepare(
       `INSERT INTO redirect_events
-        (code, kind, original_url, requested_at, ip_address, country, user_agent, referer, headers, cf_data)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (code, kind, requested_at, ip_address, country, user_agent, referer, headers, cf_data)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-      .bind(code, kind, originalUrl, Date.now(), ipAddress, country, userAgent, referer, headers, cfData)
+      .bind(code, kind, Date.now(), ipAddress, country, userAgent, referer, headers, cfData)
       .run();
   } catch {
     // stats are best-effort; never block a redirect over it
@@ -383,7 +383,7 @@ async function handleRedirect(code, kind, env, ctx, request) {
     return new Response("Not found", { status: 404 });
   }
 
-  ctx.waitUntil(recordRedirectEvent(env, { code, kind, originalUrl: row.original_url, request }));
+  ctx.waitUntil(recordRedirectEvent(env, { code, kind, request }));
 
   return Response.redirect(row.original_url, 302);
 }
