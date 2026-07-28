@@ -264,6 +264,7 @@ footer {
 .url-cards {
   column-width: 22rem;
   column-gap: 10px;
+  justify-content: center;
 }
 
 .url-card {
@@ -276,6 +277,11 @@ footer {
   border: 1px solid var(--card-border);
   border-radius: 0.5rem;
   break-inside: avoid;
+}
+
+.url-card:only-child {
+  position: relative;
+  left: 50%;
 }
 
 .url-card--flash {
