@@ -54,13 +54,14 @@ function loginPage(errorCode) {
   <script>(function () { var t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); })();</script>
 </head>
 <body>
+  <span class="wordmark">tiny<span class="accent-dot">.</span>vin</span>
   <div class="theme-toggle" role="group" aria-label="Theme">
     <button type="button" class="theme-btn" data-theme-value="light">Light</button>
     <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
   </div>
   <h1>Tiny VIN</h1>
   <main class="panel">
-    <p class="login-instruction">Sign in to paste or enter a URL and shorten it. Then share it anywhere &ndash; it's available to everyone!</p>
+    <p class="login-instruction">Sign in and paste or enter a URL to shorten it. Then share it &ndash; it's available to everyone!</p>
     <div class="login-buttons">
       <a class="provider-btn" href="/auth/google/start">
         <svg class="provider-icon" viewBox="0 0 48 48" aria-hidden="true">

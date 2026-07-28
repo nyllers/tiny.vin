@@ -493,3 +493,16 @@ footer {
   background: var(--heading);
   color: #fff;
 }
+
+.wordmark {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  color: var(--text);
+  font-size: 25px;
+  font-weight: 700;
+}
+
+.accent-dot {
+    color: var(--heading);
+}
