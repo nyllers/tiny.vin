@@ -330,7 +330,7 @@ footer {
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: 0.5rem;
-  margin-top: 0.35rem;
+  margin-top: calc(0.35rem - 3px);
 }
 
 .url-card-actions-separator {
@@ -413,7 +413,7 @@ footer {
 }
 
 .url-card-row--tiny > .url-card-copy-row {
-  padding-bottom: 0.15rem;
+  padding-bottom: calc(0.15rem + 1px);
   border-bottom: 1px solid var(--card-border);
 }
 
@@ -432,9 +432,8 @@ footer {
   font-weight: 700;
 }
 
-.url-card-timestamp {
-  font-size: 0.75rem;
-  color: #4b5563;
+.url-card-copy-text:hover {
+  color: #4338ff;
 }
 
 .url-card-suffix-wrapper {

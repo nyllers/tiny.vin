@@ -254,26 +254,23 @@ function createUrlCard(group, justCreatedCode) {
 
   const originalRow = document.createElement("div");
   originalRow.className = "url-card-row";
-  const metaRow = document.createElement("div");
-  metaRow.className = "url-card-meta-row";
-  const meta = document.createElement("div");
-  meta.className = "url-card-meta";
   if (isNew) {
+    const metaRow = document.createElement("div");
+    metaRow.className = "url-card-meta-row";
+    const meta = document.createElement("div");
+    meta.className = "url-card-meta";
     const newBadge = document.createElement("span");
     newBadge.className = "new-badge";
     newBadge.textContent = "NEW!";
     meta.appendChild(newBadge);
+    metaRow.appendChild(meta);
+    originalRow.appendChild(metaRow);
   }
-  const createdValue = document.createElement("span");
-  createdValue.className = "url-card-timestamp";
-  createdValue.textContent = `Created: ${new Date(oldestCreatedAt).toLocaleString()}`;
-  meta.appendChild(createdValue);
-  metaRow.appendChild(meta);
   const originalValue = document.createElement("span");
   originalValue.className = "url-card-value url-card-value--original";
   originalValue.title = group.originalUrl;
   originalValue.textContent = group.originalUrl;
-  originalRow.append(metaRow, originalValue);
+  originalRow.append(originalValue);
 
   const shortRow = document.createElement("div");
   shortRow.className = "url-card-row url-card-row--tiny";
