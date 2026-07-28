@@ -45,24 +45,29 @@ async function generateUrl() {
 async function copyCardShortUrl(shortUrl, displayEl) {
   try {
     await navigator.clipboard.writeText(shortUrl);
-    displayEl.textContent = "Copied!";
+    displayEl.textContent = "Copied to clipboard!";
     setTimeout(() => {
       displayEl.textContent = shortUrl;
     }, 1000);
   } catch {
-    displayEl.textContent = "Could not copy, select the text manually.";
+    displayEl.textContent = "Could not copy to clipboard";
+    setTimeout(() => {
+      displayEl.textContent = shortUrl;
+    }, 1000);
   }
 }
 
 function createCopyIconButton() {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "icon-btn";
-  button.title = "Copy to clipboard";
-  button.setAttribute("aria-label", "Copy to clipboard");
-  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="9" y="9" width="13" height="13" rx="2"></rect>
-    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+  button.className = "icon-btn copy-link-btn";
+  button.title = "Click to copy";
+  button.setAttribute("aria-label", "Click to copy");
+  button.innerHTML = `<svg viewBox="0 0 148 148" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="translate(0.000000,148.000000) scale(0.100000,-0.100000)" fill="currentColor" stroke="none" class="">
+      <path d="M218 1380 c-48 -9 -101 -50 -122 -94 -15 -32 -17 -84 -17 -460 -1 -471 -2 -460 67 -512 27 -21 51 -29 102 -33 l67 -6 5 -50 c6 -58 35 -104 85 -135 34 -21 43 -22 452 -22 l416 0 40 29 c22 15 49 44 59 65 18 34 19 64 20 447 0 405 0 410 -22 445 -31 51 -77 80 -135 86 l-50 5 -2 49 c-2 68 -9 90 -39 126 -56 66 -47 65 -489 66 -220 1 -417 -2 -437 -6z m833 -139 c11 -14 19 -39 19 -62 l0 -40 -307 1 c-170 1 -317 -2 -328 -6 -40 -14 -87 -57 -102 -93 -13 -30 -15 -89 -14 -343 l2 -308 -45 0 c-36 0 -48 5 -65 26 -20 26 -21 37 -21 420 l0 393 26 20 c25 20 37 20 421 18 l395 -2 19 -24z m208 -235 c20 -18 20 -28 21 -396 0 -357 -1 -379 -19 -401 l-19 -24 -379 -3 c-373 -3 -380 -2 -406 18 l-27 21 0 384 0 384 26 20 c25 20 37 20 404 18 353 -2 379 -3 399 -21z" class=""></path>
+      <path d="M885 923 c-43 -22 -132 -111 -162 -161 -22 -37 -25 -52 -21 -106 5 -83 34 -127 106 -163 l54 -26 -44 -38 c-24 -21 -55 -43 -71 -50 -22 -9 -35 -9 -64 2 -20 8 -45 26 -56 42 -27 35 -27 89 0 125 17 22 20 38 15 80 -2 29 -9 52 -13 52 -15 0 -68 -61 -91 -105 -15 -27 -22 -57 -21 -93 0 -40 7 -63 30 -100 38 -62 96 -95 168 -94 32 0 68 8 92 20 52 27 158 141 173 187 19 56 8 133 -24 182 -19 29 -42 48 -79 63 l-52 23 35 29 c51 43 92 68 115 68 34 0 85 -39 101 -76 12 -28 13 -43 4 -69 -6 -18 -17 -39 -25 -45 -10 -9 -13 -25 -9 -58 9 -77 12 -79 44 -41 17 19 42 54 57 79 21 34 27 56 27 96 -1 69 -39 134 -98 169 -33 19 -56 25 -102 25 -33 -1 -72 -8 -89 -17z m-34 -264 c34 -24 63 -74 55 -95 -8 -20 -33 -17 -68 7 -31 23 -63 83 -53 99 10 16 35 12 66 -11z"></path>
+    </g>
   </svg>`;
   return button;
 }
@@ -71,10 +76,7 @@ function createAddButton(label) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "icon-btn card-action-btn";
-  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19"></line>
-    <line x1="5" y1="12" x2="19" y2="12"></line>
-  </svg><span>${label}</span>`;
+  button.innerHTML = `<span>${label}</span>`;
   return button;
 }
 
@@ -82,9 +84,7 @@ function createSaveSuffixButton() {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "icon-btn card-action-btn save-suffix-btn";
-  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="20 6 9 17 4 12"></polyline>
-  </svg><span>Save</span>`;
+  button.innerHTML = `<span>Save</span>`;
   return button;
 }
 
@@ -94,13 +94,7 @@ function createDeleteIconButton() {
   button.className = "icon-btn delete-btn";
   button.title = "Delete";
   button.setAttribute("aria-label", "Delete this URL");
-  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="3 6 5 6 21 6"></polyline>
-    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-    <path d="M10 11v6"></path>
-    <path d="M14 11v6"></path>
-    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
-  </svg><span>Delete</span>`;
+  button.innerHTML = `<span>Delete</span>`;
   return button;
 }
 
@@ -120,22 +114,21 @@ async function deleteUrl(code, kind, shortUrl) {
   }
 }
 
-const NEW_BADGE_WINDOW_MS = 5 * 60 * 1000;
-
 function createShortUrlRow(shortUrlItem) {
   const shortCopyRow = document.createElement("div");
   shortCopyRow.className = "url-card-copy-row";
 
   const shortUrlGroup = document.createElement("span");
   shortUrlGroup.className = "url-card-copy-group";
+  shortUrlGroup.title = "Click to copy";
   const shortValue = document.createElement("span");
   shortValue.className = "url-card-value url-card-copy-text";
-  shortValue.title = "Click to copy";
   shortValue.textContent = shortUrlItem.shortUrl;
   const shortCopyBtn = createCopyIconButton();
   const copyShort = () => copyCardShortUrl(shortUrlItem.shortUrl, shortValue);
   shortValue.addEventListener("click", copyShort);
   shortCopyBtn.addEventListener("click", copyShort);
+  shortUrlGroup.addEventListener("click", copyShort);
   shortUrlGroup.append(shortValue, shortCopyBtn);
 
   const deleteBtn = createDeleteIconButton();
@@ -173,14 +166,24 @@ function createInlineCodeInputRow({ group, bodyKey, prefixText, suffixText, plac
   }
 
   const saveBtn = createSaveSuffixButton();
+  const saveBtnLabel = saveBtn.querySelector("span");
   row.append(saveBtn);
 
   const error = document.createElement("p");
   error.className = "url-card-suffix-error";
 
+  function updateSaveButtonLabel() {
+    const hasValue = Boolean(input.value.trim());
+    saveBtnLabel.textContent = hasValue ? "Save" : "Cancel";
+    saveBtn.classList.toggle("save-suffix-btn--cancel", !hasValue);
+  }
+
   async function submitValue() {
     const value = input.value.trim();
-    if (!value) return;
+    if (!value) {
+      onCancel();
+      return;
+    }
 
     saveBtn.disabled = true;
     error.textContent = "";
@@ -207,10 +210,12 @@ function createInlineCodeInputRow({ group, bodyKey, prefixText, suffixText, plac
   }
 
   saveBtn.addEventListener("click", submitValue);
+  input.addEventListener("input", updateSaveButtonLabel);
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") submitValue();
     if (event.key === "Escape") onCancel();
   });
+  updateSaveButtonLabel();
 
   wrapper.append(row, error);
   return wrapper;
@@ -222,7 +227,7 @@ function createSuffixInputRow(group, onCancel) {
     bodyKey: "code",
     prefixText: "tiny.vin/",
     suffixText: null,
-    placeholder: "path",
+    placeholder: "Enter pathname",
     onCancel,
   });
 }
@@ -233,66 +238,45 @@ function createSubdomainInputRow(group, onCancel) {
     bodyKey: "subdomain",
     prefixText: null,
     suffixText: ".tiny.vin",
-    placeholder: "my-subdomain",
+    placeholder: "Enter subdomain name",
     onCancel,
   });
 }
 
 function createUrlCard(group, justCreatedCode) {
-  const oldestCreatedAt = group.shortUrls[group.shortUrls.length - 1].createdAt;
-  const isNew = Date.now() - oldestCreatedAt < NEW_BADGE_WINDOW_MS;
   const shouldFlash = group.shortUrls.some((shortUrlItem) => shortUrlItem.code === justCreatedCode);
 
   const card = document.createElement("div");
-  card.className = isNew ? "url-card url-card--new" : "url-card";
+  card.className = "url-card";
   if (shouldFlash) {
     card.classList.add("url-card--flash");
   }
 
   const originalRow = document.createElement("div");
   originalRow.className = "url-card-row";
-  const originalHeader = document.createElement("div");
-  originalHeader.className = "url-card-header";
-  const originalLabel = document.createElement("span");
-  originalLabel.className = "url-card-label";
-  originalLabel.textContent = "Original URL";
-  const meta = document.createElement("div");
-  meta.className = "url-card-meta";
-  if (isNew) {
-    const newBadge = document.createElement("span");
-    newBadge.className = "new-badge";
-    newBadge.textContent = "NEW!";
-    meta.appendChild(newBadge);
-  }
-  const createdValue = document.createElement("span");
-  createdValue.className = "url-card-timestamp";
-  createdValue.textContent = new Date(oldestCreatedAt).toLocaleString();
-  meta.appendChild(createdValue);
-  originalHeader.append(originalLabel, meta);
   const originalValue = document.createElement("span");
   originalValue.className = "url-card-value url-card-value--original";
   originalValue.title = group.originalUrl;
   originalValue.textContent = group.originalUrl;
-  originalRow.append(originalHeader, originalValue);
+  originalRow.append(originalValue);
 
   const shortRow = document.createElement("div");
   shortRow.className = "url-card-row url-card-row--tiny";
-  const shortLabel = document.createElement("span");
-  shortLabel.className = "url-card-label";
-  shortLabel.textContent = "Teeny-Weeny URL";
-  shortRow.append(shortLabel);
   for (const shortUrlItem of group.shortUrls) {
     shortRow.append(createShortUrlRow(shortUrlItem));
   }
 
   const actionsContainer = document.createElement("div");
   actionsContainer.className = "url-card-actions";
-  const addPathBtn = createAddButton("Add path");
-  const addSubdomainBtn = createAddButton("Add subdomain");
+  const addPathBtn = createAddButton("Add Path");
+  const addSubdomainBtn = createAddButton("Add Subdomain");
 
   function showActionButtons() {
     actionsContainer.textContent = "";
-    actionsContainer.append(addPathBtn, addSubdomainBtn);
+    const separator = document.createElement("span");
+    separator.className = "url-card-actions-separator";
+    separator.textContent = "or";
+    actionsContainer.append(addPathBtn, separator, addSubdomainBtn);
   }
 
   addPathBtn.addEventListener("click", () => {
@@ -332,12 +316,15 @@ async function loadHistory(justCreatedCode) {
     }
 
     panel.hidden = false;
+    const heading = document.createElement("h2");
+    heading.className = "section-heading";
+    heading.textContent = "CREATED URLS";
     const list = document.createElement("div");
     list.className = "url-cards";
     for (const group of data.urls) {
       list.appendChild(createUrlCard(group, justCreatedCode));
     }
-    container.appendChild(list);
+    container.append(heading, list);
   } catch {
     // history is a nice-to-have; a failed fetch shouldn't break the page
   }

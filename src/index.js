@@ -43,18 +43,25 @@ function loginPage(errorCode) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tiny VIN</title>
-  <meta name="description" content="Tiny VIN is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.">
+  <title>tiny.vin</title>
+  <meta name="description" content="tiny.vin is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://tiny.vin">
-  <meta property="og:site_name" content="Tiny VIN">
-  <meta property="og:title" content="Tiny VIN">
-  <meta property="og:description" content="Tiny VIN is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.">
+  <meta property="og:site_name" content="tiny.vin">
+  <meta property="og:title" content="tiny.vin">
+  <meta property="og:description" content="tiny.vin is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.">
   <link rel="stylesheet" href="/style.css">
+  <script>(function () { var t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); })();</script>
 </head>
 <body>
+  <span class="wordmark">tiny<span class="accent-dot">.</span>vin</span>
+  <div class="theme-toggle" role="group" aria-label="Theme">
+    <button type="button" class="theme-btn" data-theme-value="light">Light</button>
+    <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
+  </div>
   <main class="panel">
-    <h1>Tiny VIN</h1>
+    <p class="heading-large">tiny<span class="accent-dot">.</span>vin</p>
+    <p class="login-instruction">Sign in and paste or enter a URL to shorten it. Then share it &ndash; it's available to everyone!</p>
     <div class="login-buttons">
       <a class="provider-btn" href="/auth/google/start">
         <svg class="provider-icon" viewBox="0 0 48 48" aria-hidden="true">
@@ -67,10 +74,14 @@ function loginPage(errorCode) {
       </a>
     </div>
     ${message ? `<p class="login-error">${message}</p>` : ""}
-    <p class="login-subtitle">Tiny VIN is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.</p>
+    <details class="info-toggle">
+      <summary>What is tiny.vin?</summary>
+      <p>tiny.vin is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.</p>
+    </details>
   </main>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
   <footer>Simple project by Anders &amp; Claude</footer>
+  <script src="/theme.js"></script>
 </body>
 </html>`;
 }
