@@ -57,14 +57,14 @@ function createCopyIconButton() {
   return button;
 }
 
-function createAddPathButton() {
+function createAddButton(label) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "icon-btn card-action-btn";
   button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <line x1="12" y1="5" x2="12" y2="19"></line>
     <line x1="5" y1="12" x2="19" y2="12"></line>
-  </svg><span>Add path</span>`;
+  </svg><span>${label}</span>`;
   return button;
 }
 
@@ -94,12 +94,12 @@ function createDeleteIconButton() {
   return button;
 }
 
-async function deleteUrl(code, shortUrl) {
+async function deleteUrl(code, kind, shortUrl) {
   const confirmed = confirm(`Are you sure you want to delete the redirected URL ${shortUrl}?`);
   if (!confirmed) return;
 
   try {
-    const response = await fetch(`/api/urls/${code}`, { method: "DELETE" });
+    const response = await fetch(`/api/urls/${code}?kind=${kind}`, { method: "DELETE" });
     if (!response.ok) {
       alert("Could not delete that URL, try again.");
       return;
@@ -129,33 +129,48 @@ function createShortUrlRow(shortUrlItem) {
   shortUrlGroup.append(shortValue, shortCopyBtn);
 
   const deleteBtn = createDeleteIconButton();
-  deleteBtn.addEventListener("click", () => deleteUrl(shortUrlItem.code, shortUrlItem.shortUrl));
+  deleteBtn.addEventListener("click", () => deleteUrl(shortUrlItem.code, shortUrlItem.kind, shortUrlItem.shortUrl));
 
   shortCopyRow.append(shortUrlGroup, deleteBtn);
   return shortCopyRow;
 }
 
-function createSuffixInputRow(group, onCancel) {
+function createInlineCodeInputRow({ group, bodyKey, prefixText, suffixText, placeholder, onCancel }) {
   const wrapper = document.createElement("div");
   wrapper.className = "url-card-suffix-wrapper";
 
   const row = document.createElement("div");
   row.className = "url-card-copy-row";
-  const prefix = document.createElement("span");
-  prefix.className = "url-card-suffix-prefix";
-  prefix.textContent = "tiny.vin/";
+
+  if (prefixText) {
+    const prefix = document.createElement("span");
+    prefix.className = "url-card-suffix-prefix";
+    prefix.textContent = prefixText;
+    row.append(prefix);
+  }
+
   const input = document.createElement("input");
   input.type = "text";
   input.className = "url-card-suffix-input";
-  input.placeholder = "path";
+  input.placeholder = placeholder;
+  row.append(input);
+
+  if (suffixText) {
+    const suffix = document.createElement("span");
+    suffix.className = "url-card-suffix-prefix";
+    suffix.textContent = suffixText;
+    row.append(suffix);
+  }
+
   const saveBtn = createSaveSuffixButton();
+  row.append(saveBtn);
 
   const error = document.createElement("p");
   error.className = "url-card-suffix-error";
 
-  async function submitSuffix() {
-    const suffix = input.value.trim();
-    if (!suffix) return;
+  async function submitValue() {
+    const value = input.value.trim();
+    if (!value) return;
 
     saveBtn.disabled = true;
     error.textContent = "";
@@ -164,7 +179,7 @@ function createSuffixInputRow(group, onCancel) {
       const response = await fetch("/api/shorten", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: group.originalUrl, code: suffix }),
+        body: JSON.stringify({ url: group.originalUrl, [bodyKey]: value }),
       });
       const data = await response.json();
 
@@ -181,15 +196,36 @@ function createSuffixInputRow(group, onCancel) {
     }
   }
 
-  saveBtn.addEventListener("click", submitSuffix);
+  saveBtn.addEventListener("click", submitValue);
   input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") submitSuffix();
+    if (event.key === "Enter") submitValue();
     if (event.key === "Escape") onCancel();
   });
 
-  row.append(prefix, input, saveBtn);
   wrapper.append(row, error);
   return wrapper;
+}
+
+function createSuffixInputRow(group, onCancel) {
+  return createInlineCodeInputRow({
+    group,
+    bodyKey: "code",
+    prefixText: "tiny.vin/",
+    suffixText: null,
+    placeholder: "path",
+    onCancel,
+  });
+}
+
+function createSubdomainInputRow(group, onCancel) {
+  return createInlineCodeInputRow({
+    group,
+    bodyKey: "subdomain",
+    prefixText: null,
+    suffixText: ".tiny.vin",
+    placeholder: "my-subdomain",
+    onCancel,
+  });
 }
 
 function createUrlCard(group, justCreatedCode) {
@@ -241,18 +277,29 @@ function createUrlCard(group, justCreatedCode) {
 
   const actionsContainer = document.createElement("div");
   actionsContainer.className = "url-card-actions";
-  const addPathBtn = createAddPathButton();
-  function closeSuffixRow() {
+  const addPathBtn = createAddButton("Add path");
+  const addSubdomainBtn = createAddButton("Add subdomain");
+
+  function showActionButtons() {
     actionsContainer.textContent = "";
-    actionsContainer.appendChild(addPathBtn);
+    actionsContainer.append(addPathBtn, addSubdomainBtn);
   }
+
   addPathBtn.addEventListener("click", () => {
     actionsContainer.textContent = "";
-    const inputRow = createSuffixInputRow(group, closeSuffixRow);
+    const inputRow = createSuffixInputRow(group, showActionButtons);
     actionsContainer.appendChild(inputRow);
     inputRow.querySelector("input").focus();
   });
-  actionsContainer.appendChild(addPathBtn);
+
+  addSubdomainBtn.addEventListener("click", () => {
+    actionsContainer.textContent = "";
+    const inputRow = createSubdomainInputRow(group, showActionButtons);
+    actionsContainer.appendChild(inputRow);
+    inputRow.querySelector("input").focus();
+  });
+
+  showActionButtons();
 
   card.append(originalRow, shortRow, actionsContainer);
   return card;

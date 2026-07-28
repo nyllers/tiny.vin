@@ -266,6 +266,7 @@ footer {
 .url-card-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: flex-start;
   gap: 0.5rem;
   margin-top: -0.35rem;

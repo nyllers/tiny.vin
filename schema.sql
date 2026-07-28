@@ -6,10 +6,12 @@ CREATE TABLE IF NOT EXISTS login_identities (
 );
 
 CREATE TABLE IF NOT EXISTS urls (
-  code TEXT PRIMARY KEY,
+  code TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'path',
   original_url TEXT NOT NULL,
   created_at INTEGER NOT NULL,
-  created_by INTEGER REFERENCES login_identities(id)
+  created_by INTEGER REFERENCES login_identities(id),
+  PRIMARY KEY (code, kind)
 );
 
 CREATE TABLE IF NOT EXISTS login_events (

@@ -6,9 +6,10 @@ const UPPERCASE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const CODE_LENGTH = 8;
 const MAX_ATTEMPTS = 5;
 const CODE_PATTERN = /^\/([A-Za-z0-9]{1,32})$/;
+const SUBDOMAIN_REDIRECT_PATTERN = /^\/subdomain\/([a-z0-9-]{1,63})$/;
 const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
-const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9]+)$/;
-const RESERVED_CODES = new Set(["login"]);
+const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9-]+)$/;
+const RESERVED_CODES = new Set(["login", "subdomain"]);
 
 const LOGIN_ERRORS = {
   oauth_failed: "Something went wrong signing in. Please try again.",
@@ -178,6 +179,22 @@ function validateSuffix(input) {
   return { code: input };
 }
 
+function validateSubdomain(input) {
+  const normalized = input.toLowerCase();
+
+  if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(normalized)) {
+    return {
+      error: "Subdomains can only contain letters, numbers, and hyphens (not at the start or end), 1-63 characters.",
+    };
+  }
+
+  if (RESERVED_CODES.has(normalized)) {
+    return { error: `"${normalized}" is reserved, try another.` };
+  }
+
+  return { code: normalized };
+}
+
 async function handleShorten(request, env, session) {
   let body;
   try {
@@ -206,7 +223,35 @@ async function handleShorten(request, env, session) {
     customCode = suffixValidation.code;
   }
 
+  const customSubdomain = typeof body.subdomain === "string" ? body.subdomain.trim() : "";
+  let subdomainCode = null;
+  if (customSubdomain) {
+    const subdomainValidation = validateSubdomain(customSubdomain);
+    if (subdomainValidation.error) {
+      return jsonResponse({ error: subdomainValidation.error }, 400);
+    }
+    subdomainCode = subdomainValidation.code;
+  }
+
   const createdBy = await getOrCreateIdentityId(env, session.provider, session.email);
+
+  if (subdomainCode) {
+    try {
+      await env.DB.prepare(
+        "INSERT INTO urls (code, kind, original_url, created_at, created_by) VALUES (?, 'subdomain', ?, ?, ?)"
+      )
+        .bind(subdomainCode, validation.url, Date.now(), createdBy)
+        .run();
+      return jsonResponse({
+        code: subdomainCode,
+        kind: "subdomain",
+        originalUrl: validation.url,
+        shortUrl: `${subdomainCode}.tiny.vin`,
+      });
+    } catch {
+      return jsonResponse({ error: `"${subdomainCode}.tiny.vin" is already taken, try another.` }, 409);
+    }
+  }
 
   if (customCode) {
     try {
@@ -217,6 +262,7 @@ async function handleShorten(request, env, session) {
         .run();
       return jsonResponse({
         code: customCode,
+        kind: "path",
         originalUrl: validation.url,
         shortUrl: `tiny.vin/${customCode}`,
       });
@@ -235,6 +281,7 @@ async function handleShorten(request, env, session) {
         .run();
       return jsonResponse({
         code,
+        kind: "path",
         originalUrl: validation.url,
         shortUrl: `tiny.vin/${code}`,
       });
@@ -260,7 +307,7 @@ async function handleHistory(env, session) {
   const identityId = await getIdentityId(env, session.provider, session.email);
 
   const { results } = await env.DB.prepare(
-    "SELECT code, original_url, created_at FROM urls WHERE created_by = ? ORDER BY created_at DESC"
+    "SELECT code, kind, original_url, created_at FROM urls WHERE created_by = ? ORDER BY created_at DESC"
   )
     .bind(identityId)
     .all();
@@ -272,7 +319,8 @@ async function handleHistory(env, session) {
     }
     groups.get(row.original_url).push({
       code: row.code,
-      shortUrl: `tiny.vin/${row.code}`,
+      kind: row.kind,
+      shortUrl: row.kind === "subdomain" ? `${row.code}.tiny.vin` : `tiny.vin/${row.code}`,
       createdAt: row.created_at,
     });
   }
@@ -288,13 +336,13 @@ async function handleHistory(env, session) {
   return jsonResponse({ urls });
 }
 
-async function handleDeleteUrl(code, env, session) {
+async function handleDeleteUrl(code, kind, env, session) {
   const identityId = await getIdentityId(env, session.provider, session.email);
 
   const result = await env.DB.prepare(
-    "DELETE FROM urls WHERE code = ? AND created_by = ?"
+    "DELETE FROM urls WHERE code = ? AND kind = ? AND created_by = ?"
   )
-    .bind(code, identityId)
+    .bind(code, kind, identityId)
     .run();
 
   if (!result.meta.changes) {
@@ -304,11 +352,11 @@ async function handleDeleteUrl(code, env, session) {
   return jsonResponse({ ok: true });
 }
 
-async function handleRedirect(code, env) {
+async function handleRedirect(code, kind, env) {
   const row = await env.DB.prepare(
-    "SELECT original_url FROM urls WHERE code = ?"
+    "SELECT original_url FROM urls WHERE code = ? AND kind = ?"
   )
-    .bind(code)
+    .bind(code, kind)
     .first();
 
   if (!row) {
@@ -417,9 +465,14 @@ export default {
       return handleAuthCallback(url, request, env);
     }
 
+    const subdomainMatch = url.pathname.match(SUBDOMAIN_REDIRECT_PATTERN);
+    if (request.method === "GET" && subdomainMatch) {
+      return handleRedirect(subdomainMatch[1], "subdomain", env);
+    }
+
     const codeMatch = url.pathname.match(CODE_PATTERN);
     if (request.method === "GET" && codeMatch) {
-      return handleRedirect(codeMatch[1], env);
+      return handleRedirect(codeMatch[1], "path", env);
     }
 
     if (request.method === "POST" && url.pathname === "/api/shorten") {
@@ -438,7 +491,8 @@ export default {
     if (request.method === "DELETE" && deleteMatch) {
       const session = await getSession(request, env.SESSION_SECRET);
       if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
-      return handleDeleteUrl(deleteMatch[1], env, session);
+      const kind = url.searchParams.get("kind") === "subdomain" ? "subdomain" : "path";
+      return handleDeleteUrl(deleteMatch[1], kind, env, session);
     }
 
     if (url.pathname === "/") {
