@@ -223,7 +223,7 @@ function createSuffixInputRow(group, onCancel) {
     bodyKey: "code",
     prefixText: "tiny.vin/",
     suffixText: null,
-    placeholder: "path",
+    placeholder: "Enter pathname",
     onCancel,
   });
 }
@@ -234,7 +234,7 @@ function createSubdomainInputRow(group, onCancel) {
     bodyKey: "subdomain",
     prefixText: null,
     suffixText: ".tiny.vin",
-    placeholder: "my-subdomain",
+    placeholder: "Enter subdomain name",
     onCancel,
   });
 }

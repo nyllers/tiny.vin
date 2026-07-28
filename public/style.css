@@ -367,9 +367,9 @@ footer {
 }
 
 .icon-btn.delete-btn {
-  color: #ff3333;
+  color: #cc0000;
   background: none;
-  border: 1px solid #ff3333;
+  border: 1px solid #cc0000;
   gap: 0.25rem;
   padding: 1px 0.35rem;
   font-size: 0.75rem;
@@ -383,7 +383,7 @@ footer {
 }
 
 .icon-btn.delete-btn:hover {
-  color: #ff3333;
+  color: #cc0000;
   background: none;
   opacity: 0.75;
 }
@@ -430,6 +430,8 @@ footer {
 .url-card-copy-text {
   cursor: pointer;
   min-width: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
 }
 
 .url-card-timestamp {
