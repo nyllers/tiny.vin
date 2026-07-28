@@ -401,7 +401,7 @@ async function handleRedirect(code, kind, env, ctx, request) {
 
 function handleAuthStart(url, env) {
   const state = randomState();
-  const redirectUri = `${url.origin}/auth/google/callback`;
+  const redirectUri = `${env.SITE_URL}/auth/google/callback`;
   const authorizeUrl = buildAuthorizeUrl(env, redirectUri, state);
 
   return new Response(null, {
@@ -453,7 +453,7 @@ async function handleAuthCallback(url, request, env) {
   }
 
   try {
-    const redirectUri = `${url.origin}/auth/google/callback`;
+    const redirectUri = `${env.SITE_URL}/auth/google/callback`;
     const accessToken = await exchangeCodeForToken(env, redirectUri, code);
     const user = await fetchUserInfo(accessToken);
 
