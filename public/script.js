@@ -114,8 +114,6 @@ async function deleteUrl(code, kind, shortUrl) {
   }
 }
 
-const NEW_BADGE_WINDOW_MS = 5 * 60 * 1000;
-
 function createShortUrlRow(shortUrlItem) {
   const shortCopyRow = document.createElement("div");
   shortCopyRow.className = "url-card-copy-row";
@@ -246,30 +244,16 @@ function createSubdomainInputRow(group, onCancel) {
 }
 
 function createUrlCard(group, justCreatedCode) {
-  const oldestCreatedAt = group.shortUrls[group.shortUrls.length - 1].createdAt;
-  const isNew = Date.now() - oldestCreatedAt < NEW_BADGE_WINDOW_MS;
   const shouldFlash = group.shortUrls.some((shortUrlItem) => shortUrlItem.code === justCreatedCode);
 
   const card = document.createElement("div");
-  card.className = isNew ? "url-card url-card--new" : "url-card";
+  card.className = "url-card";
   if (shouldFlash) {
     card.classList.add("url-card--flash");
   }
 
   const originalRow = document.createElement("div");
   originalRow.className = "url-card-row";
-  if (isNew) {
-    const metaRow = document.createElement("div");
-    metaRow.className = "url-card-meta-row";
-    const meta = document.createElement("div");
-    meta.className = "url-card-meta";
-    const newBadge = document.createElement("span");
-    newBadge.className = "new-badge";
-    newBadge.textContent = "NEW!";
-    meta.appendChild(newBadge);
-    metaRow.appendChild(meta);
-    originalRow.appendChild(metaRow);
-  }
   const originalValue = document.createElement("span");
   originalValue.className = "url-card-value url-card-value--original";
   originalValue.title = group.originalUrl;
@@ -334,7 +318,7 @@ async function loadHistory(justCreatedCode) {
     panel.hidden = false;
     const heading = document.createElement("h2");
     heading.className = "section-heading";
-    heading.textContent = "YOUR URLS";
+    heading.textContent = "CREATED URLS";
     const list = document.createElement("div");
     list.className = "url-cards";
     for (const group of data.urls) {

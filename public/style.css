@@ -71,7 +71,7 @@ body {
 .generate-section {
   width: 100%;
   max-width: 740px;
-  padding: 1rem 0;
+  margin-bottom: 1rem;
 }
 
 .history-panel {
@@ -276,10 +276,6 @@ footer {
   border: 1px solid var(--card-border);
   border-radius: 0.5rem;
   break-inside: avoid;
-}
-
-.url-card--new {
-  background: #eeffee;
 }
 
 .url-card--flash {
