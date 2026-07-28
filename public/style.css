@@ -505,5 +505,13 @@ footer {
 }
 
 .accent-dot {
-    color: var(--heading);
+  color: var(--heading);
+}
+
+.heading-large {
+  margin: 0 0 1.25rem 0;
+  text-align: center;
+  color: var(--text);
+  font-size: 50px;
+  font-weight: 700;
 }

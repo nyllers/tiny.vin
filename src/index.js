@@ -59,8 +59,8 @@ function loginPage(errorCode) {
     <button type="button" class="theme-btn" data-theme-value="light">Light</button>
     <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
   </div>
-  <h1>Tiny VIN</h1>
   <main class="panel">
+    <p class="heading-large">tiny<span class="accent-dot">.</span>vin</p>
     <p class="login-instruction">Sign in and paste or enter a URL to shorten it. Then share it &ndash; it's available to everyone!</p>
     <div class="login-buttons">
       <a class="provider-btn" href="/auth/google/start">
