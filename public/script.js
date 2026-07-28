@@ -3,12 +3,22 @@ async function generateUrl() {
   const result = document.getElementById("url-result");
   const url = input.value.trim();
 
+  function setError(message) {
+    result.textContent = message;
+    result.classList.add("url-result-error");
+  }
+
+  function setStatus(message) {
+    result.textContent = message;
+    result.classList.remove("url-result-error");
+  }
+
   if (!url) {
-    result.textContent = "Enter a URL first.";
+    setError("Enter a URL first.");
     return;
   }
 
-  result.textContent = "Checking that page exists...";
+  setStatus("Checking that page exists...");
 
   try {
     const response = await fetch("/api/shorten", {
@@ -19,16 +29,16 @@ async function generateUrl() {
     const data = await response.json();
 
     if (!response.ok) {
-      result.textContent = data.error || "Something went wrong.";
+      setError(data.error || "Something went wrong.");
       return;
     }
 
     input.value = "";
-    result.textContent = "";
+    setStatus("");
     updateGenerateButtonState();
     loadHistory(data.code);
   } catch {
-    result.textContent = "Network error, try again.";
+    setError("Network error, try again.");
   }
 }
 
@@ -306,6 +316,7 @@ function createUrlCard(group, justCreatedCode) {
 }
 
 async function loadHistory(justCreatedCode) {
+  const panel = document.getElementById("history-panel");
   const container = document.getElementById("history-list");
 
   try {
@@ -316,13 +327,11 @@ async function loadHistory(justCreatedCode) {
     container.textContent = "";
 
     if (data.urls.length === 0) {
-      const empty = document.createElement("p");
-      empty.className = "login-subtitle";
-      empty.textContent = "You haven't created any short URLs yet.";
-      container.appendChild(empty);
+      panel.hidden = true;
       return;
     }
 
+    panel.hidden = false;
     const list = document.createElement("div");
     list.className = "url-cards";
     for (const group of data.urls) {
