@@ -45,7 +45,7 @@ async function generateUrl() {
 async function copyCardShortUrl(shortUrl, displayEl) {
   try {
     await navigator.clipboard.writeText(shortUrl);
-    displayEl.textContent = "Copied!";
+    displayEl.textContent = "Copied to clipboard!";
     setTimeout(() => {
       displayEl.textContent = shortUrl;
     }, 1000);
