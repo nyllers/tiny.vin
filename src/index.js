@@ -180,19 +180,18 @@ function validateSuffix(input) {
 }
 
 function validateSubdomain(input) {
-  const normalized = input.toLowerCase();
-
-  if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(normalized)) {
+  if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(input)) {
     return {
-      error: "Subdomains can only contain letters, numbers, and hyphens (not at the start or end), 1-63 characters.",
+      error:
+        "Subdomains can only contain lowercase letters, numbers, and hyphens (not at the start or end), 1-63 characters.",
     };
   }
 
-  if (RESERVED_CODES.has(normalized)) {
-    return { error: `"${normalized}" is reserved, try another.` };
+  if (RESERVED_CODES.has(input)) {
+    return { error: `"${input}" is reserved, try another.` };
   }
 
-  return { code: normalized };
+  return { code: input };
 }
 
 async function handleShorten(request, env, session) {
