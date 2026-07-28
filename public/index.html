@@ -14,7 +14,16 @@
   <script>(function () { var t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); })();</script>
 </head>
 <body>
-  <span class="wordmark">tiny<span class="accent-dot">.</span>vin</span>
+  <div class="site-nav">
+    <button type="button" class="nav-toggle" aria-label="Menu" aria-haspopup="true" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="wordmark">tiny<span class="accent-dot">.</span>vin</span>
+    <nav class="nav-dropdown" hidden>
+      <a class="nav-link" href="/">Links</a>
+      <a class="nav-link" href="/stats">Statistics</a>
+    </nav>
+  </div>
   <div class="theme-toggle" role="group" aria-label="Theme">
     <button type="button" class="theme-btn" data-theme-value="light">Light</button>
     <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
@@ -35,5 +44,6 @@
   <footer>Simple project by Anders &amp; Claude &middot; v28</footer>
   <script src="script.js"></script>
   <script src="theme.js"></script>
+  <script src="nav.js"></script>
 </body>
 </html>
