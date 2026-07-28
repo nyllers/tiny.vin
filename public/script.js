@@ -173,14 +173,22 @@ function createInlineCodeInputRow({ group, bodyKey, prefixText, suffixText, plac
   }
 
   const saveBtn = createSaveSuffixButton();
+  const saveBtnLabel = saveBtn.querySelector("span");
   row.append(saveBtn);
 
   const error = document.createElement("p");
   error.className = "url-card-suffix-error";
 
+  function updateSaveButtonLabel() {
+    saveBtnLabel.textContent = input.value.trim() ? "Save" : "Cancel";
+  }
+
   async function submitValue() {
     const value = input.value.trim();
-    if (!value) return;
+    if (!value) {
+      onCancel();
+      return;
+    }
 
     saveBtn.disabled = true;
     error.textContent = "";
@@ -207,10 +215,12 @@ function createInlineCodeInputRow({ group, bodyKey, prefixText, suffixText, plac
   }
 
   saveBtn.addEventListener("click", submitValue);
+  input.addEventListener("input", updateSaveButtonLabel);
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") submitValue();
     if (event.key === "Escape") onCancel();
   });
+  updateSaveButtonLabel();
 
   wrapper.append(row, error);
   return wrapper;
