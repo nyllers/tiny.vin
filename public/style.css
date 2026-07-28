@@ -257,7 +257,7 @@ footer {
 .section-heading {
   margin: 0 0 1rem;
   font-size: 1rem;
-  color: var(--text);
+  color: #6b7280;
   text-align: center;
 }
 
@@ -330,7 +330,7 @@ footer {
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: 0.5rem;
-  margin-top: calc(0.35rem - 3px);
+  margin-top: calc(0.35rem - 6px);
 }
 
 .url-card-actions-separator {
@@ -348,15 +348,13 @@ footer {
   border-radius: 0.25rem;
 }
 
-.icon-btn.card-action-btn:hover {
-  color: var(--heading);
-  background: none;
-  opacity: 0.75;
-}
-
 .icon-btn.card-action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.icon-btn.copy-link-btn {
+  color: var(--heading);
 }
 
 .save-suffix-btn.save-suffix-btn--cancel {
@@ -425,15 +423,15 @@ footer {
   min-width: 0;
 }
 
+.url-card-copy-group:hover {
+  opacity: 0.75;
+}
+
 .url-card-copy-text {
   cursor: pointer;
   min-width: 0;
-  font-size: 0.85rem;
+  font-size: 0.90rem;
   font-weight: 700;
-}
-
-.url-card-copy-text:hover {
-  color: #4338ff;
 }
 
 .url-card-suffix-wrapper {
