@@ -351,7 +351,28 @@ async function handleDeleteUrl(code, kind, env, session) {
   return jsonResponse({ ok: true });
 }
 
-async function handleRedirect(code, kind, env) {
+async function recordRedirectEvent(env, { code, kind, request }) {
+  try {
+    const headers = JSON.stringify(Object.fromEntries(request.headers.entries()));
+    const cfData = JSON.stringify(request.cf || {});
+    const ipAddress = request.headers.get("CF-Connecting-IP");
+    const userAgent = request.headers.get("User-Agent");
+    const referer = request.headers.get("Referer");
+    const country = request.cf?.country || null;
+
+    await env.DB.prepare(
+      `INSERT INTO redirect_events
+        (code, kind, requested_at, ip_address, country, user_agent, referer, headers, cf_data)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(code, kind, Date.now(), ipAddress, country, userAgent, referer, headers, cfData)
+      .run();
+  } catch {
+    // stats are best-effort; never block a redirect over it
+  }
+}
+
+async function handleRedirect(code, kind, env, ctx, request) {
   const row = await env.DB.prepare(
     "SELECT original_url FROM urls WHERE code = ? AND kind = ?"
   )
@@ -361,6 +382,8 @@ async function handleRedirect(code, kind, env) {
   if (!row) {
     return new Response("Not found", { status: 404 });
   }
+
+  ctx.waitUntil(recordRedirectEvent(env, { code, kind, request }));
 
   return Response.redirect(row.original_url, 302);
 }
@@ -443,7 +466,7 @@ async function handleAuthCallback(url, request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (url.pathname === "/login") {
@@ -466,12 +489,12 @@ export default {
 
     const subdomainMatch = url.pathname.match(SUBDOMAIN_REDIRECT_PATTERN);
     if (request.method === "GET" && subdomainMatch) {
-      return handleRedirect(subdomainMatch[1], "subdomain", env);
+      return handleRedirect(subdomainMatch[1], "subdomain", env, ctx, request);
     }
 
     const codeMatch = url.pathname.match(CODE_PATTERN);
     if (request.method === "GET" && codeMatch) {
-      return handleRedirect(codeMatch[1], "path", env);
+      return handleRedirect(codeMatch[1], "path", env, ctx, request);
     }
 
     if (request.method === "POST" && url.pathname === "/api/shorten") {
