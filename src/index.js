@@ -51,10 +51,16 @@ function loginPage(errorCode) {
   <meta property="og:title" content="Tiny VIN">
   <meta property="og:description" content="Tiny VIN is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.">
   <link rel="stylesheet" href="/style.css">
+  <script>(function () { var t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); })();</script>
 </head>
 <body>
+  <div class="theme-toggle" role="group" aria-label="Theme">
+    <button type="button" class="theme-btn" data-theme-value="light">Light</button>
+    <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
+  </div>
+  <h1>Tiny VIN</h1>
   <main class="panel">
-    <h1>Tiny VIN</h1>
+    <p class="login-instruction">Sign in to paste or enter a URL and shorten it. Then share it anywhere &ndash; it's available to everyone!</p>
     <div class="login-buttons">
       <a class="provider-btn" href="/auth/google/start">
         <svg class="provider-icon" viewBox="0 0 48 48" aria-hidden="true">
@@ -67,10 +73,14 @@ function loginPage(errorCode) {
       </a>
     </div>
     ${message ? `<p class="login-error">${message}</p>` : ""}
-    <p class="login-subtitle">Tiny VIN is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.</p>
+    <details class="info-toggle">
+      <summary>What is Tiny VIN?</summary>
+      <p>Tiny VIN is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.</p>
+    </details>
   </main>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
   <footer>Simple project by Anders &amp; Claude</footer>
+  <script src="/theme.js"></script>
 </body>
 </html>`;
 }

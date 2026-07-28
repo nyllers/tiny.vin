@@ -261,11 +261,8 @@ function createUrlCard(group, justCreatedCode) {
 
   const originalRow = document.createElement("div");
   originalRow.className = "url-card-row";
-  const originalHeader = document.createElement("div");
-  originalHeader.className = "url-card-header";
-  const originalLabel = document.createElement("span");
-  originalLabel.className = "url-card-label";
-  originalLabel.textContent = "Original URL";
+  const metaRow = document.createElement("div");
+  metaRow.className = "url-card-meta-row";
   const meta = document.createElement("div");
   meta.className = "url-card-meta";
   if (isNew) {
@@ -278,27 +275,23 @@ function createUrlCard(group, justCreatedCode) {
   createdValue.className = "url-card-timestamp";
   createdValue.textContent = new Date(oldestCreatedAt).toLocaleString();
   meta.appendChild(createdValue);
-  originalHeader.append(originalLabel, meta);
+  metaRow.appendChild(meta);
   const originalValue = document.createElement("span");
   originalValue.className = "url-card-value url-card-value--original";
   originalValue.title = group.originalUrl;
   originalValue.textContent = group.originalUrl;
-  originalRow.append(originalHeader, originalValue);
+  originalRow.append(metaRow, originalValue);
 
   const shortRow = document.createElement("div");
   shortRow.className = "url-card-row url-card-row--tiny";
-  const shortLabel = document.createElement("span");
-  shortLabel.className = "url-card-label";
-  shortLabel.textContent = "Teeny-Weeny URL";
-  shortRow.append(shortLabel);
   for (const shortUrlItem of group.shortUrls) {
     shortRow.append(createShortUrlRow(shortUrlItem));
   }
 
   const actionsContainer = document.createElement("div");
   actionsContainer.className = "url-card-actions";
-  const addPathBtn = createAddButton("Add path");
-  const addSubdomainBtn = createAddButton("Add subdomain");
+  const addPathBtn = createAddButton("Path");
+  const addSubdomainBtn = createAddButton("Subdomain");
 
   function showActionButtons() {
     actionsContainer.textContent = "";
