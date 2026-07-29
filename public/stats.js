@@ -63,116 +63,6 @@ function formatDayLabel(dateStr) {
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
-const CATEGORY_CHART_WIDTH = 220;
-const CATEGORY_CHART_TOP_LABEL_SPACE = 10;
-const CATEGORY_CHART_PLOT_HEIGHT = 32;
-const CATEGORY_CHART_BOTTOM_LABEL_SPACE = 22;
-const CATEGORY_CHART_BASELINE_Y = CATEGORY_CHART_TOP_LABEL_SPACE + CATEGORY_CHART_PLOT_HEIGHT;
-const CATEGORY_CHART_HEIGHT = CATEGORY_CHART_BASELINE_Y + CATEGORY_CHART_BOTTOM_LABEL_SPACE;
-const CATEGORY_CHART_BAR_GAP = 3;
-
-function shrinkSvgTextToFit(el, maxWidth) {
-  const fullText = el.getAttribute("data-full-text");
-  let text = fullText;
-  el.textContent = text;
-  while (text.length > 1 && el.getComputedTextLength() > maxWidth) {
-    text = text.slice(0, -1);
-    el.textContent = `${text}…`;
-  }
-}
-
-function createCategoryChart(rows, ariaLabel) {
-  const barCount = rows.length;
-  const barWidth = (CATEGORY_CHART_WIDTH - CATEGORY_CHART_BAR_GAP * (barCount - 1)) / barCount;
-  const maxCount = Math.max(...rows.map((row) => row.count), 1);
-  const peakIndex = rows.reduce((best, row, i) => (row.count > rows[best].count ? i : best), 0);
-
-  const svg = document.createElementNS(SVG_NS, "svg");
-  svg.setAttribute("viewBox", `0 0 ${CATEGORY_CHART_WIDTH} ${CATEGORY_CHART_HEIGHT}`);
-  svg.setAttribute("preserveAspectRatio", "none");
-  svg.setAttribute("class", "category-chart");
-  svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", ariaLabel);
-
-  const baseline = document.createElementNS(SVG_NS, "line");
-  baseline.setAttribute("x1", "0");
-  baseline.setAttribute("x2", String(CATEGORY_CHART_WIDTH));
-  baseline.setAttribute("y1", String(CATEGORY_CHART_BASELINE_Y));
-  baseline.setAttribute("y2", String(CATEGORY_CHART_BASELINE_Y));
-  baseline.setAttribute("class", "category-chart-baseline");
-  svg.appendChild(baseline);
-
-  rows.forEach((row, i) => {
-    const x = i * (barWidth + CATEGORY_CHART_BAR_GAP);
-    const centerX = x + barWidth / 2;
-    const barHeight = row.count > 0 ? Math.max((row.count / maxCount) * (CATEGORY_CHART_PLOT_HEIGHT - 2), 3) : 0;
-    const barTop = CATEGORY_CHART_BASELINE_Y - barHeight;
-
-    const col = document.createElementNS(SVG_NS, "g");
-    col.setAttribute("class", "category-chart-col");
-
-    if (barHeight > 0) {
-      const bar = document.createElementNS(SVG_NS, "path");
-      bar.setAttribute("class", "category-chart-bar");
-      bar.setAttribute("d", roundedTopBarPath(x, barTop, barWidth, barHeight, 3));
-      col.appendChild(bar);
-    }
-
-    if (row.count > 0 && i === peakIndex) {
-      const peakLabel = document.createElementNS(SVG_NS, "text");
-      peakLabel.setAttribute("class", "chart-value-label");
-      peakLabel.setAttribute("x", String(centerX));
-      peakLabel.setAttribute("y", String(barTop - 3));
-      peakLabel.setAttribute("text-anchor", "middle");
-      peakLabel.textContent = String(row.count);
-      col.appendChild(peakLabel);
-    }
-
-    const nameLabel = document.createElementNS(SVG_NS, "text");
-    nameLabel.setAttribute("class", "category-chart-name-label");
-    nameLabel.setAttribute("x", String(centerX));
-    nameLabel.setAttribute("y", String(CATEGORY_CHART_BASELINE_Y + 15));
-    nameLabel.setAttribute("text-anchor", "middle");
-    nameLabel.setAttribute("data-full-text", row.name);
-    nameLabel.setAttribute("data-max-width", String(barWidth + CATEGORY_CHART_BAR_GAP));
-    nameLabel.textContent = row.name;
-    col.appendChild(nameLabel);
-
-    const hit = document.createElementNS(SVG_NS, "rect");
-    hit.setAttribute("class", "category-chart-hit");
-    hit.setAttribute("x", String(x));
-    hit.setAttribute("y", "0");
-    hit.setAttribute("width", String(barWidth));
-    hit.setAttribute("height", String(CATEGORY_CHART_HEIGHT));
-    hit.setAttribute("tabindex", "0");
-    hit.setAttribute("role", "img");
-    const description = `${row.name}: ${row.count} redirect${row.count === 1 ? "" : "s"}`;
-    hit.setAttribute("aria-label", description);
-
-    const titleEl = document.createElementNS(SVG_NS, "title");
-    titleEl.textContent = description;
-    hit.appendChild(titleEl);
-
-    col.appendChild(hit);
-    svg.appendChild(col);
-  });
-
-  return svg;
-}
-
-function createCategoryChartCard(title, rows) {
-  const card = document.createElement("div");
-  card.className = "url-card breakdown-card";
-
-  const titleEl = document.createElement("p");
-  titleEl.className = "breakdown-card-title";
-  titleEl.textContent = title;
-
-  const chart = createCategoryChart(rows, `${title} by redirect count`);
-
-  card.append(titleEl, chart);
-  return card;
-}
 const DAILY_CHART_WIDTH = 220;
 const DAILY_CHART_HEIGHT = 64;
 const DAILY_CHART_BAR_GAP = 2;
@@ -265,7 +155,7 @@ function createDailyChart(days) {
 
 function createDailyChartCard(days) {
   const card = document.createElement("div");
-  card.className = "url-card breakdown-card";
+  card.className = "url-card";
 
   const title = document.createElement("p");
   title.className = "breakdown-card-title";
@@ -326,30 +216,8 @@ async function loadStats() {
     return;
   }
 
-  const breakdowns = [];
   if (data.dailyRedirects.some((d) => d.count > 0)) {
-    breakdowns.push({ type: "daily", days: data.dailyRedirects });
-  }
-  for (const [title, rows] of [
-    ["Top Origin Countries", data.topCountries],
-    ["Top Referrers", data.topReferrers],
-    ["Browsers", data.browsers],
-    ["Devices", data.devices],
-  ]) {
-    if (rows.some((row) => row.count > 0)) {
-      breakdowns.push({ type: "list", title, rows });
-    }
-  }
-
-  if (breakdowns.length > 0) {
-    list.append(
-      createCardsSection("BREAKDOWN", breakdowns, (breakdown) =>
-        breakdown.type === "daily" ? createDailyChartCard(breakdown.days) : createCategoryChartCard(breakdown.title, breakdown.rows)
-      )
-    );
-    document.querySelectorAll(".category-chart-name-label").forEach((el) => {
-      shrinkSvgTextToFit(el, parseFloat(el.getAttribute("data-max-width")));
-    });
+    list.append(createCardsSection("BREAKDOWN", [data.dailyRedirects], createDailyChartCard));
   }
 
   list.append(createCardsSection("REDIRECTS BY URL", data.urls, createStatCard));
