@@ -348,6 +348,40 @@ async function handleHistory(env, session) {
   return jsonResponse({ urls });
 }
 
+function normalizeReferrer(referer) {
+  if (!referer) return "Direct";
+  try {
+    const hostname = new URL(referer).hostname.replace(/^www\./, "");
+    return hostname || "Direct";
+  } catch {
+    return "Direct";
+  }
+}
+
+function parseUserAgent(userAgent) {
+  if (!userAgent) return { browser: "Unknown", device: "Unknown" };
+  if (/bot|crawl|spider|slurp/i.test(userAgent)) return { browser: "Bot", device: "Bot" };
+
+  let browser = "Other";
+  if (/Edg\//.test(userAgent)) browser = "Edge";
+  else if (/OPR\/|Opera/.test(userAgent)) browser = "Opera";
+  else if (/Chrome\//.test(userAgent)) browser = "Chrome";
+  else if (/Firefox\//.test(userAgent)) browser = "Firefox";
+  else if (/Safari\//.test(userAgent) && /Version\//.test(userAgent)) browser = "Safari";
+
+  let device = "Desktop";
+  if (/iPad|Tablet/i.test(userAgent)) device = "Tablet";
+  else if (/Mobi|Android|iPhone/i.test(userAgent)) device = "Mobile";
+
+  return { browser, device };
+}
+
+function topCounts(counts, limit) {
+  return Array.from(counts, ([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
 async function handleStats(env, session) {
   const identityId = await getIdentityId(env, session.provider, session.email);
 
@@ -364,17 +398,58 @@ async function handleStats(env, session) {
     .bind(identityId)
     .all();
 
-  const topCountryRow = await env.DB.prepare(
+  const { results: topCountryRows } = await env.DB.prepare(
     `SELECT re.country AS country, COUNT(*) AS cnt
      FROM redirect_events re
      JOIN urls u ON u.code = re.code AND u.kind = re.kind
      WHERE u.created_by = ? AND re.country IS NOT NULL
      GROUP BY re.country
      ORDER BY cnt DESC
-     LIMIT 1`
+     LIMIT 5`
   )
     .bind(identityId)
-    .first();
+    .all();
+
+  const dailyWindowDays = 14;
+  const dailyCutoff = Date.now() - dailyWindowDays * 24 * 60 * 60 * 1000;
+  const { results: dailyRows } = await env.DB.prepare(
+    `SELECT strftime('%Y-%m-%d', re.requested_at / 1000, 'unixepoch') AS day,
+            COUNT(*) AS cnt
+     FROM redirect_events re
+     JOIN urls u ON u.code = re.code AND u.kind = re.kind
+     WHERE u.created_by = ? AND re.requested_at >= ?
+     GROUP BY day`
+  )
+    .bind(identityId, dailyCutoff)
+    .all();
+
+  const { results: eventRows } = await env.DB.prepare(
+    `SELECT re.referer AS referer, re.user_agent AS user_agent
+     FROM redirect_events re
+     JOIN urls u ON u.code = re.code AND u.kind = re.kind
+     WHERE u.created_by = ?`
+  )
+    .bind(identityId)
+    .all();
+
+  const referrerCounts = new Map();
+  const browserCounts = new Map();
+  const deviceCounts = new Map();
+  for (const row of eventRows) {
+    const referrer = normalizeReferrer(row.referer);
+    referrerCounts.set(referrer, (referrerCounts.get(referrer) || 0) + 1);
+
+    const { browser, device } = parseUserAgent(row.user_agent);
+    browserCounts.set(browser, (browserCounts.get(browser) || 0) + 1);
+    deviceCounts.set(device, (deviceCounts.get(device) || 0) + 1);
+  }
+
+  const dailyByDate = new Map(dailyRows.map((row) => [row.day, row.cnt]));
+  const dailyRedirects = [];
+  for (let i = dailyWindowDays - 1; i >= 0; i--) {
+    const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    dailyRedirects.push({ date, count: dailyByDate.get(date) || 0 });
+  }
 
   const groups = new Map();
   let totalClicks = 0;
@@ -400,7 +475,12 @@ async function handleStats(env, session) {
   return jsonResponse({
     totalLinks: results.length,
     totalClicks,
-    topCountry: topCountryRow ? topCountryRow.country : null,
+    topCountry: topCountryRows[0] ? topCountryRows[0].country : null,
+    topCountries: topCountryRows.map((row) => ({ name: row.country, count: row.cnt })),
+    topReferrers: topCounts(referrerCounts, 5),
+    browsers: topCounts(browserCounts, 10),
+    devices: topCounts(deviceCounts, 10),
+    dailyRedirects,
     urls,
   });
 }
