@@ -1,52 +1,13 @@
-CREATE TABLE IF NOT EXISTS login_identities (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  provider TEXT NOT NULL,
-  username TEXT NOT NULL,
-  UNIQUE (provider, username)
-);
-
-CREATE TABLE IF NOT EXISTS urls (
-  code TEXT NOT NULL,
-  kind TEXT NOT NULL DEFAULT 'path',
-  original_url TEXT NOT NULL,
-  created_at INTEGER NOT NULL,
-  created_by INTEGER REFERENCES login_identities(id),
-  PRIMARY KEY (code, kind)
-);
-
-CREATE TABLE IF NOT EXISTS login_events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  identity_id INTEGER NOT NULL REFERENCES login_identities(id),
-  logged_in_at INTEGER NOT NULL,
-  ip_address TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_login_events_identity ON login_events(identity_id);
-
-CREATE TABLE IF NOT EXISTS redirect_events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  code TEXT NOT NULL,
-  kind TEXT NOT NULL,
-  requested_at INTEGER NOT NULL,
-  ip_address TEXT,
-  country TEXT,
-  user_agent TEXT,
-  referer TEXT,
-  headers TEXT NOT NULL,
-  cf_data TEXT,
-  FOREIGN KEY (code, kind) REFERENCES urls(code, kind) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_redirect_events_code ON redirect_events(code, kind);
-
--- Audit history: one "<table>_history" per tracked table above, holding a
--- copy of each row's content immediately before it was updated or deleted.
--- Populated entirely by triggers, so this happens regardless of which code
--- path performs the update/delete. History tables intentionally drop the
--- original table's PRIMARY KEY, UNIQUE, and FOREIGN KEY constraints: the
--- same logical row can be updated/deleted many times over its life (each
--- producing its own history row), and a history row must never be blocked
--- by a parent row that's since been deleted itself.
+-- Audit history: one "<table>_history" per tracked table, holding a copy of
+-- each row's content immediately before it was updated or deleted. Populated
+-- entirely by triggers, so this happens regardless of which code path
+-- performs the update/delete.
+--
+-- History tables intentionally drop the original table's PRIMARY KEY,
+-- UNIQUE, and FOREIGN KEY constraints: the same logical row can be
+-- updated/deleted many times over its life (each producing its own history
+-- row), and a history row must never be blocked by a parent row that's
+-- since been deleted itself.
 
 CREATE TABLE IF NOT EXISTS login_identities_history (
   history_id INTEGER PRIMARY KEY AUTOINCREMENT,
