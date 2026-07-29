@@ -162,17 +162,17 @@ function createQrIconButton() {
   button.title = "Show QR code";
   button.setAttribute("aria-label", "Show QR code");
   button.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
-    <rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
-    <rect x="3.5" y="3.5" width="3" height="3" fill="currentColor"/>
-    <rect x="15.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
-    <rect x="17.5" y="3.5" width="3" height="3" fill="currentColor"/>
-    <rect x="1.5" y="15.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
-    <rect x="3.5" y="17.5" width="3" height="3" fill="currentColor"/>
-    <rect x="13" y="13" width="2" height="2" fill="currentColor"/>
-    <rect x="16.5" y="16.5" width="2" height="2" fill="currentColor"/>
-    <rect x="20" y="16.5" width="2" height="2" fill="currentColor"/>
-    <rect x="16.5" y="20" width="2" height="2" fill="currentColor"/>
-    <rect x="20" y="20" width="2" height="2" fill="currentColor"/>
+    <rect x="2.5935183" y="2.8879271" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <rect x="4.5935183" y="4.8879271" width="3" height="3" fill="currentColor"/>
+    <rect x="14.125116" y="2.8581874" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <rect x="16.125116" y="4.8581872" width="3" height="3" fill="currentColor"/>
+    <rect x="2.6638107" y="13.88421" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <rect x="4.6638088" y="15.88421" width="3" height="3" fill="currentColor"/>
+    <rect x="11.981996" y="12.157454" width="2" height="2" fill="currentColor"/>
+    <rect x="14.82772" y="14.61657" width="2" height="2" fill="currentColor"/>
+    <rect x="18.327723" y="14.61657" width="2" height="2" fill="currentColor"/>
+    <rect x="14.82772" y="18.116564" width="2" height="2" fill="currentColor"/>
+    <rect x="18.327723" y="18.116564" width="2" height="2" fill="currentColor"/>
   </svg>`;
   return button;
 }
