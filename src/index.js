@@ -60,19 +60,20 @@ function loginPage(errorCode) {
   <meta property="og:site_name" content="tiny.vin">
   <meta property="og:title" content="tiny.vin">
   <meta property="og:description" content="${SITE_DESCRIPTION}">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
   <script src="/theme-init.js"></script>
 </head>
 <body>
   <div class="site-nav">
-    <span class="wordmark">tiny<span class="accent-dot">.</span>vin</span>
+    <a class="wordmark" href="/">tin<span class="accent-dot">y.v</span>in</a>
   </div>
   <div class="theme-toggle" role="group" aria-label="Theme">
     <button type="button" class="theme-btn" data-theme-value="light">Light</button>
     <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
   </div>
   <main class="panel">
-    <p class="heading-large">tiny<span class="accent-dot">.</span>vin</p>
+    <p class="heading-large">tiny<span class="heading-large-accent-dot">.</span>vin</p>
     <p class="login-instruction">Sign in and paste or enter a URL to shorten it. Then share it &ndash; it's available to everyone!</p>
     <div class="login-buttons">
       <a class="provider-btn" href="/auth/google/start">
