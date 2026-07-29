@@ -4,17 +4,27 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>tiny.vin</title>
-  <meta name="description" content="tiny.vin is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.">
+  <meta name="description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://tiny.vin">
   <meta property="og:site_name" content="tiny.vin">
   <meta property="og:title" content="tiny.vin">
-  <meta property="og:description" content="tiny.vin is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.">
+  <meta property="og:description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
   <link rel="stylesheet" href="style.css">
   <script>(function () { var t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); })();</script>
 </head>
 <body>
-  <span class="wordmark">tiny<span class="accent-dot">.</span>vin</span>
+  <div class="site-nav">
+    <button type="button" class="nav-toggle" aria-label="Menu" aria-haspopup="true" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="wordmark">tiny<span class="accent-dot">.</span>vin</span>
+    <nav class="nav-dropdown" hidden>
+      <a class="nav-link" href="/">URLs</a>
+      <a class="nav-link" href="/stats">Statistics</a>
+      <a class="nav-link nav-link--signout" href="/auth/logout">Sign out</a>
+    </nav>
+  </div>
   <div class="theme-toggle" role="group" aria-label="Theme">
     <button type="button" class="theme-btn" data-theme-value="light">Light</button>
     <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
@@ -30,10 +40,10 @@
   <section class="history-panel" id="history-panel">
     <div id="history-list"></div>
   </section>
-  <p class="signout-row"><a href="/auth/logout">Sign out</a></p>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
   <footer>Simple project by Anders &amp; Claude &middot; v29</footer>
   <script src="script.js"></script>
   <script src="theme.js"></script>
+  <script src="nav.js"></script>
 </body>
 </html>

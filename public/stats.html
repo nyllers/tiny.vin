@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tiny.vin — Statistics</title>
+  <meta name="description" content="View redirect statistics for the tiny URLs you've created on tiny.vin.">
+  <link rel="stylesheet" href="style.css">
+  <script>(function () { var t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); })();</script>
+</head>
+<body>
+  <div class="site-nav">
+    <button type="button" class="nav-toggle" aria-label="Menu" aria-haspopup="true" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="wordmark">tiny<span class="accent-dot">.</span>vin</span>
+    <nav class="nav-dropdown" hidden>
+      <a class="nav-link" href="/">URLs</a>
+      <a class="nav-link" href="/stats">Statistics</a>
+      <a class="nav-link nav-link--signout" href="/auth/logout">Sign out</a>
+    </nav>
+  </div>
+  <div class="theme-toggle" role="group" aria-label="Theme">
+    <button type="button" class="theme-btn" data-theme-value="light">Light</button>
+    <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
+  </div>
+  <h2 class="section-heading">STATISTICS</h2>
+  <section class="stats-summary" id="stats-summary"></section>
+  <section class="history-panel" id="stats-panel">
+    <div id="stats-list"></div>
+  </section>
+  <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
+  <footer>Simple project by Anders &amp; Claude</footer>
+  <script src="stats.js"></script>
+  <script src="theme.js"></script>
+  <script src="nav.js"></script>
+</body>
+</html>

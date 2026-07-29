@@ -9,7 +9,8 @@ const CODE_PATTERN = /^\/([A-Za-z0-9]{1,32})$/;
 const SUBDOMAIN_REDIRECT_PATTERN = /^\/subdomain\/([a-z0-9-]{1,63})$/;
 const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
 const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9-]+)$/;
-const RESERVED_CODES = new Set(["login", "subdomain"]);
+const RESERVED_CODES = new Set(["login", "subdomain", "stats", "privacy", "terms"]);
+const PROTECTED_PAGES = new Set(["/", "/stats", "/stats.html"]);
 
 const LOGIN_ERRORS = {
   oauth_failed: "Something went wrong signing in. Please try again.",
@@ -44,17 +45,19 @@ function loginPage(errorCode) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>tiny.vin</title>
-  <meta name="description" content="tiny.vin is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.">
+  <meta name="description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://tiny.vin">
   <meta property="og:site_name" content="tiny.vin">
   <meta property="og:title" content="tiny.vin">
-  <meta property="og:description" content="tiny.vin is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.">
+  <meta property="og:description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
   <link rel="stylesheet" href="/style.css">
   <script>(function () { var t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); })();</script>
 </head>
 <body>
-  <span class="wordmark">tiny<span class="accent-dot">.</span>vin</span>
+  <div class="site-nav">
+    <span class="wordmark">tiny<span class="accent-dot">.</span>vin</span>
+  </div>
   <div class="theme-toggle" role="group" aria-label="Theme">
     <button type="button" class="theme-btn" data-theme-value="light">Light</button>
     <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
@@ -76,7 +79,7 @@ function loginPage(errorCode) {
     ${message ? `<p class="login-error">${message}</p>` : ""}
     <details class="info-toggle">
       <summary>What is tiny.vin?</summary>
-      <p>tiny.vin is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.</p>
+      <p>tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.</p>
     </details>
   </main>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
@@ -150,7 +153,7 @@ async function validateUrl(input) {
   const scheme = input.slice(0, input.indexOf("://")).toLowerCase();
   if (scheme !== "http" && scheme !== "https") {
     return {
-      error: `"${scheme}://" links aren't supported, only http:// and https://. Try: https://example.com`,
+      error: `"${scheme}://" URLs aren't supported, only http:// and https://. Try: https://example.com`,
     };
   }
 
@@ -346,6 +349,63 @@ async function handleHistory(env, session) {
   return jsonResponse({ urls });
 }
 
+async function handleStats(env, session) {
+  const identityId = await getIdentityId(env, session.provider, session.email);
+
+  const { results } = await env.DB.prepare(
+    `SELECT u.code, u.kind, u.original_url, u.created_at,
+            COUNT(re.id) AS clicks,
+            MAX(re.requested_at) AS last_click
+     FROM urls u
+     LEFT JOIN redirect_events re ON re.code = u.code AND re.kind = u.kind
+     WHERE u.created_by = ?
+     GROUP BY u.code, u.kind
+     ORDER BY u.created_at DESC`
+  )
+    .bind(identityId)
+    .all();
+
+  const topCountryRow = await env.DB.prepare(
+    `SELECT re.country AS country, COUNT(*) AS cnt
+     FROM redirect_events re
+     JOIN urls u ON u.code = re.code AND u.kind = re.kind
+     WHERE u.created_by = ? AND re.country IS NOT NULL
+     GROUP BY re.country
+     ORDER BY cnt DESC
+     LIMIT 1`
+  )
+    .bind(identityId)
+    .first();
+
+  const groups = new Map();
+  let totalClicks = 0;
+  for (const row of results) {
+    totalClicks += row.clicks;
+    if (!groups.has(row.original_url)) {
+      groups.set(row.original_url, { originalUrl: row.original_url, totalClicks: 0, shortUrls: [] });
+    }
+    const group = groups.get(row.original_url);
+    group.totalClicks += row.clicks;
+    group.shortUrls.push({
+      code: row.code,
+      kind: row.kind,
+      shortUrl: row.kind === "subdomain" ? `${row.code}.tiny.vin` : `tiny.vin/${row.code}`,
+      createdAt: row.created_at,
+      clicks: row.clicks,
+      lastClickAt: row.last_click,
+    });
+  }
+
+  const urls = Array.from(groups.values()).sort((a, b) => b.totalClicks - a.totalClicks);
+
+  return jsonResponse({
+    totalLinks: results.length,
+    totalClicks,
+    topCountry: topCountryRow ? topCountryRow.country : null,
+    urls,
+  });
+}
+
 async function handleDeleteUrl(code, kind, env, session) {
   const identityId = await getIdentityId(env, session.provider, session.email);
 
@@ -504,7 +564,7 @@ export default {
     }
 
     const codeMatch = url.pathname.match(CODE_PATTERN);
-    if (request.method === "GET" && codeMatch) {
+    if (request.method === "GET" && codeMatch && !RESERVED_CODES.has(codeMatch[1].toLowerCase())) {
       return handleRedirect(codeMatch[1], "path", env, ctx, request);
     }
 
@@ -520,6 +580,12 @@ export default {
       return handleHistory(env, session);
     }
 
+    if (request.method === "GET" && url.pathname === "/api/stats") {
+      const session = await getSession(request, env.SESSION_SECRET);
+      if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
+      return handleStats(env, session);
+    }
+
     const deleteMatch = url.pathname.match(DELETE_URL_PATTERN);
     if (request.method === "DELETE" && deleteMatch) {
       const session = await getSession(request, env.SESSION_SECRET);
@@ -528,7 +594,7 @@ export default {
       return handleDeleteUrl(deleteMatch[1], kind, env, session);
     }
 
-    if (url.pathname === "/") {
+    if (PROTECTED_PAGES.has(url.pathname)) {
       const session = await getSession(request, env.SESSION_SECRET);
       if (!session) return htmlResponse(loginPage());
     }
