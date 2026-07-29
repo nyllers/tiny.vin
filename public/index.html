@@ -50,12 +50,14 @@
     <button type="button" class="theme-btn" data-theme-value="light">Light</button>
     <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
   </div>
+  <p class="token-indicator" id="token-indicator" hidden></p>
   <h2 class="section-heading">ADD URL</h2>
   <main class="generate-section">
     <div class="controls">
       <input type="text" id="url-input" placeholder="Paste or write a URL">
       <button id="generate-btn">Make it Tiny</button>
     </div>
+    <p class="action-price" id="generate-price" data-price-kind="generated-path"></p>
     <p id="url-result"></p>
   </main>
   <section class="history-panel" id="history-panel">
@@ -74,6 +76,7 @@
     </div>
   </div>
   <script src="cards.js"></script>
+  <script src="tokens.js"></script>
   <script src="script.js"></script>
   <script src="theme.js"></script>
   <script src="nav.js"></script>

@@ -35,7 +35,7 @@ Every successful login is recorded in D1: `login_identities` holds one row per (
 
 ## Subdomains
 
-In addition to path-based short URLs (`tiny.vin/<code>`), a URL can also get a subdomain-based one (`<name>.tiny.vin`) via the "Add subdomain" button on each card. `urls.kind` (`'path'` or `'subdomain'`) distinguishes the two, and `(code, kind)` is the primary key, so the same string can be used as both a path and a subdomain independently.
+In addition to path-based short URLs (`tiny.vin/<code>`), a URL can also get a subdomain-based one (`<name>.tiny.vin`) via the "Add subdomain" button on each card. `urls.kind` (`'generated-path'`, `'custom-path'`, or `'subdomain'` — see "Token economy" below for why path is split in two) distinguishes them, and `(code, kind)` is the primary key, so the same string can be used as both a path and a subdomain independently.
 
 This depends on Cloudflare routing every subdomain request to `https://tiny.vin/subdomain/<name>` (a wildcard DNS record plus a redirect rule, configured outside this repo) — the Worker only handles the resulting `/subdomain/<name>` request, looking it up with `kind = 'subdomain'` and issuing the redirect from there.
 
@@ -54,3 +54,23 @@ If the database was created before this existed, apply `migrations/0006_add_redi
 Every table has a matching `<table>_history` table (`login_identities_history`, `urls_history`, `login_events_history`, `redirect_events_history`) holding the same columns plus a `history_created` timestamp. Triggers on each table copy a row's content into its history table right before an `UPDATE` or `DELETE`, so nothing has to opt in from the application code — this includes rows removed indirectly, e.g. a `redirect_events` row disappearing via `urls`' `ON DELETE CASCADE` still lands in `redirect_events_history`. History tables drop the original's primary/unique/foreign key constraints, since the same row can be changed many times over its life and a history row must never be blocked by a parent that's since been deleted itself.
 
 If the database was created before this existed, apply `migrations/0007_add_history_tables.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0007_add_history_tables.sql --remote`) in addition to `schema.sql`.
+
+## Token economy
+
+Every account has a token balance (`login_identities.token_balance`), spent on creating and keeping tiny URLs/subdomains alive. New accounts get 100 tokens on first sign-in.
+
+| Kind | Create cost | Monthly upkeep |
+|---|---|---|
+| `generated-path` (auto-generated code, the default "Make it Tiny" flow) | 10 | 1 |
+| `custom-path` (a user-chosen pathname, via "Add Path") | 25 | 10 |
+| `subdomain` (via "Add Subdomain") | 50 | 20 |
+
+The creation cost includes the first month of upkeep — `urls.paid_through_at` (epoch ms) is set to one month out at creation time, and is `NULL` for anything grandfathered in (see the migration note below). Every debit/credit is recorded in `token_transactions`, an append-only ledger keyed by identity — unlike every other table in this schema, it has no `_history` twin, since it's never updated or deleted and so already IS the history.
+
+Creating something checks the balance first; if it's insufficient, `POST /api/shorten` returns `402` with a message naming the cost and the current balance, and nothing is created or charged.
+
+Monthly upkeep is charged by a Cloudflare Cron Trigger (`wrangler.jsonc`'s `triggers.crons`, currently daily at 03:00 UTC — daily granularity is more than enough precision for monthly billing) running the Worker's `scheduled()` handler. For every row whose `paid_through_at` has passed, it charges that kind's upkeep and pushes `paid_through_at` a month further out; if the account can't afford it, the row is deleted immediately (no grace period) and a `$0` ledger entry records why. Test this locally with `wrangler dev --test-scheduled` (already the default in `.claude/launch.json`) and `curl -X POST "http://localhost:8787/__scheduled?cron=0+3+*+*+*"`.
+
+`GET /api/tokens` exposes the balance, the cost table above (so the frontend never hardcodes prices separately), and a `monthsRemaining` estimate — current balance divided by the sum of upkeep cost across every row with a non-`NULL` `paid_through_at` (i.e. actually-metered resources; grandfathered ones don't count), floored to a whole number, or `null` if that sum is zero (no ongoing costs) rather than dividing by zero. The frontend shows this as a small pill at the top-middle of every page, and shows each action's price next to "Make it Tiny", "Add Path", and "Add Subdomain".
+
+If the database was created before this existed, apply `migrations/0008_add_token_economy.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0008_add_token_economy.sql --remote`) in addition to `schema.sql`. It converts every existing `kind = 'path'` row to `'generated-path'` (reclassifying specific rows to `'custom-path'` afterward is manual, one-off data entry — the migration has no way to know which existing codes were originally hand-picked) and grants every existing account 100 tokens, but leaves every existing url/subdomain grandfathered in for free (`paid_through_at` stays `NULL`, so the cron never bills them) rather than retroactively charging for things created before this feature existed.

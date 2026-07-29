@@ -75,6 +75,10 @@ body {
   #generate-btn {
     width: 100%;
   }
+
+  .token-indicator {
+    top: 3.5rem;
+  }
 }
 
 h1 {
@@ -456,6 +460,35 @@ footer {
   background: var(--panel-bg);
   border: 1px solid var(--card-border);
   border-radius: 999px;
+}
+
+.token-indicator {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  margin: 0;
+  padding: 0.25rem 0.75rem;
+  background: var(--panel-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.action-price {
+  margin: 0.25rem 0 0;
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.theme-btn .action-price {
+  margin: 0;
+  color: inherit;
+  opacity: 0.85;
 }
 
 .theme-btn {

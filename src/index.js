@@ -12,6 +12,15 @@ const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9-]+)$/;
 const RESERVED_CODES = new Set(["login", "subdomain", "stats", "privacy", "terms"]);
 const PROTECTED_PAGES = new Set(["/", "/stats", "/stats.html"]);
 
+const VALID_KINDS = new Set(["generated-path", "custom-path", "subdomain"]);
+const TOKEN_COSTS = {
+  "generated-path": { create: 10, upkeep: 1 },
+  "custom-path": { create: 25, upkeep: 10 },
+  subdomain: { create: 50, upkeep: 20 },
+};
+const SIGNUP_BONUS_TOKENS = 100;
+const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
 const LOGIN_ERRORS = {
   oauth_failed: "Something went wrong signing in. Please try again.",
   state_mismatch: "Your sign-in request expired. Please try again.",
@@ -222,16 +231,56 @@ function formatShortUrl(code, kind) {
   return kind === "subdomain" ? `${code}.tiny.vin` : `tiny.vin/${code}`;
 }
 
-async function insertUrl(env, { code, kind, originalUrl, createdBy }) {
+async function insertUrl(env, { code, kind, originalUrl, createdBy, createdAt, paidThroughAt }) {
   await env.DB.prepare(
-    "INSERT INTO urls (code, kind, original_url, created_at, created_by) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO urls (code, kind, original_url, created_at, created_by, paid_through_at) VALUES (?, ?, ?, ?, ?, ?)"
   )
-    .bind(code, kind, originalUrl, Date.now(), createdBy)
+    .bind(code, kind, originalUrl, createdAt, createdBy, paidThroughAt)
     .run();
 }
 
 function shortUrlResponse(code, kind, originalUrl) {
   return jsonResponse({ code, kind, originalUrl, shortUrl: formatShortUrl(code, kind) });
+}
+
+async function getTokenBalance(env, identityId) {
+  const row = await env.DB.prepare("SELECT token_balance FROM login_identities WHERE id = ?")
+    .bind(identityId)
+    .first();
+  return row ? row.token_balance : 0;
+}
+
+async function logTokenEvent(env, identityId, amount, reason, { code = null, kind = null } = {}) {
+  await env.DB.prepare(
+    "INSERT INTO token_transactions (identity_id, amount, reason, code, kind, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+  )
+    .bind(identityId, amount, reason, code, kind, Date.now())
+    .run();
+}
+
+async function debitTokens(env, identityId, amount, reason, extra = {}) {
+  await env.DB.prepare("UPDATE login_identities SET token_balance = token_balance - ? WHERE id = ?")
+    .bind(amount, identityId)
+    .run();
+  await logTokenEvent(env, identityId, -amount, reason, extra);
+}
+
+async function createShortUrl(env, { code, kind, originalUrl, createdBy }) {
+  const cost = TOKEN_COSTS[kind].create;
+  const balance = await getTokenBalance(env, createdBy);
+  if (balance < cost) {
+    return { insufficientBalance: true, balance, cost };
+  }
+
+  const now = Date.now();
+  try {
+    await insertUrl(env, { code, kind, originalUrl, createdBy, createdAt: now, paidThroughAt: now + ONE_MONTH_MS });
+  } catch {
+    return { conflict: true };
+  }
+
+  await debitTokens(env, createdBy, cost, `create_${kind}`, { code, kind });
+  return { ok: true };
 }
 
 async function handleShorten(request, env, session) {
@@ -275,31 +324,44 @@ async function handleShorten(request, env, session) {
   const createdBy = await getOrCreateIdentityId(env, session.provider, session.email);
 
   if (subdomainCode) {
-    try {
-      await insertUrl(env, { code: subdomainCode, kind: "subdomain", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(subdomainCode, "subdomain", validation.url);
-    } catch {
+    const result = await createShortUrl(env, { code: subdomainCode, kind: "subdomain", originalUrl: validation.url, createdBy });
+    if (result.insufficientBalance) {
+      return jsonResponse(
+        { error: `Adding a subdomain costs ${result.cost} tokens, but you only have ${result.balance}.` },
+        402
+      );
+    }
+    if (result.conflict) {
       return jsonResponse({ error: `"${subdomainCode}.tiny.vin" is already taken, try another.` }, 409);
     }
+    return shortUrlResponse(subdomainCode, "subdomain", validation.url);
   }
 
   if (customCode) {
-    try {
-      await insertUrl(env, { code: customCode, kind: "path", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(customCode, "path", validation.url);
-    } catch {
+    const result = await createShortUrl(env, { code: customCode, kind: "custom-path", originalUrl: validation.url, createdBy });
+    if (result.insufficientBalance) {
+      return jsonResponse(
+        { error: `Adding a custom path costs ${result.cost} tokens, but you only have ${result.balance}.` },
+        402
+      );
+    }
+    if (result.conflict) {
       return jsonResponse({ error: `"${customCode}" is already taken, try another.` }, 409);
     }
+    return shortUrlResponse(customCode, "custom-path", validation.url);
   }
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const code = generateCode();
-    try {
-      await insertUrl(env, { code, kind: "path", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(code, "path", validation.url);
-    } catch {
-      // code collision, retry with a new random code
+    const result = await createShortUrl(env, { code, kind: "generated-path", originalUrl: validation.url, createdBy });
+    if (result.insufficientBalance) {
+      return jsonResponse(
+        { error: `Creating a tiny URL costs ${result.cost} tokens, but you only have ${result.balance}.` },
+        402
+      );
     }
+    if (result.conflict) continue;
+    return shortUrlResponse(code, "generated-path", validation.url);
   }
 
   return jsonResponse({ error: "Could not generate a unique code, try again" }, 500);
@@ -380,6 +442,26 @@ function topCounts(counts, limit) {
   return Array.from(counts, ([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, limit);
+}
+
+async function handleTokens(env, session) {
+  const identityId = await getIdentityId(env, session.provider, session.email);
+  const balance = await getTokenBalance(env, identityId);
+
+  const { results } = await env.DB.prepare(
+    "SELECT kind, COUNT(*) AS cnt FROM urls WHERE created_by = ? AND paid_through_at IS NOT NULL GROUP BY kind"
+  )
+    .bind(identityId)
+    .all();
+
+  let monthlyBurn = 0;
+  for (const row of results) {
+    monthlyBurn += TOKEN_COSTS[row.kind].upkeep * row.cnt;
+  }
+
+  const monthsRemaining = monthlyBurn > 0 ? Math.floor(balance / monthlyBurn) : null;
+
+  return jsonResponse({ balance, costs: TOKEN_COSTS, monthlyBurn, monthsRemaining });
 }
 
 async function handleStats(env, session) {
@@ -524,18 +606,19 @@ async function recordRedirectEvent(env, { code, kind, request }) {
   }
 }
 
-async function handleRedirect(code, kind, env, ctx, request) {
+async function handleRedirect(code, kinds, env, ctx, request) {
+  const placeholders = kinds.map(() => "?").join(", ");
   const row = await env.DB.prepare(
-    "SELECT original_url FROM urls WHERE code = ? AND kind = ?"
+    `SELECT kind, original_url FROM urls WHERE code = ? AND kind IN (${placeholders})`
   )
-    .bind(code, kind)
+    .bind(code, ...kinds)
     .first();
 
   if (!row) {
     return new Response("Not found", { status: 404 });
   }
 
-  ctx.waitUntil(recordRedirectEvent(env, { code, kind, request }));
+  ctx.waitUntil(recordRedirectEvent(env, { code, kind: row.kind, request }));
 
   return Response.redirect(row.original_url, 302);
 }
@@ -555,13 +638,19 @@ function handleAuthStart(url, env) {
 }
 
 async function getOrCreateIdentityId(env, provider, username) {
-  await env.DB.prepare(
-    "INSERT INTO login_identities (provider, username) VALUES (?, ?) ON CONFLICT (provider, username) DO NOTHING"
+  const result = await env.DB.prepare(
+    "INSERT INTO login_identities (provider, username, token_balance) VALUES (?, ?, ?) ON CONFLICT (provider, username) DO NOTHING"
   )
-    .bind(provider, username)
+    .bind(provider, username, SIGNUP_BONUS_TOKENS)
     .run();
 
-  return getIdentityId(env, provider, username);
+  const identityId = await getIdentityId(env, provider, username);
+
+  if (result.meta.changes > 0) {
+    await logTokenEvent(env, identityId, SIGNUP_BONUS_TOKENS, "signup_bonus");
+  }
+
+  return identityId;
 }
 
 async function recordLogin(env, provider, username, ipAddress) {
@@ -611,6 +700,39 @@ async function handleAuthCallback(url, request, env) {
   }
 }
 
+async function runMonthlyBilling(env) {
+  const now = Date.now();
+  const { results } = await env.DB.prepare(
+    "SELECT code, kind, created_by, paid_through_at FROM urls WHERE paid_through_at IS NOT NULL AND paid_through_at <= ?"
+  )
+    .bind(now)
+    .all();
+
+  for (const row of results) {
+    let paidThroughAt = row.paid_through_at;
+    let deleted = false;
+
+    while (paidThroughAt <= now) {
+      const upkeepCost = TOKEN_COSTS[row.kind].upkeep;
+      const balance = await getTokenBalance(env, row.created_by);
+      if (balance < upkeepCost) {
+        await env.DB.prepare("DELETE FROM urls WHERE code = ? AND kind = ?").bind(row.code, row.kind).run();
+        await logTokenEvent(env, row.created_by, 0, "deleted_insufficient_balance", { code: row.code, kind: row.kind });
+        deleted = true;
+        break;
+      }
+      await debitTokens(env, row.created_by, upkeepCost, `upkeep_${row.kind}`, { code: row.code, kind: row.kind });
+      paidThroughAt += ONE_MONTH_MS;
+    }
+
+    if (!deleted) {
+      await env.DB.prepare("UPDATE urls SET paid_through_at = ? WHERE code = ? AND kind = ?")
+        .bind(paidThroughAt, row.code, row.kind)
+        .run();
+    }
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -635,12 +757,12 @@ export default {
 
     const subdomainMatch = url.pathname.match(SUBDOMAIN_REDIRECT_PATTERN);
     if (request.method === "GET" && subdomainMatch) {
-      return handleRedirect(subdomainMatch[1], "subdomain", env, ctx, request);
+      return handleRedirect(subdomainMatch[1], ["subdomain"], env, ctx, request);
     }
 
     const codeMatch = url.pathname.match(CODE_PATTERN);
     if (request.method === "GET" && codeMatch && !RESERVED_CODES.has(codeMatch[1].toLowerCase())) {
-      return handleRedirect(codeMatch[1], "path", env, ctx, request);
+      return handleRedirect(codeMatch[1], ["generated-path", "custom-path"], env, ctx, request);
     }
 
     if (request.method === "POST" && url.pathname === "/api/shorten") {
@@ -655,9 +777,14 @@ export default {
       return withAuth(request, env, (session) => handleStats(env, session));
     }
 
+    if (request.method === "GET" && url.pathname === "/api/tokens") {
+      return withAuth(request, env, (session) => handleTokens(env, session));
+    }
+
     const deleteMatch = url.pathname.match(DELETE_URL_PATTERN);
     if (request.method === "DELETE" && deleteMatch) {
-      const kind = url.searchParams.get("kind") === "subdomain" ? "subdomain" : "path";
+      const kindParam = url.searchParams.get("kind");
+      const kind = VALID_KINDS.has(kindParam) ? kindParam : "generated-path";
       return withAuth(request, env, (session) => handleDeleteUrl(deleteMatch[1], kind, env, session));
     }
 
@@ -667,5 +794,9 @@ export default {
     }
 
     return env.ASSETS.fetch(request);
+  },
+
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runMonthlyBilling(env));
   },
 };

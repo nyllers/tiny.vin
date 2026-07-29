@@ -119,11 +119,11 @@ function createCopyIconButton() {
   return button;
 }
 
-function createAddButton(label) {
+function createAddButton(label, kind) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "theme-btn active";
-  button.innerHTML = `<span>${label}</span>`;
+  button.innerHTML = `<span>${label}</span> <span class="action-price" data-price-kind="${kind}"></span>`;
   return button;
 }
 
@@ -310,8 +310,8 @@ function createUrlCard(group, justCreatedCode) {
 
   const actionsContainer = document.createElement("div");
   actionsContainer.className = "url-card-actions";
-  const addPathBtn = createAddButton("Add Path");
-  const addSubdomainBtn = createAddButton("Add Subdomain");
+  const addPathBtn = createAddButton("Add Path", "custom-path");
+  const addSubdomainBtn = createAddButton("Add Subdomain", "subdomain");
 
   function showActionButtons() {
     actionsContainer.textContent = "";
@@ -357,6 +357,7 @@ async function loadHistory(justCreatedCode) {
 
   panel.hidden = false;
   container.append(createCardsSection("CREATED URLS", data.urls, (group) => createUrlCard(group, justCreatedCode)));
+  applyTokenPrices();
 }
 
 function updateGenerateButtonState() {
