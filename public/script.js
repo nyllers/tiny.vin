@@ -122,7 +122,7 @@ function createCopyIconButton() {
 function createAddButton(label) {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "icon-btn card-action-btn";
+  button.className = "theme-btn active";
   button.innerHTML = `<span>${label}</span>`;
   return button;
 }
@@ -130,7 +130,7 @@ function createAddButton(label) {
 function createSaveSuffixButton() {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "icon-btn card-action-btn save-suffix-btn";
+  button.className = "icon-btn cancel-btn";
   button.innerHTML = `<span>Save</span>`;
   return button;
 }
@@ -146,7 +146,7 @@ function createDeleteIconButton() {
 }
 
 async function deleteUrl(code, kind, shortUrl) {
-  const confirmed = await confirmDelete(`Are you sure you want to delete the redirected URL ${shortUrl}?`);
+  const confirmed = await confirmDelete(`Are you sure you want to delete ${shortUrl}?`);
   if (!confirmed) return;
 
   try {
@@ -222,7 +222,8 @@ function createInlineCodeInputRow({ group, bodyKey, prefixText, suffixText, plac
   function updateSaveButtonLabel() {
     const hasValue = Boolean(input.value.trim());
     saveBtnLabel.textContent = hasValue ? "Save" : "Cancel";
-    saveBtn.classList.toggle("save-suffix-btn--cancel", !hasValue);
+    saveBtn.classList.toggle("save-btn", hasValue);
+    saveBtn.classList.toggle("cancel-btn", !hasValue);
   }
 
   async function submitValue() {

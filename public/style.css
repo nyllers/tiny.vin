@@ -12,6 +12,7 @@
   --card-border: #e5e7eb;
   --input-border: #d1d5db;
   --input-bg: #fff;
+  --delete: #cc0000;
   --muted: #6b7280;
 }
 
@@ -25,6 +26,7 @@
   --card-border: #374151;
   --input-border: #4b5563;
   --input-bg: #111827;
+  --delete: #cc0000;
 }
 
 body {
@@ -316,30 +318,51 @@ footer {
   color: var(--heading);
 }
 
-.save-suffix-btn.save-suffix-btn--cancel {
-  color: var(--muted);
-  border-color: var(--muted);
-}
-
 .icon-btn.delete-btn {
-  color: #cc0000;
-  background: none;
-  border: 1px solid #cc0000;
-  gap: 0.25rem;
-  padding: 1px 0.35rem;
+  padding: 0.25rem 0.75rem;
   font-size: 0.75rem;
-  border-radius: 0.25rem;
-}
-
-.icon-btn.delete-btn,
-.icon-btn.save-suffix-btn {
+  color: var(--bg);
+  background: var(--delete);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
   width: 4.5rem;
   justify-content: center;
 }
 
 .icon-btn.delete-btn:hover {
-  color: #cc0000;
+  opacity: 0.75;
+}
+
+.icon-btn.cancel-btn {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text);
   background: none;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  cursor: pointer;
+  width: 4.5rem;
+  justify-content: center;
+}
+
+.icon-btn.cancel-btn:hover {
+  opacity: 0.75;
+}
+
+.icon-btn.save-btn {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  background: var(--heading);
+  color: #fff;  
+  border: none;
+  border-radius: 999px;
+  cursor: pointer; 
+  width: 4.5rem;
+  justify-content: center;
+}
+
+.icon-btn.save-btn:hover {
   opacity: 0.75;
 }
 
@@ -448,6 +471,10 @@ footer {
 .theme-btn.active {
   background: var(--heading);
   color: #fff;
+}
+
+.theme-btn:hover {
+  opacity: 0.75;
 }
 
 .wordmark {
