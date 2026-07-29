@@ -35,11 +35,13 @@ Every successful login is recorded in D1: `login_identities` holds one row per (
 
 ## Subdomains
 
-In addition to path-based short URLs (`tiny.vin/<code>`), a URL can also get a subdomain-based one (`<name>.tiny.vin`) via the "Add subdomain" button on each card. `urls.kind` (`'path'` or `'subdomain'`) distinguishes the two, and `(code, kind)` is the primary key, so the same string can be used as both a path and a subdomain independently.
+In addition to path-based short URLs (`tiny.vin/<code>`), a URL can also get a subdomain-based one (`<name>.tiny.vin`) via the "Add subdomain" button on each card. `urls.kind` (`'generated-path'`, `'custom-path'`, or `'subdomain'` — the first two distinguish an auto-generated code from a user-chosen pathname) distinguishes them, and `(code, kind)` is the primary key, so the same string can be used as a path and a subdomain independently.
 
 This depends on Cloudflare routing every subdomain request to `https://tiny.vin/subdomain/<name>` (a wildcard DNS record plus a redirect rule, configured outside this repo) — the Worker only handles the resulting `/subdomain/<name>` request, looking it up with `kind = 'subdomain'` and issuing the redirect from there.
 
 If the database was created before this feature existed, apply `migrations/0005_add_subdomain_support.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0005_add_subdomain_support.sql --remote`) in addition to `schema.sql`. This migration rebuilds the `urls` table (SQLite can't add a column to a composite primary key in place), so back up first if the data matters.
+
+The `generated-path`/`custom-path` split is separate and newer: if the database predates it, apply `migrations/0008_split_path_kind.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0008_split_path_kind.sql --remote`) in addition to `schema.sql`. It converts every existing `kind = 'path'` row to `'generated-path'` — reclassifying specific rows to `'custom-path'` afterward is manual, one-off data entry, since the migration has no way to know which existing codes were originally hand-picked.
 
 ## Redirect statistics
 
