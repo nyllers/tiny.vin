@@ -706,6 +706,52 @@ footer {
   color: var(--text);
 }
 
+.daily-chart {
+  width: 100%;
+  height: 4rem;
+  display: block;
+  overflow: visible;
+}
+
+.daily-chart-baseline {
+  stroke: var(--card-border);
+  stroke-width: 1;
+}
+
+.daily-chart-bar {
+  fill: var(--heading);
+  transition: opacity 0.1s ease;
+}
+
+.daily-chart-peak-label {
+  fill: var(--muted);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.daily-chart-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.daily-chart-col:hover .daily-chart-bar,
+.daily-chart-col:focus-within .daily-chart-bar {
+  opacity: 0.7;
+}
+
+.daily-chart-hit:focus-visible {
+  outline: 2px solid var(--heading);
+  outline-offset: -1px;
+}
+
+.daily-chart-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
