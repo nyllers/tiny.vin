@@ -511,10 +511,17 @@ footer {
 }
 
 .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   padding: 0.6rem 1rem;
   color: var(--text);
   text-decoration: none;
   font-size: 0.9rem;
+}
+
+.nav-link-icon {
+  flex-shrink: 0;
 }
 
 .nav-link:hover {
