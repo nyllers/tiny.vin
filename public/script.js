@@ -1,3 +1,48 @@
+function confirmDelete(message) {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById("delete-modal-overlay");
+    const messageEl = document.getElementById("delete-modal-message");
+    const confirmBtn = document.getElementById("delete-modal-confirm");
+    const cancelBtn = document.getElementById("delete-modal-cancel");
+    const previouslyFocused = document.activeElement;
+
+    messageEl.textContent = message;
+    overlay.hidden = false;
+    cancelBtn.focus();
+
+    function close(result) {
+      overlay.hidden = true;
+      confirmBtn.removeEventListener("click", onConfirm);
+      cancelBtn.removeEventListener("click", onCancel);
+      overlay.removeEventListener("click", onOverlayClick);
+      document.removeEventListener("keydown", onKeydown);
+      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
+      resolve(result);
+    }
+
+    function onConfirm() {
+      close(true);
+    }
+
+    function onCancel() {
+      close(false);
+    }
+
+    function onOverlayClick(event) {
+      if (event.target === overlay) close(false);
+    }
+
+    function onKeydown(event) {
+      if (event.key === "Escape") close(false);
+    }
+
+    confirmBtn.addEventListener("click", onConfirm);
+    cancelBtn.addEventListener("click", onCancel);
+    overlay.addEventListener("click", onOverlayClick);
+    document.addEventListener("keydown", onKeydown);
+  });
+}
+
 async function generateUrl() {
   const input = document.getElementById("url-input");
   const result = document.getElementById("url-result");
@@ -99,7 +144,7 @@ function createDeleteIconButton() {
 }
 
 async function deleteUrl(code, kind, shortUrl) {
-  const confirmed = confirm(`Are you sure you want to delete the redirected URL ${shortUrl}?`);
+  const confirmed = await confirmDelete(`Are you sure you want to delete the redirected URL ${shortUrl}?`);
   if (!confirmed) return;
 
   try {
