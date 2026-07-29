@@ -11,6 +11,7 @@ const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
 const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9-]+)$/;
 const RESERVED_CODES = new Set(["login", "subdomain", "stats", "privacy", "terms"]);
 const PROTECTED_PAGES = new Set(["/", "/stats", "/stats.html"]);
+const VALID_KINDS = new Set(["generated-path", "custom-path", "subdomain"]);
 
 const LOGIN_ERRORS = {
   oauth_failed: "Something went wrong signing in. Please try again.",
@@ -285,8 +286,8 @@ async function handleShorten(request, env, session) {
 
   if (customCode) {
     try {
-      await insertUrl(env, { code: customCode, kind: "path", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(customCode, "path", validation.url);
+      await insertUrl(env, { code: customCode, kind: "custom-path", originalUrl: validation.url, createdBy });
+      return shortUrlResponse(customCode, "custom-path", validation.url);
     } catch {
       return jsonResponse({ error: `"${customCode}" is already taken, try another.` }, 409);
     }
@@ -295,8 +296,8 @@ async function handleShorten(request, env, session) {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const code = generateCode();
     try {
-      await insertUrl(env, { code, kind: "path", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(code, "path", validation.url);
+      await insertUrl(env, { code, kind: "generated-path", originalUrl: validation.url, createdBy });
+      return shortUrlResponse(code, "generated-path", validation.url);
     } catch {
       // code collision, retry with a new random code
     }
@@ -524,18 +525,19 @@ async function recordRedirectEvent(env, { code, kind, request }) {
   }
 }
 
-async function handleRedirect(code, kind, env, ctx, request) {
+async function handleRedirect(code, kinds, env, ctx, request) {
+  const placeholders = kinds.map(() => "?").join(", ");
   const row = await env.DB.prepare(
-    "SELECT original_url FROM urls WHERE code = ? AND kind = ?"
+    `SELECT kind, original_url FROM urls WHERE code = ? AND kind IN (${placeholders})`
   )
-    .bind(code, kind)
+    .bind(code, ...kinds)
     .first();
 
   if (!row) {
     return new Response("Not found", { status: 404 });
   }
 
-  ctx.waitUntil(recordRedirectEvent(env, { code, kind, request }));
+  ctx.waitUntil(recordRedirectEvent(env, { code, kind: row.kind, request }));
 
   return Response.redirect(row.original_url, 302);
 }
@@ -635,12 +637,12 @@ export default {
 
     const subdomainMatch = url.pathname.match(SUBDOMAIN_REDIRECT_PATTERN);
     if (request.method === "GET" && subdomainMatch) {
-      return handleRedirect(subdomainMatch[1], "subdomain", env, ctx, request);
+      return handleRedirect(subdomainMatch[1], ["subdomain"], env, ctx, request);
     }
 
     const codeMatch = url.pathname.match(CODE_PATTERN);
     if (request.method === "GET" && codeMatch && !RESERVED_CODES.has(codeMatch[1].toLowerCase())) {
-      return handleRedirect(codeMatch[1], "path", env, ctx, request);
+      return handleRedirect(codeMatch[1], ["generated-path", "custom-path"], env, ctx, request);
     }
 
     if (request.method === "POST" && url.pathname === "/api/shorten") {
@@ -657,7 +659,8 @@ export default {
 
     const deleteMatch = url.pathname.match(DELETE_URL_PATTERN);
     if (request.method === "DELETE" && deleteMatch) {
-      const kind = url.searchParams.get("kind") === "subdomain" ? "subdomain" : "path";
+      const kindParam = url.searchParams.get("kind");
+      const kind = VALID_KINDS.has(kindParam) ? kindParam : "generated-path";
       return withAuth(request, env, (session) => handleDeleteUrl(deleteMatch[1], kind, env, session));
     }
 

@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS login_identities (
 
 CREATE TABLE IF NOT EXISTS urls (
   code TEXT NOT NULL,
-  kind TEXT NOT NULL DEFAULT 'path',
+  kind TEXT NOT NULL DEFAULT 'generated-path',
   original_url TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   created_by INTEGER REFERENCES login_identities(id),
