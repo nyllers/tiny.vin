@@ -242,7 +242,7 @@ function createShortUrlRow(shortUrlItem) {
   const deleteBtn = createDeleteIconButton();
   deleteBtn.addEventListener("click", () => deleteUrl(shortUrlItem.code, shortUrlItem.kind, shortUrlItem.shortUrl));
 
-  shortCopyRow.append(shortUrlGroup, qrBtn, deleteBtn);
+  shortCopyRow.append(qrBtn, shortUrlGroup, deleteBtn);
   return shortCopyRow;
 }
 

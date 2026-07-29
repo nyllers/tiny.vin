@@ -318,9 +318,17 @@ footer {
   cursor: not-allowed;
 }
 
-.icon-btn.copy-link-btn,
-.icon-btn.qr-code-btn {
+.icon-btn.copy-link-btn {
   color: var(--heading);
+}
+
+.icon-btn.qr-code-btn {
+  color: var(--text);
+}
+
+.icon-btn.qr-code-btn:hover {
+  color: var(--text);
+  opacity: 0.75;
 }
 
 .icon-btn.delete-btn {
