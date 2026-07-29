@@ -73,7 +73,18 @@
       </div>
     </div>
   </div>
+  <div class="modal-overlay" id="qr-modal-overlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="qr-modal-title">
+      <p class="modal-title" id="qr-modal-title">QR Code</p>
+      <div class="qr-modal-image" id="qr-modal-image"></div>
+      <p class="qr-modal-url" id="qr-modal-url"></p>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn modal-btn--cancel" id="qr-modal-close">Close</button>
+      </div>
+    </div>
+  </div>
   <script src="cards.js"></script>
+  <script src="qrcode-lib.js"></script>
   <script src="script.js"></script>
   <script src="theme.js"></script>
   <script src="nav.js"></script>

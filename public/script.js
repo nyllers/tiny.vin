@@ -43,6 +43,42 @@ function confirmDelete(message) {
   });
 }
 
+function openQrModal(url) {
+  const overlay = document.getElementById("qr-modal-overlay");
+  const imageEl = document.getElementById("qr-modal-image");
+  const urlEl = document.getElementById("qr-modal-url");
+  const closeBtn = document.getElementById("qr-modal-close");
+  const previouslyFocused = document.activeElement;
+
+  const qr = qrcode(0, "M");
+  qr.addData(url);
+  qr.make();
+  imageEl.innerHTML = qr.createSvgTag({ scalable: true, alt: `QR code for ${url}` });
+  urlEl.textContent = url;
+  overlay.hidden = false;
+  closeBtn.focus();
+
+  function close() {
+    overlay.hidden = true;
+    closeBtn.removeEventListener("click", close);
+    overlay.removeEventListener("click", onOverlayClick);
+    document.removeEventListener("keydown", onKeydown);
+    if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
+  }
+
+  function onOverlayClick(event) {
+    if (event.target === overlay) close();
+  }
+
+  function onKeydown(event) {
+    if (event.key === "Escape") close();
+  }
+
+  closeBtn.addEventListener("click", close);
+  overlay.addEventListener("click", onOverlayClick);
+  document.addEventListener("keydown", onKeydown);
+}
+
 async function generateUrl() {
   const input = document.getElementById("url-input");
   const result = document.getElementById("url-result");
@@ -119,6 +155,28 @@ function createCopyIconButton() {
   return button;
 }
 
+function createQrIconButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-btn qr-code-btn";
+  button.title = "Show QR code";
+  button.setAttribute("aria-label", "Show QR code");
+  button.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <rect x="3.5" y="3.5" width="3" height="3" fill="currentColor"/>
+    <rect x="15.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <rect x="17.5" y="3.5" width="3" height="3" fill="currentColor"/>
+    <rect x="1.5" y="15.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <rect x="3.5" y="17.5" width="3" height="3" fill="currentColor"/>
+    <rect x="13" y="13" width="2" height="2" fill="currentColor"/>
+    <rect x="16.5" y="16.5" width="2" height="2" fill="currentColor"/>
+    <rect x="20" y="16.5" width="2" height="2" fill="currentColor"/>
+    <rect x="16.5" y="20" width="2" height="2" fill="currentColor"/>
+    <rect x="20" y="20" width="2" height="2" fill="currentColor"/>
+  </svg>`;
+  return button;
+}
+
 function createAddButton(label) {
   const button = document.createElement("button");
   button.type = "button";
@@ -178,10 +236,13 @@ function createShortUrlRow(shortUrlItem) {
   shortUrlGroup.addEventListener("click", copyShort);
   shortUrlGroup.append(shortValue, shortCopyBtn);
 
+  const qrBtn = createQrIconButton();
+  qrBtn.addEventListener("click", () => openQrModal(`https://${shortUrlItem.shortUrl}`));
+
   const deleteBtn = createDeleteIconButton();
   deleteBtn.addEventListener("click", () => deleteUrl(shortUrlItem.code, shortUrlItem.kind, shortUrlItem.shortUrl));
 
-  shortCopyRow.append(shortUrlGroup, deleteBtn);
+  shortCopyRow.append(shortUrlGroup, qrBtn, deleteBtn);
   return shortCopyRow;
 }
 
