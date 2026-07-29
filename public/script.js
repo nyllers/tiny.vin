@@ -61,8 +61,8 @@ function createCopyIconButton() {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "icon-btn copy-link-btn";
-  button.title = "Click to copy";
-  button.setAttribute("aria-label", "Click to copy");
+  button.title = "Copy to clipboard";
+  button.setAttribute("aria-label", "Copy to clipboard");
   button.innerHTML = `<svg viewBox="0 0 148 148" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <g transform="translate(0.000000,148.000000) scale(0.100000,-0.100000)" fill="currentColor" stroke="none" class="">
       <path d="M218 1380 c-48 -9 -101 -50 -122 -94 -15 -32 -17 -84 -17 -460 -1 -471 -2 -460 67 -512 27 -21 51 -29 102 -33 l67 -6 5 -50 c6 -58 35 -104 85 -135 34 -21 43 -22 452 -22 l416 0 40 29 c22 15 49 44 59 65 18 34 19 64 20 447 0 405 0 410 -22 445 -31 51 -77 80 -135 86 l-50 5 -2 49 c-2 68 -9 90 -39 126 -56 66 -47 65 -489 66 -220 1 -417 -2 -437 -6z m833 -139 c11 -14 19 -39 19 -62 l0 -40 -307 1 c-170 1 -317 -2 -328 -6 -40 -14 -87 -57 -102 -93 -13 -30 -15 -89 -14 -343 l2 -308 -45 0 c-36 0 -48 5 -65 26 -20 26 -21 37 -21 420 l0 393 26 20 c25 20 37 20 421 18 l395 -2 19 -24z m208 -235 c20 -18 20 -28 21 -396 0 -357 -1 -379 -19 -401 l-19 -24 -379 -3 c-373 -3 -380 -2 -406 18 l-27 21 0 384 0 384 26 20 c25 20 37 20 404 18 353 -2 379 -3 399 -21z" class=""></path>
@@ -120,7 +120,7 @@ function createShortUrlRow(shortUrlItem) {
 
   const shortUrlGroup = document.createElement("span");
   shortUrlGroup.className = "url-card-copy-group";
-  shortUrlGroup.title = "Click to copy";
+  shortUrlGroup.title = "Copy to clipboard";
   const shortValue = document.createElement("span");
   shortValue.className = "url-card-value url-card-copy-text";
   shortValue.textContent = shortUrlItem.shortUrl;

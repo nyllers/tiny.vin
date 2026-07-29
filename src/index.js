@@ -45,12 +45,12 @@ function loginPage(errorCode) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>tiny.vin</title>
-  <meta name="description" content="tiny.vin is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.">
+  <meta name="description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://tiny.vin">
   <meta property="og:site_name" content="tiny.vin">
   <meta property="og:title" content="tiny.vin">
-  <meta property="og:description" content="tiny.vin is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.">
+  <meta property="og:description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
   <link rel="stylesheet" href="/style.css">
   <script>(function () { var t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); })();</script>
 </head>
@@ -79,7 +79,7 @@ function loginPage(errorCode) {
     ${message ? `<p class="login-error">${message}</p>` : ""}
     <details class="info-toggle">
       <summary>What is tiny.vin?</summary>
-      <p>tiny.vin is a simple link-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own short links. No other data is requested, and anyone can follow a shortened link without signing in.</p>
+      <p>tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.</p>
     </details>
   </main>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
@@ -153,7 +153,7 @@ async function validateUrl(input) {
   const scheme = input.slice(0, input.indexOf("://")).toLowerCase();
   if (scheme !== "http" && scheme !== "https") {
     return {
-      error: `"${scheme}://" links aren't supported, only http:// and https://. Try: https://example.com`,
+      error: `"${scheme}://" URLs aren't supported, only http:// and https://. Try: https://example.com`,
     };
   }
 

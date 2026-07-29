@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>tiny.vin — Statistics</title>
-  <meta name="description" content="View click statistics for the short links you've created on tiny.vin.">
+  <meta name="description" content="View redirect statistics for the tiny URLs you've created on tiny.vin.">
   <link rel="stylesheet" href="style.css">
   <script>(function () { var t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); })();</script>
 </head>
@@ -15,8 +15,9 @@
     </button>
     <span class="wordmark">tiny<span class="accent-dot">.</span>vin</span>
     <nav class="nav-dropdown" hidden>
-      <a class="nav-link" href="/">Links</a>
+      <a class="nav-link" href="/">URLs</a>
       <a class="nav-link" href="/stats">Statistics</a>
+      <a class="nav-link nav-link--signout" href="/auth/logout">Sign out</a>
     </nav>
   </div>
   <div class="theme-toggle" role="group" aria-label="Theme">
@@ -28,7 +29,6 @@
   <section class="history-panel" id="stats-panel">
     <div id="stats-list"></div>
   </section>
-  <p class="signout-row"><a href="/auth/logout">Sign out</a></p>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
   <footer>Simple project by Anders &amp; Claude</footer>
   <script src="stats.js"></script>

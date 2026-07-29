@@ -172,16 +172,6 @@ footer {
   font-size: 0.7rem;
 }
 
-.signout-row {
-  margin: 1rem 0 0;
-  text-align: center;
-}
-
-.signout-row a {
-  color: #6b7280;
-  font-size: 0.8rem;
-}
-
 .legal-links {
   margin: 0.5rem 0 0;
   text-align: center;
@@ -573,6 +563,10 @@ footer {
   color: var(--heading);
   font-weight: 600;
   background: var(--bg);
+}
+
+.nav-link--signout {
+  border-top: 1px solid var(--card-border);
 }
 
 .heading-large {

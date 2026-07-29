@@ -13,14 +13,14 @@ function createStatRow(shortUrlItem, maxClicks) {
   value.textContent = shortUrlItem.shortUrl;
   const meta = document.createElement("span");
   meta.className = "stat-row-meta";
-  meta.textContent = shortUrlItem.lastClickAt ? `Last click: ${formatDate(shortUrlItem.lastClickAt)}` : "No clicks yet";
+  meta.textContent = shortUrlItem.lastClickAt ? `Last redirect: ${formatDate(shortUrlItem.lastClickAt)}` : "No redirects yet";
   info.append(value, meta);
 
   const countWrap = document.createElement("div");
   countWrap.className = "stat-row-count-wrap";
   const count = document.createElement("span");
   count.className = "stat-row-count";
-  count.textContent = `${shortUrlItem.clicks} click${shortUrlItem.clicks === 1 ? "" : "s"}`;
+  count.textContent = `${shortUrlItem.clicks} redirect${shortUrlItem.clicks === 1 ? "" : "s"}`;
   const bar = document.createElement("div");
   bar.className = "stat-bar";
   const barFill = document.createElement("div");
@@ -41,7 +41,7 @@ function createStatCard(group) {
   metaRow.className = "url-card-meta-row";
   const totalBadge = document.createElement("span");
   totalBadge.className = "stat-total-badge";
-  totalBadge.textContent = `${group.totalClicks} total click${group.totalClicks === 1 ? "" : "s"}`;
+  totalBadge.textContent = `${group.totalClicks} total redirect${group.totalClicks === 1 ? "" : "s"}`;
   metaRow.appendChild(totalBadge);
 
   const originalRow = document.createElement("div");
@@ -87,7 +87,7 @@ async function loadStats() {
     const data = await response.json();
 
     summary.textContent = "";
-    summary.append(createSummaryTile("Links", data.totalLinks), createSummaryTile("Clicks", data.totalClicks));
+    summary.append(createSummaryTile("URLs", data.totalLinks), createSummaryTile("Redirects", data.totalClicks));
     if (data.topCountry) {
       summary.appendChild(createSummaryTile("Top Country", data.topCountry));
     }
@@ -98,14 +98,14 @@ async function loadStats() {
     if (data.urls.length === 0) {
       const empty = document.createElement("p");
       empty.className = "stats-empty";
-      empty.textContent = "You haven't created any short links yet.";
+      empty.textContent = "You haven't created any tiny URLs yet.";
       list.append(empty);
       return;
     }
 
     const heading = document.createElement("h2");
     heading.className = "section-heading";
-    heading.textContent = "CLICKS BY LINK";
+    heading.textContent = "REDIRECTS BY URL";
     const cards = document.createElement("div");
     cards.className = "url-cards";
     for (const group of data.urls) {
