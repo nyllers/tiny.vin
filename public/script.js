@@ -252,13 +252,7 @@ function createUrlCard(group, justCreatedCode) {
     card.classList.add("url-card--flash");
   }
 
-  const originalRow = document.createElement("div");
-  originalRow.className = "url-card-row";
-  const originalValue = document.createElement("span");
-  originalValue.className = "url-card-value url-card-value--original";
-  originalValue.title = group.originalUrl;
-  originalValue.textContent = group.originalUrl;
-  originalRow.append(originalValue);
+  const originalRow = createOriginalUrlRow(group.originalUrl);
 
   const shortRow = document.createElement("div");
   shortRow.className = "url-card-row url-card-row--tiny";
@@ -303,31 +297,18 @@ async function loadHistory(justCreatedCode) {
   const panel = document.getElementById("history-panel");
   const container = document.getElementById("history-list");
 
-  try {
-    const response = await fetch("/api/history");
-    if (!response.ok) return;
-    const data = await response.json();
+  const data = await fetchJsonOrNull("/api/history");
+  if (!data) return;
 
-    container.textContent = "";
+  container.textContent = "";
 
-    if (data.urls.length === 0) {
-      panel.hidden = true;
-      return;
-    }
-
-    panel.hidden = false;
-    const heading = document.createElement("h2");
-    heading.className = "section-heading";
-    heading.textContent = "CREATED URLS";
-    const list = document.createElement("div");
-    list.className = "url-cards";
-    for (const group of data.urls) {
-      list.appendChild(createUrlCard(group, justCreatedCode));
-    }
-    container.append(heading, list);
-  } catch {
-    // history is a nice-to-have; a failed fetch shouldn't break the page
+  if (data.urls.length === 0) {
+    panel.hidden = true;
+    return;
   }
+
+  panel.hidden = false;
+  container.append(createCardsSection("CREATED URLS", data.urls, (group) => createUrlCard(group, justCreatedCode)));
 }
 
 function updateGenerateButtonState() {
