@@ -44,13 +44,7 @@ function createStatCard(group) {
   totalBadge.textContent = `${group.totalClicks} total redirect${group.totalClicks === 1 ? "" : "s"}`;
   metaRow.appendChild(totalBadge);
 
-  const originalRow = document.createElement("div");
-  originalRow.className = "url-card-row";
-  const originalValue = document.createElement("span");
-  originalValue.className = "url-card-value url-card-value--original";
-  originalValue.title = group.originalUrl;
-  originalValue.textContent = group.originalUrl;
-  originalRow.append(originalValue);
+  const originalRow = createOriginalUrlRow(group.originalUrl);
 
   const shortRow = document.createElement("div");
   shortRow.className = "url-card-row url-card-row--tiny";
@@ -81,40 +75,27 @@ async function loadStats() {
   const panel = document.getElementById("stats-panel");
   const list = document.getElementById("stats-list");
 
-  try {
-    const response = await fetch("/api/stats");
-    if (!response.ok) return;
-    const data = await response.json();
+  const data = await fetchJsonOrNull("/api/stats");
+  if (!data) return;
 
-    summary.textContent = "";
-    summary.append(createSummaryTile("URLs", data.totalLinks), createSummaryTile("Redirects", data.totalClicks));
-    if (data.topCountry) {
-      summary.appendChild(createSummaryTile("Top Country", data.topCountry));
-    }
-
-    list.textContent = "";
-    panel.hidden = false;
-
-    if (data.urls.length === 0) {
-      const empty = document.createElement("p");
-      empty.className = "stats-empty";
-      empty.textContent = "You haven't created any tiny URLs yet.";
-      list.append(empty);
-      return;
-    }
-
-    const heading = document.createElement("h2");
-    heading.className = "section-heading";
-    heading.textContent = "REDIRECTS BY URL";
-    const cards = document.createElement("div");
-    cards.className = "url-cards";
-    for (const group of data.urls) {
-      cards.appendChild(createStatCard(group));
-    }
-    list.append(heading, cards);
-  } catch {
-    // stats are a nice-to-have; a failed fetch shouldn't break the page
+  summary.textContent = "";
+  summary.append(createSummaryTile("URLs", data.totalLinks), createSummaryTile("Redirects", data.totalClicks));
+  if (data.topCountry) {
+    summary.appendChild(createSummaryTile("Top Country", data.topCountry));
   }
+
+  list.textContent = "";
+  panel.hidden = false;
+
+  if (data.urls.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "stats-empty";
+    empty.textContent = "You haven't created any tiny URLs yet.";
+    list.append(empty);
+    return;
+  }
+
+  list.append(createCardsSection("REDIRECTS BY URL", data.urls, createStatCard));
 }
 
 loadStats();
