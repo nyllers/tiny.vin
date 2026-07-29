@@ -17,11 +17,20 @@ const LOGIN_ERRORS = {
   state_mismatch: "Your sign-in request expired. Please try again.",
 };
 
+const SITE_DESCRIPTION =
+  "tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.";
+
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { "content-type": "application/json" },
   });
+}
+
+async function withAuth(request, env, handler) {
+  const session = await getSession(request, env.SESSION_SECRET);
+  if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
+  return handler(session);
 }
 
 function generateCode() {
@@ -45,12 +54,12 @@ function loginPage(errorCode) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>tiny.vin</title>
-  <meta name="description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
+  <meta name="description" content="${SITE_DESCRIPTION}">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://tiny.vin">
   <meta property="og:site_name" content="tiny.vin">
   <meta property="og:title" content="tiny.vin">
-  <meta property="og:description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
+  <meta property="og:description" content="${SITE_DESCRIPTION}">
   <link rel="stylesheet" href="/style.css">
   <script>(function () { var t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); })();</script>
 </head>
@@ -79,7 +88,7 @@ function loginPage(errorCode) {
     ${message ? `<p class="login-error">${message}</p>` : ""}
     <details class="info-toggle">
       <summary>What is tiny.vin?</summary>
-      <p>tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.</p>
+      <p>${SITE_DESCRIPTION}</p>
     </details>
   </main>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
@@ -208,6 +217,22 @@ function validateSubdomain(input) {
   return { code: input };
 }
 
+function formatShortUrl(code, kind) {
+  return kind === "subdomain" ? `${code}.tiny.vin` : `tiny.vin/${code}`;
+}
+
+async function insertUrl(env, { code, kind, originalUrl, createdBy }) {
+  await env.DB.prepare(
+    "INSERT INTO urls (code, kind, original_url, created_at, created_by) VALUES (?, ?, ?, ?, ?)"
+  )
+    .bind(code, kind, originalUrl, Date.now(), createdBy)
+    .run();
+}
+
+function shortUrlResponse(code, kind, originalUrl) {
+  return jsonResponse({ code, kind, originalUrl, shortUrl: formatShortUrl(code, kind) });
+}
+
 async function handleShorten(request, env, session) {
   let body;
   try {
@@ -250,17 +275,8 @@ async function handleShorten(request, env, session) {
 
   if (subdomainCode) {
     try {
-      await env.DB.prepare(
-        "INSERT INTO urls (code, kind, original_url, created_at, created_by) VALUES (?, 'subdomain', ?, ?, ?)"
-      )
-        .bind(subdomainCode, validation.url, Date.now(), createdBy)
-        .run();
-      return jsonResponse({
-        code: subdomainCode,
-        kind: "subdomain",
-        originalUrl: validation.url,
-        shortUrl: `${subdomainCode}.tiny.vin`,
-      });
+      await insertUrl(env, { code: subdomainCode, kind: "subdomain", originalUrl: validation.url, createdBy });
+      return shortUrlResponse(subdomainCode, "subdomain", validation.url);
     } catch {
       return jsonResponse({ error: `"${subdomainCode}.tiny.vin" is already taken, try another.` }, 409);
     }
@@ -268,17 +284,8 @@ async function handleShorten(request, env, session) {
 
   if (customCode) {
     try {
-      await env.DB.prepare(
-        "INSERT INTO urls (code, original_url, created_at, created_by) VALUES (?, ?, ?, ?)"
-      )
-        .bind(customCode, validation.url, Date.now(), createdBy)
-        .run();
-      return jsonResponse({
-        code: customCode,
-        kind: "path",
-        originalUrl: validation.url,
-        shortUrl: `tiny.vin/${customCode}`,
-      });
+      await insertUrl(env, { code: customCode, kind: "path", originalUrl: validation.url, createdBy });
+      return shortUrlResponse(customCode, "path", validation.url);
     } catch {
       return jsonResponse({ error: `"${customCode}" is already taken, try another.` }, 409);
     }
@@ -287,17 +294,8 @@ async function handleShorten(request, env, session) {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const code = generateCode();
     try {
-      await env.DB.prepare(
-        "INSERT INTO urls (code, original_url, created_at, created_by) VALUES (?, ?, ?, ?)"
-      )
-        .bind(code, validation.url, Date.now(), createdBy)
-        .run();
-      return jsonResponse({
-        code,
-        kind: "path",
-        originalUrl: validation.url,
-        shortUrl: `tiny.vin/${code}`,
-      });
+      await insertUrl(env, { code, kind: "path", originalUrl: validation.url, createdBy });
+      return shortUrlResponse(code, "path", validation.url);
     } catch {
       // code collision, retry with a new random code
     }
@@ -333,7 +331,7 @@ async function handleHistory(env, session) {
     groups.get(row.original_url).push({
       code: row.code,
       kind: row.kind,
-      shortUrl: row.kind === "subdomain" ? `${row.code}.tiny.vin` : `tiny.vin/${row.code}`,
+      shortUrl: formatShortUrl(row.code, row.kind),
       createdAt: row.created_at,
     });
   }
@@ -389,7 +387,7 @@ async function handleStats(env, session) {
     group.shortUrls.push({
       code: row.code,
       kind: row.kind,
-      shortUrl: row.kind === "subdomain" ? `${row.code}.tiny.vin` : `tiny.vin/${row.code}`,
+      shortUrl: formatShortUrl(row.code, row.kind),
       createdAt: row.created_at,
       clicks: row.clicks,
       lastClickAt: row.last_click,
@@ -480,13 +478,7 @@ async function getOrCreateIdentityId(env, provider, username) {
     .bind(provider, username)
     .run();
 
-  const identity = await env.DB.prepare(
-    "SELECT id FROM login_identities WHERE provider = ? AND username = ?"
-  )
-    .bind(provider, username)
-    .first();
-
-  return identity.id;
+  return getIdentityId(env, provider, username);
 }
 
 async function recordLogin(env, provider, username, ipAddress) {
@@ -569,29 +561,21 @@ export default {
     }
 
     if (request.method === "POST" && url.pathname === "/api/shorten") {
-      const session = await getSession(request, env.SESSION_SECRET);
-      if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
-      return handleShorten(request, env, session);
+      return withAuth(request, env, (session) => handleShorten(request, env, session));
     }
 
     if (request.method === "GET" && url.pathname === "/api/history") {
-      const session = await getSession(request, env.SESSION_SECRET);
-      if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
-      return handleHistory(env, session);
+      return withAuth(request, env, (session) => handleHistory(env, session));
     }
 
     if (request.method === "GET" && url.pathname === "/api/stats") {
-      const session = await getSession(request, env.SESSION_SECRET);
-      if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
-      return handleStats(env, session);
+      return withAuth(request, env, (session) => handleStats(env, session));
     }
 
     const deleteMatch = url.pathname.match(DELETE_URL_PATTERN);
     if (request.method === "DELETE" && deleteMatch) {
-      const session = await getSession(request, env.SESSION_SECRET);
-      if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
       const kind = url.searchParams.get("kind") === "subdomain" ? "subdomain" : "path";
-      return handleDeleteUrl(deleteMatch[1], kind, env, session);
+      return withAuth(request, env, (session) => handleDeleteUrl(deleteMatch[1], kind, env, session));
     }
 
     if (PROTECTED_PAGES.has(url.pathname)) {
