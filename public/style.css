@@ -12,6 +12,7 @@
   --card-border: #e5e7eb;
   --input-border: #d1d5db;
   --input-bg: #fff;
+  --muted: #6b7280;
 }
 
 :root[data-theme="dark"] {
@@ -134,7 +135,7 @@ h1 {
   padding: 0.15rem;
   background: none;
   border: none;
-  color: #6b7280;
+  color: var(--muted);
   cursor: pointer;
 }
 
@@ -144,7 +145,7 @@ h1 {
 
 footer {
   margin-top: 1.5rem;
-  color: #6b7280;
+  color: var(--muted);
   font-size: 0.7rem;
 }
 
@@ -154,7 +155,7 @@ footer {
 }
 
 .legal-links a {
-  color: #6b7280;
+  color: var(--muted);
   font-size: 0.7rem;
 }
 
@@ -178,7 +179,7 @@ footer {
 
 .info-toggle p {
   margin: 0.75rem 0 0;
-  color: #6b7280;
+  color: var(--muted);
   font-size: 0.875rem;
 }
 
@@ -223,7 +224,7 @@ footer {
 .section-heading {
   margin: 0 0 1rem;
   font-size: 1rem;
-  color: #6b7280;
+  color: var(--muted);
   text-align: center;
 }
 
@@ -288,7 +289,7 @@ footer {
 }
 
 .url-card-actions-separator {
-  color: #6b7280;
+  color: var(--muted);
   font-size: 0.75rem;
 }
 
@@ -312,8 +313,8 @@ footer {
 }
 
 .save-suffix-btn.save-suffix-btn--cancel {
-  color: #6b7280;
-  border-color: #6b7280;
+  color: var(--muted);
+  border-color: var(--muted);
 }
 
 .icon-btn.delete-btn {
@@ -354,7 +355,7 @@ footer {
 }
 
 .url-card-value--original {
-  color: #6b7280;
+  color: var(--muted);
 }
 
 .url-card-copy-row {
@@ -393,7 +394,7 @@ footer {
 }
 
 .url-card-suffix-prefix {
-  color: #6b7280;
+  color: var(--muted);
   font-size: 0.85rem;
   white-space: nowrap;
 }
@@ -572,7 +573,7 @@ footer {
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: #6b7280;
+  color: var(--muted);
 }
 
 .stat-total-badge {
@@ -593,7 +594,7 @@ footer {
 
 .stat-row-meta {
   font-size: 0.7rem;
-  color: #6b7280;
+  color: var(--muted);
 }
 
 .stat-row-count-wrap {
@@ -627,6 +628,6 @@ footer {
 
 .stats-empty {
   text-align: center;
-  color: #6b7280;
+  color: var(--muted);
   font-size: 0.9rem;
 }
