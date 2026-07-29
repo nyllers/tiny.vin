@@ -37,13 +37,6 @@ function createStatCard(group) {
   const card = document.createElement("div");
   card.className = "url-card";
 
-  const metaRow = document.createElement("div");
-  metaRow.className = "url-card-meta-row";
-  const totalBadge = document.createElement("span");
-  totalBadge.className = "stat-total-badge";
-  totalBadge.textContent = `${group.totalClicks} total redirect${group.totalClicks === 1 ? "" : "s"}`;
-  metaRow.appendChild(totalBadge);
-
   const originalRow = createOriginalUrlRow(group.originalUrl);
 
   const shortRow = document.createElement("div");
@@ -53,7 +46,14 @@ function createStatCard(group) {
     shortRow.append(createStatRow(shortUrlItem, maxClicks));
   }
 
-  card.append(metaRow, originalRow, shortRow);
+  const metaRow = document.createElement("div");
+  metaRow.className = "url-card-meta-row";
+  const totalBadge = document.createElement("span");
+  totalBadge.className = "stat-total-badge";
+  totalBadge.textContent = `${group.totalClicks} total redirect${group.totalClicks === 1 ? "" : "s"}`;
+  metaRow.appendChild(totalBadge);
+
+  card.append(originalRow, shortRow, metaRow);
   return card;
 }
 
