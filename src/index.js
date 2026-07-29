@@ -437,7 +437,10 @@ async function handleStats(env, session) {
   const deviceCounts = new Map();
   for (const row of eventRows) {
     const referrer = normalizeReferrer(row.referer);
-    referrerCounts.set(referrer, (referrerCounts.get(referrer) || 0) + 1);
+    const isOwnSite = referrer === "tiny.vin" || referrer.endsWith(".tiny.vin");
+    if (!isOwnSite) {
+      referrerCounts.set(referrer, (referrerCounts.get(referrer) || 0) + 1);
+    }
 
     const { browser, device } = parseUserAgent(row.user_agent);
     browserCounts.set(browser, (browserCounts.get(browser) || 0) + 1);
@@ -475,7 +478,6 @@ async function handleStats(env, session) {
   return jsonResponse({
     totalLinks: results.length,
     totalClicks,
-    topCountry: topCountryRows[0] ? topCountryRows[0].country : null,
     topCountries: topCountryRows.map((row) => ({ name: row.country, count: row.cnt })),
     topReferrers: topCounts(referrerCounts, 5),
     browsers: topCounts(browserCounts, 10),

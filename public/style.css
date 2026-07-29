@@ -228,6 +228,10 @@ footer {
   text-align: center;
 }
 
+.url-cards + .section-heading {
+  margin-top: 1.5rem;
+}
+
 .url-cards {
   display: flex;
   flex-wrap: wrap;
@@ -672,7 +676,7 @@ footer {
 }
 
 .breakdown-card {
-  flex: 1 1 16rem;
+  flex-grow: 0;
 }
 
 .breakdown-card-title {
@@ -684,26 +688,87 @@ footer {
   color: var(--muted);
 }
 
-.breakdown-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+.chart-value-label {
+  fill: var(--muted);
+  font-size: 9px;
+  font-weight: 600;
 }
 
-.breakdown-row {
+.daily-chart {
+  width: 100%;
+  height: 4rem;
+  display: block;
+  overflow: visible;
+}
+
+.daily-chart-baseline {
+  stroke: var(--card-border);
+  stroke-width: 1;
+}
+
+.daily-chart-bar {
+  fill: var(--heading);
+  transition: opacity 0.1s ease;
+}
+
+.daily-chart-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.daily-chart-col:hover .daily-chart-bar,
+.daily-chart-col:focus-within .daily-chart-bar {
+  opacity: 0.7;
+}
+
+.daily-chart-hit:focus-visible {
+  outline: 2px solid var(--heading);
+  outline-offset: -1px;
+}
+
+.daily-chart-axis {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--muted);
 }
 
-.breakdown-row-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.85rem;
-  color: var(--text);
+.category-chart {
+  width: 100%;
+  height: 64px;
+  display: block;
+  overflow: visible;
+}
+
+.category-chart-baseline {
+  stroke: var(--card-border);
+  stroke-width: 1;
+}
+
+.category-chart-bar {
+  fill: var(--heading);
+  transition: opacity 0.1s ease;
+}
+
+.category-chart-name-label {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.category-chart-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.category-chart-col:hover .category-chart-bar,
+.category-chart-col:focus-within .category-chart-bar {
+  opacity: 0.7;
+}
+
+.category-chart-hit:focus-visible {
+  outline: 2px solid var(--heading);
+  outline-offset: -1px;
 }
 
 .modal-overlay {
