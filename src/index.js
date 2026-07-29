@@ -61,7 +61,7 @@ function loginPage(errorCode) {
   <meta property="og:title" content="tiny.vin">
   <meta property="og:description" content="${SITE_DESCRIPTION}">
   <link rel="stylesheet" href="/style.css">
-  <script>(function () { var t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); })();</script>
+  <script src="/theme-init.js"></script>
 </head>
 <body>
   <div class="site-nav">
