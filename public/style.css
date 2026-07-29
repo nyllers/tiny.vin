@@ -356,6 +356,7 @@ footer {
 
 .url-card-value--original {
   color: var(--muted);
+  text-align: center;
 }
 
 .url-card-copy-row {
@@ -385,8 +386,6 @@ footer {
 .url-card-copy-text {
   cursor: pointer;
   min-width: 0;
-  font-size: 0.90rem;
-  font-weight: 700;
 }
 
 .url-card-suffix-wrapper {
