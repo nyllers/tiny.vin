@@ -35,29 +35,33 @@
      rx="14"
      fill="#111827"
      id="rect1" />
-  <circle
-     cx="32"
-     cy="32"
-     r="22"
+  <ellipse
+     cx="32.237919"
+     cy="31.920694"
      fill="#a5b4fc"
-     id="circle1" />
+     id="circle1"
+     rx="27.789343"
+     ry="27.710037"
+     style="stroke-width:1.26134" />
   <text
-     x="32.172367"
-     y="33.5"
+     x="33.26656"
+     y="33.191242"
      text-anchor="middle"
      font-family="system-ui, sans-serif"
      font-weight="700"
-     font-size="21px"
+     font-size="30.391px"
      fill="#111827"
-     id="text1">y.v</text>
+     id="text1"
+     transform="scale(0.96740653,1.0336916)"
+     style="stroke-width:1.44717">y.v</text>
   <text
-     x="35.427505"
-     y="36.780529"
+     x="36.494553"
+     y="36.992458"
      text-anchor="middle"
      font-family="system-ui, sans-serif"
-     font-size="22.5686px"
+     font-size="34.5696px"
      fill="#111827"
      id="text2"
-     transform="scale(0.89380866,1.1188077)"
-     style="stroke-width:1.88072">‿</text>
+     transform="scale(0.88482006,1.1301733)"
+     style="stroke-width:2.8808">‿</text>
 </svg>
