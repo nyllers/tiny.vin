@@ -904,8 +904,8 @@ footer {
 }
 
 .modal-btn--confirm {
-  background: #cc0000;
-  border: 1px solid #cc0000;
+  background: var(--delete);
+  border: 1px solid var(--delete);
   color: #fff;
 }
 
