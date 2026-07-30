@@ -7,7 +7,7 @@ const SHORTEN_EXAMPLES = [
 function curlExample(key, body) {
   const keyPlaceholder = key || "YOUR_API_KEY";
   return [
-    "curl -X POST https://tiny.vin/api/shorten \\",
+    "curl -X POST https://tiny.vin/api/urls \\",
     `  -H "Authorization: Bearer ${keyPlaceholder}" \\`,
     '  -H "Content-Type: application/json" \\',
     `  -d '${JSON.stringify(body)}'`,
