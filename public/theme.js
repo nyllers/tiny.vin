@@ -5,12 +5,12 @@ function setTheme(theme) {
 }
 
 function updateThemeButtons(theme) {
-  document.querySelectorAll(".theme-btn").forEach((btn) => {
+  document.querySelectorAll(".theme-toggle .theme-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.themeValue === theme);
   });
 }
 
-document.querySelectorAll(".theme-btn").forEach((btn) => {
+document.querySelectorAll(".theme-toggle .theme-btn").forEach((btn) => {
   btn.addEventListener("click", () => setTheme(btn.dataset.themeValue));
 });
 

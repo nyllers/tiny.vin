@@ -323,11 +323,11 @@ footer {
 }
 
 .icon-btn.qr-code-btn {
-  color: var(--text);
+  color: var(--muted);
 }
 
 .icon-btn.qr-code-btn:hover {
-  color: var(--text);
+  color: var(--muted);
   opacity: 0.75;
 }
 
