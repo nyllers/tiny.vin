@@ -46,10 +46,13 @@ function renderApiKeySection(key) {
     row.className = "url-card-copy-row api-key-row";
     const regenerateBtn = document.createElement("button");
     regenerateBtn.type = "button";
-    regenerateBtn.className = "icon-btn cancel-btn";
+    regenerateBtn.className = "theme-btn active";
     regenerateBtn.innerHTML = "<span>Regenerate</span>";
-    regenerateBtn.addEventListener("click", () => {
-      if (confirm("This will invalidate your current API key. Continue?")) createApiKey(regenerateBtn);
+    regenerateBtn.addEventListener("click", async () => {
+      const confirmed = await confirmAction("This will invalidate your current API key.", {
+        confirmLabel: "Regenerate",
+      });
+      if (confirmed) createApiKey(regenerateBtn);
     });
     row.append(createCopyableTextGroup(key), regenerateBtn);
     section.append(intro, row);

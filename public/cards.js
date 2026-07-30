@@ -80,3 +80,55 @@ function createCopyableTextGroup(text) {
   group.append(value, copyBtn);
   return group;
 }
+
+function confirmAction(message, { confirmLabel = "Confirm", danger = false } = {}) {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById("confirm-modal-overlay");
+    const messageEl = document.getElementById("confirm-modal-message");
+    const confirmBtn = document.getElementById("confirm-modal-confirm");
+    const cancelBtn = document.getElementById("confirm-modal-cancel");
+    const previouslyFocused = document.activeElement;
+
+    messageEl.textContent = message;
+    confirmBtn.textContent = confirmLabel;
+    confirmBtn.classList.toggle("modal-btn--confirm", danger);
+    confirmBtn.classList.toggle("modal-btn--primary", !danger);
+    overlay.hidden = false;
+    cancelBtn.focus();
+
+    function close(result) {
+      overlay.hidden = true;
+      confirmBtn.removeEventListener("click", onConfirm);
+      cancelBtn.removeEventListener("click", onCancel);
+      overlay.removeEventListener("click", onOverlayClick);
+      document.removeEventListener("keydown", onKeydown);
+      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
+      resolve(result);
+    }
+
+    function onConfirm() {
+      close(true);
+    }
+
+    function onCancel() {
+      close(false);
+    }
+
+    function onOverlayClick(event) {
+      if (event.target === overlay) close(false);
+    }
+
+    function onKeydown(event) {
+      if (event.key === "Escape") close(false);
+    }
+
+    confirmBtn.addEventListener("click", onConfirm);
+    cancelBtn.addEventListener("click", onCancel);
+    overlay.addEventListener("click", onOverlayClick);
+    document.addEventListener("keydown", onKeydown);
+  });
+}
+
+function confirmDelete(message) {
+  return confirmAction(message, { confirmLabel: "Delete", danger: true });
+}

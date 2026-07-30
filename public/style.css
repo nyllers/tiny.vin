@@ -891,6 +891,16 @@ footer {
   opacity: 0.85;
 }
 
+.modal-btn--primary {
+  background: var(--heading);
+  border: 1px solid var(--heading);
+  color: #fff;
+}
+
+.modal-btn--primary:hover {
+  opacity: 0.85;
+}
+
 #qr-modal-overlay .modal-title {
   text-align: center;
 }
