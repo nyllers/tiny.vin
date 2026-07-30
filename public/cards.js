@@ -19,6 +19,25 @@ function createOriginalUrlRow(originalUrl) {
   return row;
 }
 
+function packMasonryRows(grid) {
+  const style = window.getComputedStyle(grid);
+  const rowHeight = parseFloat(style.gridAutoRows) || 1;
+  const gap = parseFloat(style.columnGap) || 0;
+
+  for (const card of grid.children) {
+    const span = Math.ceil((card.getBoundingClientRect().height + gap) / rowHeight);
+    card.style.gridRowEnd = `span ${span}`;
+  }
+}
+
+let masonryResizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(masonryResizeTimer);
+  masonryResizeTimer = setTimeout(() => {
+    document.querySelectorAll(".url-cards").forEach(packMasonryRows);
+  }, 150);
+});
+
 function createCardsSection(headingText, items, renderItem) {
   const heading = document.createElement("h2");
   heading.className = "section-heading";
@@ -28,6 +47,7 @@ function createCardsSection(headingText, items, renderItem) {
   for (const item of items) {
     grid.appendChild(renderItem(item));
   }
+  requestAnimationFrame(() => packMasonryRows(grid));
   const fragment = document.createDocumentFragment();
   fragment.append(heading, grid);
   return fragment;
