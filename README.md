@@ -19,7 +19,7 @@ This repo is connected to a Cloudflare Workers project (`tiny-vin`) via GitHub, 
 
 Local dev (optional, needs Wrangler): `wrangler dev`.
 
-## Login (feature/oauth-login branch)
+## Login
 
 The homepage and `POST /api/shorten` require signing in with Google; `GET /<code>` redirects stay public so shared links keep working for anyone. There's no email allowlist — any Google account can sign in. (Facebook login was dropped: Meta requires Business Verification to take a Facebook Login app out of Development mode, which doesn't fit a personal project.)
 

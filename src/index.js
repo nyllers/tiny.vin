@@ -100,9 +100,9 @@ function loginPage(errorCode) {
 </html>`;
 }
 
-function htmlResponse(body, extraHeaders = {}) {
+function htmlResponse(body) {
   return new Response(body, {
-    headers: { "content-type": "text/html; charset=utf-8", ...extraHeaders },
+    headers: { "content-type": "text/html; charset=utf-8" },
   });
 }
 
@@ -316,6 +316,17 @@ async function getIdentityId(env, provider, username) {
   return identity ? identity.id : null;
 }
 
+function groupByOriginalUrl(rows, buildEntry) {
+  const groups = new Map();
+  for (const row of rows) {
+    if (!groups.has(row.original_url)) {
+      groups.set(row.original_url, []);
+    }
+    groups.get(row.original_url).push(buildEntry(row));
+  }
+  return groups;
+}
+
 async function handleHistory(env, session) {
   const identityId = await getIdentityId(env, session.provider, session.email);
 
@@ -325,18 +336,12 @@ async function handleHistory(env, session) {
     .bind(identityId)
     .all();
 
-  const groups = new Map();
-  for (const row of results) {
-    if (!groups.has(row.original_url)) {
-      groups.set(row.original_url, []);
-    }
-    groups.get(row.original_url).push({
-      code: row.code,
-      kind: row.kind,
-      shortUrl: formatShortUrl(row.code, row.kind),
-      createdAt: row.created_at,
-    });
-  }
+  const groups = groupByOriginalUrl(results, (row) => ({
+    code: row.code,
+    kind: row.kind,
+    shortUrl: formatShortUrl(row.code, row.kind),
+    createdAt: row.created_at,
+  }));
 
   const urls = Array.from(groups, ([originalUrl, shortUrls]) => ({
     originalUrl,
@@ -455,26 +460,21 @@ async function handleStats(env, session) {
     dailyRedirects.push({ date, count: dailyByDate.get(date) || 0 });
   }
 
-  const groups = new Map();
-  let totalClicks = 0;
-  for (const row of results) {
-    totalClicks += row.clicks;
-    if (!groups.has(row.original_url)) {
-      groups.set(row.original_url, { originalUrl: row.original_url, totalClicks: 0, shortUrls: [] });
-    }
-    const group = groups.get(row.original_url);
-    group.totalClicks += row.clicks;
-    group.shortUrls.push({
-      code: row.code,
-      kind: row.kind,
-      shortUrl: formatShortUrl(row.code, row.kind),
-      createdAt: row.created_at,
-      clicks: row.clicks,
-      lastClickAt: row.last_click,
-    });
-  }
+  const groups = groupByOriginalUrl(results, (row) => ({
+    code: row.code,
+    kind: row.kind,
+    shortUrl: formatShortUrl(row.code, row.kind),
+    createdAt: row.created_at,
+    clicks: row.clicks,
+    lastClickAt: row.last_click,
+  }));
 
-  const urls = Array.from(groups.values()).sort((a, b) => b.totalClicks - a.totalClicks);
+  let totalClicks = 0;
+  const urls = Array.from(groups, ([originalUrl, shortUrls]) => {
+    const groupTotal = shortUrls.reduce((sum, s) => sum + s.clicks, 0);
+    totalClicks += groupTotal;
+    return { originalUrl, totalClicks: groupTotal, shortUrls };
+  }).sort((a, b) => b.totalClicks - a.totalClicks);
 
   return jsonResponse({
     totalLinks: results.length,
