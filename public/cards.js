@@ -38,19 +38,21 @@ window.addEventListener("resize", () => {
   }, 150);
 });
 
-function createCardsSection(headingText, items, renderItem) {
+function createCardsSectionFromElements(headingText, cardElements) {
   const heading = document.createElement("h2");
   heading.className = "section-heading";
   heading.textContent = headingText;
   const grid = document.createElement("div");
   grid.className = "url-cards";
-  for (const item of items) {
-    grid.appendChild(renderItem(item));
-  }
+  grid.append(...cardElements);
   requestAnimationFrame(() => packMasonryRows(grid));
   const fragment = document.createDocumentFragment();
   fragment.append(heading, grid);
   return fragment;
+}
+
+function createCardsSection(headingText, items, renderItem) {
+  return createCardsSectionFromElements(headingText, items.map(renderItem));
 }
 
 async function copyTextToClipboard(text, displayEl) {
