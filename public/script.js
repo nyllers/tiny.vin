@@ -204,7 +204,7 @@ function createDeleteIconButton() {
 }
 
 async function deleteUrl(code, kind, shortUrl) {
-  const confirmed = await confirmDelete(`Are you sure you want to delete ${shortUrl}?`);
+  const confirmed = await confirmDelete(`This will delete ${shortUrl}`);
   if (!confirmed) return;
 
   try {
