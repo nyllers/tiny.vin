@@ -176,10 +176,11 @@ function createDailyChartCard(days) {
 }
 
 const URL_CHART_LIMIT = 10;
-const URL_CHART_LABEL_MAX_CHARS = 8;
+const URL_CHART_LABEL_TOTAL_CHARS = 24;
 
-function truncateCode(code) {
-  return code.length > URL_CHART_LABEL_MAX_CHARS ? `${code.slice(0, URL_CHART_LABEL_MAX_CHARS)}…` : code;
+function truncateCode(code, maxChars) {
+  if (maxChars <= 3) return " ";
+  return code.length > maxChars ? `${code.slice(0, maxChars)}…` : code;
 }
 
 function flattenShortUrls(urls) {
@@ -194,10 +195,9 @@ function createUrlBreakdownChart(entries) {
   const barCount = entries.length;
   const barWidth = (DAILY_CHART_WIDTH - DAILY_CHART_BAR_GAP * (barCount - 1)) / barCount;
   const maxCount = Math.max(...entries.map((e) => e.clicks), 1);
-  const topLabelSpace = 11;
-  const bottomLabelSpace = 12;
-  const baseline_y = DAILY_CHART_HEIGHT - bottomLabelSpace;
-  const plotHeight = baseline_y - topLabelSpace;
+  const labelSpace = 11;
+  const baseline_y = DAILY_CHART_HEIGHT - 1;
+  const plotHeight = baseline_y - labelSpace;
   const peakIndex = entries.reduce((best, e, i) => (e.clicks > entries[best].clicks ? i : best), 0);
 
   const svg = document.createElementNS(SVG_NS, "svg");
@@ -238,14 +238,6 @@ function createUrlBreakdownChart(entries) {
       col.appendChild(peakLabel);
     }
 
-    const codeLabel = document.createElementNS(SVG_NS, "text");
-    codeLabel.setAttribute("class", "chart-code-label");
-    codeLabel.setAttribute("x", String(x + barWidth / 2));
-    codeLabel.setAttribute("y", String(DAILY_CHART_HEIGHT - 2));
-    codeLabel.setAttribute("text-anchor", "middle");
-    codeLabel.textContent = truncateCode(entry.code);
-    col.appendChild(codeLabel);
-
     const hit = document.createElementNS(SVG_NS, "rect");
     hit.setAttribute("class", "daily-chart-hit");
     hit.setAttribute("x", String(x));
@@ -276,7 +268,19 @@ function createUrlBreakdownChartCard(entries) {
   title.className = "breakdown-card-title";
   title.textContent = "Redirects per URL";
 
-  card.append(title, createUrlBreakdownChart(entries));
+  const chart = createUrlBreakdownChart(entries);
+
+  const codeLabelMaxChars =
+    entries.length === 0 ? URL_CHART_LABEL_TOTAL_CHARS : Math.floor(URL_CHART_LABEL_TOTAL_CHARS / entries.length);
+  const axis = document.createElement("div");
+  axis.className = "url-chart-axis";
+  for (const entry of entries) {
+    const span = document.createElement("span");
+    span.textContent = truncateCode(entry.code, codeLabelMaxChars);
+    axis.append(span);
+  }
+
+  card.append(title, chart, axis);
   return card;
 }
 

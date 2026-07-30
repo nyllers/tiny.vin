@@ -802,11 +802,6 @@ footer {
   font-weight: 600;
 }
 
-.chart-code-label {
-  fill: var(--muted);
-  font-size: 7px;
-}
-
 .daily-chart {
   width: 100%;
   height: 4rem;
@@ -845,6 +840,20 @@ footer {
   margin-top: 0.25rem;
   font-size: 0.7rem;
   color: var(--muted);
+}
+
+.url-chart-axis {
+  display: flex;
+  margin-top: 0.25rem;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.url-chart-axis span {
+  flex: 1;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .modal-overlay {
