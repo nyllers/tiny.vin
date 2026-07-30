@@ -740,6 +740,10 @@ footer {
   min-width: 0;
 }
 
+.api-page .copy-link-btn:hover {
+  opacity: 0.75;
+}
+
 .api-docs-heading {
   margin: 1.5rem 0 0.5rem;
   font-size: 0.9rem;
