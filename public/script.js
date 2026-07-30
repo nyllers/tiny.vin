@@ -161,7 +161,7 @@ function createQrIconButton() {
   button.className = "icon-btn qr-code-btn";
   button.title = "Show QR code";
   button.setAttribute("aria-label", "Show QR code");
-  button.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
+  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
     <rect x="2.5935183" y="2.8879271" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
     <rect x="4.5935183" y="4.8879271" width="3" height="3" fill="currentColor"/>
     <rect x="14.125116" y="2.8581874" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
