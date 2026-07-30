@@ -60,7 +60,6 @@ body {
 .history-panel {
   width: 100%;
   max-width: 740px;
-  margin-top: 1.5rem;
 }
 
 @media (max-width: 30rem) {
@@ -224,7 +223,7 @@ footer {
 }
 
 .section-heading {
-  margin: 0 0 1rem;
+  margin: 2.5rem 0 1rem;
   font-size: 1rem;
   color: var(--muted);
   text-align: center;
@@ -232,10 +231,6 @@ footer {
 
 .url-cards + .section-heading {
   margin-top: 1.5rem;
-}
-
-#stats-page-heading {
-  margin-top: 20px;
 }
 
 #api-page-heading {
