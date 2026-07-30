@@ -9,8 +9,9 @@ const CODE_PATTERN = /^\/([A-Za-z0-9]{1,32})$/;
 const SUBDOMAIN_REDIRECT_PATTERN = /^\/subdomain\/([a-z0-9-]{1,63})$/;
 const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
 const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9-]+)$/;
-const RESERVED_CODES = new Set(["login", "subdomain", "stats", "privacy", "terms"]);
-const PROTECTED_PAGES = new Set(["/", "/stats", "/stats.html"]);
+const RESERVED_CODES = new Set(["login", "subdomain", "stats", "privacy", "terms", "api"]);
+const PROTECTED_PAGES = new Set(["/", "/stats", "/stats.html", "/api", "/api.html"]);
+const API_KEY_PATTERN = /^tvk_[0-9a-f]{48}$/;
 const VALID_KINDS = new Set(["generated-path", "custom-path", "subdomain"]);
 
 const LOGIN_ERRORS = {
@@ -21,10 +22,10 @@ const LOGIN_ERRORS = {
 const SITE_DESCRIPTION =
   "tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.";
 
-function jsonResponse(data, status = 200) {
+function jsonResponse(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...extraHeaders },
   });
 }
 
@@ -32,6 +33,17 @@ async function withAuth(request, env, handler) {
   const session = await getSession(request, env.SESSION_SECRET);
   if (!session) return jsonResponse({ error: "Unauthorized" }, 401);
   return handler(session);
+}
+
+async function withAuthOrApiKey(request, env, handler) {
+  const authHeader = request.headers.get("Authorization") || "";
+  const bearerMatch = authHeader.match(/^Bearer\s+(\S+)$/i);
+  if (bearerMatch) {
+    const identity = await getIdentityByApiKey(env, bearerMatch[1]);
+    if (!identity) return jsonResponse({ error: "Invalid API key" }, 401);
+    return handler(identity);
+  }
+  return withAuth(request, env, handler);
 }
 
 function generateCode() {
@@ -45,6 +57,12 @@ function generateCode() {
     }
   }
   return code;
+}
+
+function generateApiKey() {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `tvk_${hex}`;
 }
 
 function loginPage(errorCode) {
@@ -231,8 +249,9 @@ async function insertUrl(env, { code, kind, originalUrl, createdBy }) {
     .run();
 }
 
-function shortUrlResponse(code, kind, originalUrl) {
-  return jsonResponse({ code, kind, originalUrl, shortUrl: formatShortUrl(code, kind) });
+function shortUrlResponse(code, kind) {
+  const shortUrl = formatShortUrl(code, kind);
+  return new Response(null, { status: 201, headers: { Location: `https://${shortUrl}` } });
 }
 
 async function handleShorten(request, env, session) {
@@ -253,7 +272,7 @@ async function handleShorten(request, env, session) {
     return jsonResponse({ error: validation.error }, 400);
   }
 
-  const customSuffix = typeof body.code === "string" ? body.code.trim() : "";
+  const customSuffix = typeof body.path === "string" ? body.path.trim() : "";
   let customCode = null;
   if (customSuffix) {
     const suffixValidation = validateSuffix(customSuffix);
@@ -278,7 +297,7 @@ async function handleShorten(request, env, session) {
   if (subdomainCode) {
     try {
       await insertUrl(env, { code: subdomainCode, kind: "subdomain", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(subdomainCode, "subdomain", validation.url);
+      return shortUrlResponse(subdomainCode, "subdomain");
     } catch {
       return jsonResponse({ error: `"${subdomainCode}.tiny.vin" is already taken, try another.` }, 409);
     }
@@ -287,7 +306,7 @@ async function handleShorten(request, env, session) {
   if (customCode) {
     try {
       await insertUrl(env, { code: customCode, kind: "custom-path", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(customCode, "custom-path", validation.url);
+      return shortUrlResponse(customCode, "custom-path");
     } catch {
       return jsonResponse({ error: `"${customCode}" is already taken, try another.` }, 409);
     }
@@ -297,7 +316,7 @@ async function handleShorten(request, env, session) {
     const code = generateCode();
     try {
       await insertUrl(env, { code, kind: "generated-path", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(code, "generated-path", validation.url);
+      return shortUrlResponse(code, "generated-path");
     } catch {
       // code collision, retry with a new random code
     }
@@ -314,6 +333,44 @@ async function getIdentityId(env, provider, username) {
     .first();
 
   return identity ? identity.id : null;
+}
+
+async function getIdentityByApiKey(env, key) {
+  if (!API_KEY_PATTERN.test(key)) return null;
+
+  const identity = await env.DB.prepare(
+    `SELECT li.provider, li.username
+     FROM api_keys ak
+     JOIN login_identities li ON li.id = ak.identity_id
+     WHERE ak.key = ?`
+  )
+    .bind(key)
+    .first();
+
+  return identity ? { provider: identity.provider, email: identity.username } : null;
+}
+
+async function handleGetApiKey(env, session) {
+  const identityId = await getIdentityId(env, session.provider, session.email);
+  const row = identityId
+    ? await env.DB.prepare("SELECT key FROM api_keys WHERE identity_id = ?").bind(identityId).first()
+    : null;
+
+  return jsonResponse({ key: row ? row.key : null });
+}
+
+async function handleCreateApiKey(env, session) {
+  const identityId = await getOrCreateIdentityId(env, session.provider, session.email);
+  const key = generateApiKey();
+
+  await env.DB.prepare(
+    `INSERT INTO api_keys (identity_id, key, created_at) VALUES (?, ?, ?)
+     ON CONFLICT (identity_id) DO UPDATE SET key = excluded.key, created_at = excluded.created_at`
+  )
+    .bind(identityId, key, Date.now())
+    .run();
+
+  return jsonResponse({ key });
 }
 
 function groupByOriginalUrl(rows, buildEntry) {
@@ -646,7 +703,15 @@ export default {
     }
 
     if (request.method === "POST" && url.pathname === "/api/shorten") {
-      return withAuth(request, env, (session) => handleShorten(request, env, session));
+      return withAuthOrApiKey(request, env, (session) => handleShorten(request, env, session));
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/keys") {
+      return withAuth(request, env, (session) => handleGetApiKey(env, session));
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/keys") {
+      return withAuth(request, env, (session) => handleCreateApiKey(env, session));
     }
 
     if (request.method === "GET" && url.pathname === "/api/history") {

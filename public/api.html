@@ -3,13 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>tiny.vin</title>
-  <meta name="description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://tiny.vin">
-  <meta property="og:site_name" content="tiny.vin">
-  <meta property="og:title" content="tiny.vin">
-  <meta property="og:description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
+  <title>tiny.vin — API</title>
+  <meta name="description" content="Generate an API key and create tiny URLs from the command line with curl.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <script src="theme-init.js"></script>
@@ -57,19 +52,28 @@
     <button type="button" class="theme-btn" data-theme-value="light">Light</button>
     <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
   </div>
-  <h2 class="section-heading">ADD URL</h2>
-  <main class="generate-section">
-    <div class="controls">
-      <input type="text" id="url-input" placeholder="Paste or write a URL">
-      <button id="generate-btn">Make it Tiny</button>
-    </div>
-    <p id="url-result"></p>
+  <h2 class="section-heading" id="api-page-heading">API</h2>
+  <main class="api-page">
+    <section class="api-key-section" id="api-key-section"></section>
+    <section class="api-docs">
+      <h3 class="api-docs-heading">Create a generated short URL</h3>
+      <pre class="api-example" id="example-generated-path"></pre>
+      <p class="api-example-label">Response</p>
+      <pre class="api-example" id="response-generated-path"></pre>
+
+      <h3 class="api-docs-heading">Create a custom path</h3>
+      <pre class="api-example" id="example-custom-path"></pre>
+      <p class="api-example-label">Response</p>
+      <pre class="api-example" id="response-custom-path"></pre>
+
+      <h3 class="api-docs-heading">Create a subdomain</h3>
+      <pre class="api-example" id="example-subdomain"></pre>
+      <p class="api-example-label">Response</p>
+      <pre class="api-example" id="response-subdomain"></pre>
+    </section>
   </main>
-  <section class="history-panel" id="history-panel">
-    <div id="history-list"></div>
-  </section>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
-  <footer>Simple project by Anders &amp; Claude &middot; v47</footer>
+  <footer>Simple project by Anders &amp; Claude</footer>
   <div class="modal-overlay" id="confirm-modal-overlay" hidden>
     <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-message">
       <p class="modal-title" id="confirm-modal-title">Are you sure?</p>
@@ -80,19 +84,8 @@
       </div>
     </div>
   </div>
-  <div class="modal-overlay" id="qr-modal-overlay" hidden>
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="qr-modal-title">
-      <p class="modal-title" id="qr-modal-title">QR Code</p>
-      <div class="qr-modal-image" id="qr-modal-image"></div>
-      <p class="qr-modal-url" id="qr-modal-url"></p>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn modal-btn--cancel" id="qr-modal-close">Close</button>
-      </div>
-    </div>
-  </div>
   <script src="cards.js"></script>
-  <script src="qrcode-lib.js"></script>
-  <script src="script.js"></script>
+  <script src="api.js"></script>
   <script src="theme.js"></script>
   <script src="nav.js"></script>
 </body>

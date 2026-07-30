@@ -33,6 +33,23 @@ Sign out via `/auth/logout` (linked at the bottom of the homepage).
 
 Every successful login is recorded in D1: `login_identities` holds one row per (provider, username) pair, and `login_events` holds a timestamped row per login, referencing that identity. This is on top of the base schema — if the database was created before this branch existed, apply `migrations/0002_add_login_tracking.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0002_add_login_tracking.sql --remote`) in addition to `schema.sql`.
 
+## API access
+
+Signed-in accounts can create tiny URLs from the command line instead of the browser, via an API key. The `/api` page (linked from the nav) generates one while signed in — one key per account; regenerating immediately invalidates the previous one.
+
+Send the key as `Authorization: Bearer <key>` on `POST /api/shorten`, the same endpoint the browser uses:
+
+```bash
+curl -X POST https://tiny.vin/api/shorten \
+  -H "Authorization: Bearer tvk_..." \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com"}'
+```
+
+Add `"path": "my-page"` to the body for a custom path, or `"subdomain": "my-name"` for a subdomain — same fields as picking "Add Path"/"Add Subdomain" in the browser. On success the response is `201 Created` with an empty body; the fully-qualified short URL is in the `Location` header, e.g. `Location: https://tiny.vin/aZ3xQ72K`. Errors (invalid URL, taken code, etc.) still come back as a JSON body with an `error` message.
+
+If the database was created before this existed, apply `migrations/0009_add_api_keys.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0009_add_api_keys.sql --remote`) in addition to `schema.sql`.
+
 ## Subdomains
 
 In addition to path-based short URLs (`tiny.vin/<code>`), a URL can also get a subdomain-based one (`<name>.tiny.vin`) via the "Add subdomain" button on each card. `urls.kind` (`'generated-path'`, `'custom-path'`, or `'subdomain'` — the first two distinguish an auto-generated code from a user-chosen pathname) distinguishes them, and `(code, kind)` is the primary key, so the same string can be used as a path and a subdomain independently.
@@ -53,7 +70,7 @@ If the database was created before this existed, apply `migrations/0006_add_redi
 
 ## Change history
 
-Every table has a matching `<table>_history` table (`login_identities_history`, `urls_history`, `login_events_history`, `redirect_events_history`) holding the same columns plus a `history_created` timestamp. Triggers on each table copy a row's content into its history table right before an `UPDATE` or `DELETE`, so nothing has to opt in from the application code — this includes rows removed indirectly, e.g. a `redirect_events` row disappearing via `urls`' `ON DELETE CASCADE` still lands in `redirect_events_history`. History tables drop the original's primary/unique/foreign key constraints, since the same row can be changed many times over its life and a history row must never be blocked by a parent that's since been deleted itself.
+Every table has a matching `<table>_history` table (`login_identities_history`, `urls_history`, `login_events_history`, `redirect_events_history`, `api_keys_history`) holding the same columns plus a `history_created` timestamp. Triggers on each table copy a row's content into its history table right before an `UPDATE` or `DELETE`, so nothing has to opt in from the application code — this includes rows removed indirectly, e.g. a `redirect_events` row disappearing via `urls`' `ON DELETE CASCADE` still lands in `redirect_events_history`. History tables drop the original's primary/unique/foreign key constraints, since the same row can be changed many times over its life and a history row must never be blocked by a parent that's since been deleted itself.
 
 If the database was created before this existed, apply `migrations/0007_add_history_tables.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0007_add_history_tables.sql --remote`) in addition to `schema.sql`.
 

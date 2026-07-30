@@ -1,48 +1,3 @@
-function confirmDelete(message) {
-  return new Promise((resolve) => {
-    const overlay = document.getElementById("delete-modal-overlay");
-    const messageEl = document.getElementById("delete-modal-message");
-    const confirmBtn = document.getElementById("delete-modal-confirm");
-    const cancelBtn = document.getElementById("delete-modal-cancel");
-    const previouslyFocused = document.activeElement;
-
-    messageEl.textContent = message;
-    overlay.hidden = false;
-    cancelBtn.focus();
-
-    function close(result) {
-      overlay.hidden = true;
-      confirmBtn.removeEventListener("click", onConfirm);
-      cancelBtn.removeEventListener("click", onCancel);
-      overlay.removeEventListener("click", onOverlayClick);
-      document.removeEventListener("keydown", onKeydown);
-      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
-      resolve(result);
-    }
-
-    function onConfirm() {
-      close(true);
-    }
-
-    function onCancel() {
-      close(false);
-    }
-
-    function onOverlayClick(event) {
-      if (event.target === overlay) close(false);
-    }
-
-    function onKeydown(event) {
-      if (event.key === "Escape") close(false);
-    }
-
-    confirmBtn.addEventListener("click", onConfirm);
-    cancelBtn.addEventListener("click", onCancel);
-    overlay.addEventListener("click", onOverlayClick);
-    document.addEventListener("keydown", onKeydown);
-  });
-}
-
 async function copyQrImageToClipboard(qr) {
   const cellSize = 8;
   const margin = cellSize * 2;
@@ -113,6 +68,11 @@ function openQrModal(url) {
   document.addEventListener("keydown", onKeydown);
 }
 
+function codeFromLocation(location) {
+  const url = new URL(location);
+  return url.hostname === "tiny.vin" ? url.pathname.slice(1) : url.hostname.replace(/\.tiny\.vin$/, "");
+}
+
 async function generateUrl() {
   const input = document.getElementById("url-input");
   const result = document.getElementById("url-result");
@@ -141,9 +101,9 @@ async function generateUrl() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ url }),
     });
-    const data = await response.json();
 
     if (!response.ok) {
+      const data = await response.json();
       setError(data.error || "Something went wrong.");
       return;
     }
@@ -151,58 +111,10 @@ async function generateUrl() {
     input.value = "";
     setStatus("");
     updateGenerateButtonState();
-    loadHistory(data.code);
+    loadHistory(codeFromLocation(response.headers.get("Location")));
   } catch {
     setError("Network error, try again.");
   }
-}
-
-async function copyCardShortUrl(shortUrl, displayEl) {
-  try {
-    await navigator.clipboard.writeText(shortUrl);
-    displayEl.textContent = "Copied to clipboard!";
-    setTimeout(() => {
-      displayEl.textContent = shortUrl;
-    }, 1000);
-  } catch {
-    displayEl.textContent = "Could not copy to clipboard";
-    setTimeout(() => {
-      displayEl.textContent = shortUrl;
-    }, 1000);
-  }
-}
-
-function createCopyIconButton() {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "icon-btn copy-link-btn";
-  button.title = "Copy to clipboard";
-  button.setAttribute("aria-label", "Copy to clipboard");
-  button.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
-    <rect x="9" y="9" width="13" height="13" rx="2" style="stroke-width:1.2;stroke-dasharray:none"/>
-	<path d="M5.967 14.937h-1c-.575 0-1.534.072-2.15-.3C2.25 14.293 2 13.528 2 13V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1.904" style="stroke-width:1.2;stroke-dasharray:none"/>
-    <g stroke-width="2.6">
-	  <path d="M10.922 12.654a2.744 2.78 0 0 0 4.137.3l1.647-1.668a2.744 2.78 0 0 0-3.88-3.932l-.944.95" style="stroke-width:1.2;stroke-dasharray:none" transform="matrix(.76 0 0 .76 6.4 6.4)"/>
-      <path d="M13.117 11.542a2.744 2.78 0 0 0-4.137-.3L7.333 12.91a2.744 2.78 0 0 0 3.88 3.932l.938-.951" style="stroke-width:1.2;stroke-dasharray:none" transform="matrix(.76 0 0 .76 6.4 6.4)"/>
-	</g>
-  </svg>`;
-  return button;
-}
-
-function createCopyableTextGroup(text) {
-  const group = document.createElement("span");
-  group.className = "url-card-copy-group";
-  group.title = "Copy to clipboard";
-  const value = document.createElement("span");
-  value.className = "url-card-value url-card-copy-text";
-  value.textContent = text;
-  const copyBtn = createCopyIconButton();
-  const copy = () => copyCardShortUrl(text, value);
-  value.addEventListener("click", copy);
-  copyBtn.addEventListener("click", copy);
-  group.addEventListener("click", copy);
-  group.append(value, copyBtn);
-  return group;
 }
 
 function createQrIconButton() {
@@ -342,15 +254,15 @@ function createInlineCodeInputRow({ group, bodyKey, prefixText, suffixText, plac
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ url: group.originalUrl, [bodyKey]: value }),
       });
-      const data = await response.json();
 
       if (!response.ok) {
+        const data = await response.json();
         error.textContent = data.error || "Something went wrong.";
         saveBtn.disabled = false;
         return;
       }
 
-      loadHistory(data.code);
+      loadHistory(codeFromLocation(response.headers.get("Location")));
     } catch {
       error.textContent = "Network error, try again.";
       saveBtn.disabled = false;
@@ -372,7 +284,7 @@ function createInlineCodeInputRow({ group, bodyKey, prefixText, suffixText, plac
 function createSuffixInputRow(group, onCancel) {
   return createInlineCodeInputRow({
     group,
-    bodyKey: "code",
+    bodyKey: "path",
     prefixText: "tiny.vin/",
     suffixText: null,
     placeholder: "Enter pathname",
