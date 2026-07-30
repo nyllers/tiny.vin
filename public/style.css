@@ -842,10 +842,19 @@ footer {
   opacity: 0.85;
 }
 
+#qr-modal-overlay .modal-title {
+  text-align: center;
+}
+
 .qr-modal-image {
   display: flex;
   justify-content: center;
   margin: 0 0 1rem;
+  cursor: pointer;
+}
+
+.qr-modal-image:hover {
+  opacity: 0.75;
 }
 
 .qr-modal-image svg {
@@ -856,9 +865,12 @@ footer {
 }
 
 .qr-modal-url {
+  display: flex;
+  justify-content: center;
   margin: 0 0 1.25rem;
-  color: var(--muted);
-  font-size: 0.85rem;
-  word-break: break-all;
-  text-align: center;
+}
+
+.qr-modal-url .url-card-copy-group {
+  flex: none;
+  min-width: 0;
 }

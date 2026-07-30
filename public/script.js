@@ -43,9 +43,28 @@ function confirmDelete(message) {
   });
 }
 
+async function copyQrImageToClipboard(qr) {
+  const cellSize = 8;
+  const margin = cellSize * 2;
+  const size = qr.getModuleCount() * cellSize + margin * 2;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, size, size);
+  ctx.translate(margin, margin);
+  qr.renderTo2dContext(ctx, cellSize);
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+}
+
 function openQrModal(url) {
   const overlay = document.getElementById("qr-modal-overlay");
   const imageEl = document.getElementById("qr-modal-image");
+  const titleEl = document.getElementById("qr-modal-title");
   const urlEl = document.getElementById("qr-modal-url");
   const closeBtn = document.getElementById("qr-modal-close");
   const previouslyFocused = document.activeElement;
@@ -54,7 +73,22 @@ function openQrModal(url) {
   qr.addData(url);
   qr.make();
   imageEl.innerHTML = qr.createSvgTag({ scalable: true, alt: `QR code for ${url}` });
-  urlEl.textContent = url;
+
+  imageEl.onclick = async () => {
+    const originalTitle = titleEl.textContent;
+    try {
+      await copyQrImageToClipboard(qr);
+      titleEl.textContent = "Copied to clipboard!";
+    } catch {
+      titleEl.textContent = "Could not copy to clipboard";
+    }
+    setTimeout(() => {
+      titleEl.textContent = originalTitle;
+    }, 1000);
+  };
+
+  urlEl.textContent = "";
+  urlEl.appendChild(createCopyableTextGroup(url));
   overlay.hidden = false;
   closeBtn.focus();
 
@@ -155,6 +189,22 @@ function createCopyIconButton() {
   return button;
 }
 
+function createCopyableTextGroup(text) {
+  const group = document.createElement("span");
+  group.className = "url-card-copy-group";
+  group.title = "Copy to clipboard";
+  const value = document.createElement("span");
+  value.className = "url-card-value url-card-copy-text";
+  value.textContent = text;
+  const copyBtn = createCopyIconButton();
+  const copy = () => copyCardShortUrl(text, value);
+  value.addEventListener("click", copy);
+  copyBtn.addEventListener("click", copy);
+  group.addEventListener("click", copy);
+  group.append(value, copyBtn);
+  return group;
+}
+
 function createQrIconButton() {
   const button = document.createElement("button");
   button.type = "button";
@@ -223,18 +273,7 @@ function createShortUrlRow(shortUrlItem) {
   const shortCopyRow = document.createElement("div");
   shortCopyRow.className = "url-card-copy-row";
 
-  const shortUrlGroup = document.createElement("span");
-  shortUrlGroup.className = "url-card-copy-group";
-  shortUrlGroup.title = "Copy to clipboard";
-  const shortValue = document.createElement("span");
-  shortValue.className = "url-card-value url-card-copy-text";
-  shortValue.textContent = shortUrlItem.shortUrl;
-  const shortCopyBtn = createCopyIconButton();
-  const copyShort = () => copyCardShortUrl(shortUrlItem.shortUrl, shortValue);
-  shortValue.addEventListener("click", copyShort);
-  shortCopyBtn.addEventListener("click", copyShort);
-  shortUrlGroup.addEventListener("click", copyShort);
-  shortUrlGroup.append(shortValue, shortCopyBtn);
+  const shortUrlGroup = createCopyableTextGroup(shortUrlItem.shortUrl);
 
   const qrBtn = createQrIconButton();
   qrBtn.addEventListener("click", () => openQrModal(`https://${shortUrlItem.shortUrl}`));

@@ -60,3 +60,5 @@ If the database was created before this existed, apply `migrations/0007_add_hist
 ## QR codes
 
 Each short URL in the "Created URLs" list has a QR-code icon next to its copy-link icon. Clicking it opens a modal with a large QR code encoding `https://<shortUrl>` (the scheme is added since the stored/displayed short URL never includes one). QR generation is entirely client-side and offline — `public/qrcode-lib.js` vendors [kazuhikoarase/qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT license, unmodified) rather than calling a third-party image API, so the destination URL never leaves the browser.
+
+Clicking the QR code itself copies it to the clipboard as a PNG (rendered via the library's `renderTo2dContext` onto an offscreen canvas, then `canvas.toBlob` + the Clipboard API — no server round-trip). The URL underneath the QR code reuses the same copy-group styling and copy-link icon as the short URL in its card, so both look and behave identically.
