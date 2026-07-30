@@ -732,7 +732,7 @@ footer {
 }
 
 .api-key-row .url-card-copy-group {
-  flex: none;
+  flex: 0 1 auto;
   min-width: 0;
 }
 
