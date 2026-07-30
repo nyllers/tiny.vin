@@ -615,7 +615,6 @@ footer {
   gap: 10px;
   width: 100%;
   max-width: calc(740px - 2rem);
-  margin-bottom: 1.5rem;
 }
 
 .stat-tile {
@@ -801,6 +800,11 @@ footer {
   fill: var(--muted);
   font-size: 9px;
   font-weight: 600;
+}
+
+.chart-code-label {
+  fill: var(--muted);
+  font-size: 7px;
 }
 
 .daily-chart {

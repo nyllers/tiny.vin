@@ -176,22 +176,36 @@ function createDailyChartCard(days) {
 }
 
 const URL_CHART_LIMIT = 10;
+const URL_CHART_LABEL_MAX_CHARS = 6;
 
-function createUrlBreakdownChart(urls) {
-  const barCount = urls.length;
+function truncateCode(code) {
+  return code.length > URL_CHART_LABEL_MAX_CHARS ? `${code.slice(0, URL_CHART_LABEL_MAX_CHARS)}…` : code;
+}
+
+function flattenShortUrls(urls) {
+  return urls
+    .flatMap((group) => group.shortUrls.map((shortUrlItem) => ({ ...shortUrlItem, originalUrl: group.originalUrl })))
+    .filter((entry) => entry.clicks > 0)
+    .sort((a, b) => b.clicks - a.clicks)
+    .slice(0, URL_CHART_LIMIT);
+}
+
+function createUrlBreakdownChart(entries) {
+  const barCount = entries.length;
   const barWidth = (DAILY_CHART_WIDTH - DAILY_CHART_BAR_GAP * (barCount - 1)) / barCount;
-  const maxCount = Math.max(...urls.map((u) => u.totalClicks), 1);
-  const labelSpace = 11;
-  const baseline_y = DAILY_CHART_HEIGHT - 1;
-  const plotHeight = baseline_y - labelSpace;
-  const peakIndex = urls.reduce((best, u, i) => (u.totalClicks > urls[best].totalClicks ? i : best), 0);
+  const maxCount = Math.max(...entries.map((e) => e.clicks), 1);
+  const topLabelSpace = 11;
+  const bottomLabelSpace = 12;
+  const baseline_y = DAILY_CHART_HEIGHT - bottomLabelSpace;
+  const plotHeight = baseline_y - topLabelSpace;
+  const peakIndex = entries.reduce((best, e, i) => (e.clicks > entries[best].clicks ? i : best), 0);
 
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("viewBox", `0 0 ${DAILY_CHART_WIDTH} ${DAILY_CHART_HEIGHT}`);
   svg.setAttribute("preserveAspectRatio", "none");
   svg.setAttribute("class", "daily-chart");
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "Redirects per original URL");
+  svg.setAttribute("aria-label", "Redirects per tiny URL");
 
   const baseline = document.createElementNS(SVG_NS, "line");
   baseline.setAttribute("x1", "0");
@@ -201,30 +215,36 @@ function createUrlBreakdownChart(urls) {
   baseline.setAttribute("class", "daily-chart-baseline");
   svg.appendChild(baseline);
 
-  urls.forEach((urlGroup, i) => {
+  entries.forEach((entry, i) => {
     const x = i * (barWidth + DAILY_CHART_BAR_GAP);
-    const barHeight = urlGroup.totalClicks > 0 ? Math.max((urlGroup.totalClicks / maxCount) * (plotHeight - 2), 3) : 0;
+    const barHeight = Math.max((entry.clicks / maxCount) * (plotHeight - 2), 3);
     const barTop = baseline_y - barHeight;
 
     const col = document.createElementNS(SVG_NS, "g");
     col.setAttribute("class", "daily-chart-col");
 
-    if (barHeight > 0) {
-      const bar = document.createElementNS(SVG_NS, "path");
-      bar.setAttribute("class", "daily-chart-bar");
-      bar.setAttribute("d", roundedTopBarPath(x, barTop, barWidth, barHeight, 4));
-      col.appendChild(bar);
-    }
+    const bar = document.createElementNS(SVG_NS, "path");
+    bar.setAttribute("class", "daily-chart-bar");
+    bar.setAttribute("d", roundedTopBarPath(x, barTop, barWidth, barHeight, 4));
+    col.appendChild(bar);
 
-    if (urlGroup.totalClicks > 0 && i === peakIndex) {
+    if (i === peakIndex) {
       const peakLabel = document.createElementNS(SVG_NS, "text");
       peakLabel.setAttribute("class", "chart-value-label");
       peakLabel.setAttribute("x", String(x + barWidth / 2));
       peakLabel.setAttribute("y", String(barTop - 3));
       peakLabel.setAttribute("text-anchor", "middle");
-      peakLabel.textContent = String(urlGroup.totalClicks);
+      peakLabel.textContent = String(entry.clicks);
       col.appendChild(peakLabel);
     }
+
+    const codeLabel = document.createElementNS(SVG_NS, "text");
+    codeLabel.setAttribute("class", "chart-code-label");
+    codeLabel.setAttribute("x", String(x + barWidth / 2));
+    codeLabel.setAttribute("y", String(DAILY_CHART_HEIGHT - 2));
+    codeLabel.setAttribute("text-anchor", "middle");
+    codeLabel.textContent = truncateCode(entry.code);
+    col.appendChild(codeLabel);
 
     const hit = document.createElementNS(SVG_NS, "rect");
     hit.setAttribute("class", "daily-chart-hit");
@@ -234,7 +254,7 @@ function createUrlBreakdownChart(urls) {
     hit.setAttribute("height", String(DAILY_CHART_HEIGHT));
     hit.setAttribute("tabindex", "0");
     hit.setAttribute("role", "img");
-    const label = `${urlGroup.originalUrl}: ${urlGroup.totalClicks} redirect${urlGroup.totalClicks === 1 ? "" : "s"}`;
+    const label = `${entry.shortUrl} (${entry.originalUrl}): ${entry.clicks} redirect${entry.clicks === 1 ? "" : "s"}`;
     hit.setAttribute("aria-label", label);
 
     const titleEl = document.createElementNS(SVG_NS, "title");
@@ -248,7 +268,7 @@ function createUrlBreakdownChart(urls) {
   return svg;
 }
 
-function createUrlBreakdownChartCard(urls) {
+function createUrlBreakdownChartCard(entries) {
   const card = document.createElement("div");
   card.className = "url-card";
 
@@ -256,9 +276,7 @@ function createUrlBreakdownChartCard(urls) {
   title.className = "breakdown-card-title";
   title.textContent = "Redirects per URL";
 
-  const chart = createUrlBreakdownChart(urls.slice(0, URL_CHART_LIMIT));
-
-  card.append(title, chart);
+  card.append(title, createUrlBreakdownChart(entries));
   return card;
 }
 
@@ -307,8 +325,9 @@ async function loadStats() {
   if (data.dailyRedirects.some((d) => d.count > 0)) {
     breakdownCards.push(createDailyChartCard(data.dailyRedirects));
   }
-  if (data.totalClicks > 0) {
-    breakdownCards.push(createUrlBreakdownChartCard(data.urls));
+  const urlChartEntries = flattenShortUrls(data.urls);
+  if (urlChartEntries.length > 0) {
+    breakdownCards.push(createUrlBreakdownChartCard(urlChartEntries));
   }
   if (breakdownCards.length > 0) {
     list.append(createCardsSectionFromElements("BREAKDOWN", breakdownCards));
