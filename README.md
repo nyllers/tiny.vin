@@ -3,7 +3,7 @@
 URL shortener for tiny.vin. Cloudflare Worker (static assets + API) + D1.
 
 - `public/` — static frontend (served as assets by the Worker)
-- `src/index.js` — Worker script: `POST /api/shorten` to create a short code, `GET /<code>` to redirect
+- `src/index.js` — Worker script: `POST /api/urls` to create a short code, `GET /<code>` to redirect
 - `schema.sql` — D1 table definition
 - `wrangler.jsonc` — Worker config (assets binding, D1 binding)
 
@@ -21,7 +21,7 @@ Local dev (optional, needs Wrangler): `wrangler dev`.
 
 ## Login
 
-The homepage and `POST /api/shorten` require signing in with Google; `GET /<code>` redirects stay public so shared links keep working for anyone. There's no email allowlist — any Google account can sign in. (Facebook login was dropped: Meta requires Business Verification to take a Facebook Login app out of Development mode, which doesn't fit a personal project.)
+The homepage and `POST /api/urls` require signing in with Google; `GET /<code>` redirects stay public so shared links keep working for anyone. There's no email allowlist — any Google account can sign in. (Facebook login was dropped: Meta requires Business Verification to take a Facebook Login app out of Development mode, which doesn't fit a personal project.)
 
 Required secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET` (any long random string, used to sign the session cookie).
 
@@ -37,10 +37,10 @@ Every successful login is recorded in D1: `login_identities` holds one row per (
 
 Signed-in accounts can create tiny URLs from the command line instead of the browser, via an API key. The `/api` page (linked from the nav) generates one while signed in — one key per account; regenerating immediately invalidates the previous one.
 
-Send the key as `Authorization: Bearer <key>` on `POST /api/shorten`, the same endpoint the browser uses:
+Send the key as `Authorization: Bearer <key>` on `POST /api/urls`, the same endpoint the browser uses:
 
 ```bash
-curl -X POST https://tiny.vin/api/shorten \
+curl -X POST https://tiny.vin/api/urls \
   -H "Authorization: Bearer tvk_..." \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com"}'

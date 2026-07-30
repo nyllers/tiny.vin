@@ -96,7 +96,7 @@ async function generateUrl() {
   setStatus("Checking that page exists...");
 
   try {
-    const response = await fetch("/api/shorten", {
+    const response = await fetch("/api/urls", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ url }),
@@ -249,7 +249,7 @@ function createInlineCodeInputRow({ group, bodyKey, prefixText, suffixText, plac
     error.textContent = "";
 
     try {
-      const response = await fetch("/api/shorten", {
+      const response = await fetch("/api/urls", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ url: group.originalUrl, [bodyKey]: value }),

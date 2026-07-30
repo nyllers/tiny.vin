@@ -702,7 +702,7 @@ export default {
       return handleRedirect(codeMatch[1], ["generated-path", "custom-path"], env, ctx, request);
     }
 
-    if (request.method === "POST" && url.pathname === "/api/shorten") {
+    if (request.method === "POST" && url.pathname === "/api/urls") {
       return withAuthOrApiKey(request, env, (session) => handleShorten(request, env, session));
     }
 
