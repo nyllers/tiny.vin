@@ -303,21 +303,6 @@ footer {
   font-size: 0.75rem;
 }
 
-.icon-btn.card-action-btn {
-  color: var(--heading);
-  background: none;
-  border: 1px solid var(--heading);
-  gap: 0.25rem;
-  padding: 1px 0.35rem;
-  font-size: 0.75rem;
-  border-radius: 0.25rem;
-}
-
-.icon-btn.card-action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .icon-btn.copy-link-btn {
   color: var(--heading);
 }
@@ -367,10 +352,10 @@ footer {
   padding: 0.25rem 0.75rem;
   font-size: 0.75rem;
   background: var(--heading);
-  color: #fff;  
+  color: #fff;
   border: none;
   border-radius: 999px;
-  cursor: pointer; 
+  cursor: pointer;
   width: 4.5rem;
   justify-content: center;
 }
@@ -769,7 +754,6 @@ footer {
   font-size: 0.7rem;
   color: var(--muted);
 }
-
 
 .modal-overlay {
   position: fixed;
