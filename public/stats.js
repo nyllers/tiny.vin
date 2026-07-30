@@ -96,7 +96,7 @@ function createDailyChart(days) {
   svg.setAttribute("preserveAspectRatio", "none");
   svg.setAttribute("class", "daily-chart");
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "Redirects per day for the last 14 days");
+  svg.setAttribute("aria-label", "Redirects last 14 days");
 
   const baseline = document.createElementNS(SVG_NS, "line");
   baseline.setAttribute("x1", "0");
@@ -159,7 +159,7 @@ function createDailyChartCard(days) {
 
   const title = document.createElement("p");
   title.className = "breakdown-card-title";
-  title.textContent = "Last 14 Days";
+  title.textContent = "Redirects Last 14 Days";
 
   const chart = createDailyChart(days);
 
@@ -176,11 +176,11 @@ function createDailyChartCard(days) {
 }
 
 const URL_CHART_LIMIT = 10;
-const URL_CHART_LABEL_TOTAL_CHARS = 24;
+const URL_CHART_LABEL_MAX_CHARS = 32;
 
 function truncateCode(code, maxChars) {
   if (maxChars <= 3) return " ";
-  return code.length > maxChars ? `${code.slice(0, maxChars)}…` : code;
+  return code.length > maxChars ? `${code.slice(0, maxChars - 1)}…` : code;
 }
 
 function flattenShortUrls(urls) {
@@ -205,7 +205,7 @@ function createUrlBreakdownChart(entries) {
   svg.setAttribute("preserveAspectRatio", "none");
   svg.setAttribute("class", "daily-chart");
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "Redirects per tiny URL");
+  svg.setAttribute("aria-label", "Redirects per URL");
 
   const baseline = document.createElementNS(SVG_NS, "line");
   baseline.setAttribute("x1", "0");
@@ -271,7 +271,7 @@ function createUrlBreakdownChartCard(entries) {
   const chart = createUrlBreakdownChart(entries);
 
   const codeLabelMaxChars =
-    entries.length === 0 ? URL_CHART_LABEL_TOTAL_CHARS : Math.floor(URL_CHART_LABEL_TOTAL_CHARS / entries.length);
+    entries.length === 0 ? URL_CHART_LABEL_MAX_CHARS : Math.floor(URL_CHART_LABEL_MAX_CHARS / entries.length);
   const axis = document.createElement("div");
   axis.className = "url-chart-axis";
   for (const entry of entries) {
