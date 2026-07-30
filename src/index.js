@@ -9,10 +9,20 @@ const CODE_PATTERN = /^\/([A-Za-z0-9]{1,32})$/;
 const SUBDOMAIN_REDIRECT_PATTERN = /^\/subdomain\/([a-z0-9-]{1,63})$/;
 const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
 const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9-]+)$/;
-const RESERVED_CODES = new Set(["login", "subdomain", "stats", "privacy", "terms", "api"]);
-const PROTECTED_PAGES = new Set(["/", "/stats", "/stats.html", "/api", "/api.html"]);
+const RESERVED_CODES = new Set(["login", "subdomain", "stats", "privacy", "terms", "api", "tokens"]);
+const PROTECTED_PAGES = new Set(["/", "/stats", "/stats.html", "/api", "/api.html", "/tokens", "/tokens.html"]);
 const API_KEY_PATTERN = /^tvk_[0-9a-f]{48}$/;
 const VALID_KINDS = new Set(["generated-path", "custom-path", "subdomain"]);
+
+const TOKEN_COSTS = {
+  "custom-path": { create: 25, upkeep: 10 },
+  subdomain: { create: 50, upkeep: 20 },
+};
+const GENERATED_PATH_FREE_LIMIT = 5;
+const GENERATED_PATH_CREATE_COST = 10;
+const GENERATED_PATH_UPKEEP_PER_EXTRA = 1;
+const SIGNUP_BONUS_TOKENS = 100;
+const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 
 const LOGIN_ERRORS = {
   oauth_failed: "Something went wrong signing in. Please try again.",
@@ -241,17 +251,81 @@ function formatShortUrl(code, kind) {
   return kind === "subdomain" ? `${code}.tiny.vin` : `tiny.vin/${code}`;
 }
 
-async function insertUrl(env, { code, kind, originalUrl, createdBy }) {
+async function insertUrl(env, { code, kind, originalUrl, createdBy, paidThroughAt = null }) {
   await env.DB.prepare(
-    "INSERT INTO urls (code, kind, original_url, created_at, created_by) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO urls (code, kind, original_url, created_at, created_by, paid_through_at) VALUES (?, ?, ?, ?, ?, ?)"
   )
-    .bind(code, kind, originalUrl, Date.now(), createdBy)
+    .bind(code, kind, originalUrl, Date.now(), createdBy, paidThroughAt)
     .run();
 }
 
 function shortUrlResponse(code, kind) {
   const shortUrl = formatShortUrl(code, kind);
   return new Response(null, { status: 201, headers: { Location: `https://${shortUrl}` } });
+}
+
+async function getTokenBalance(env, identityId) {
+  const row = await env.DB.prepare("SELECT token_balance FROM login_identities WHERE id = ?")
+    .bind(identityId)
+    .first();
+  return row ? row.token_balance : 0;
+}
+
+async function logTokenEvent(env, identityId, amount, reason, { code = null, kind = null } = {}) {
+  await env.DB.prepare(
+    "INSERT INTO token_transactions (identity_id, amount, reason, code, kind, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+  )
+    .bind(identityId, amount, reason, code, kind, Date.now())
+    .run();
+}
+
+async function debitTokens(env, identityId, amount, reason, extra = {}) {
+  await env.DB.prepare("UPDATE login_identities SET token_balance = token_balance - ? WHERE id = ?")
+    .bind(amount, identityId)
+    .run();
+  await logTokenEvent(env, identityId, -amount, reason, extra);
+}
+
+async function countGeneratedPaths(env, identityId) {
+  const row = await env.DB.prepare(
+    "SELECT COUNT(*) AS cnt FROM urls WHERE created_by = ? AND kind = 'generated-path'"
+  )
+    .bind(identityId)
+    .first();
+  return row.cnt;
+}
+
+function generatedPathMonthlyUpkeep(count) {
+  return Math.max(0, count - GENERATED_PATH_FREE_LIMIT) * GENERATED_PATH_UPKEEP_PER_EXTRA;
+}
+
+async function createShortUrl(env, { code, kind, originalUrl, createdBy }) {
+  const balance = await getTokenBalance(env, createdBy);
+
+  let cost;
+  let paidThroughAt = null;
+  if (kind === "generated-path") {
+    const existingCount = await countGeneratedPaths(env, createdBy);
+    cost = existingCount >= GENERATED_PATH_FREE_LIMIT ? GENERATED_PATH_CREATE_COST : 0;
+  } else {
+    cost = TOKEN_COSTS[kind].create;
+    paidThroughAt = Date.now() + ONE_MONTH_MS;
+  }
+
+  if (balance < cost) {
+    return { insufficientBalance: true, balance, cost };
+  }
+
+  try {
+    await insertUrl(env, { code, kind, originalUrl, createdBy, paidThroughAt });
+  } catch {
+    return { conflict: true };
+  }
+
+  if (cost > 0) {
+    await debitTokens(env, createdBy, cost, `create_${kind}`, { code, kind });
+  }
+  return { ok: true };
 }
 
 async function handleShorten(request, env, session) {
@@ -295,31 +369,44 @@ async function handleShorten(request, env, session) {
   const createdBy = await getOrCreateIdentityId(env, session.provider, session.email);
 
   if (subdomainCode) {
-    try {
-      await insertUrl(env, { code: subdomainCode, kind: "subdomain", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(subdomainCode, "subdomain");
-    } catch {
+    const result = await createShortUrl(env, { code: subdomainCode, kind: "subdomain", originalUrl: validation.url, createdBy });
+    if (result.insufficientBalance) {
+      return jsonResponse(
+        { error: `Adding a subdomain costs ${result.cost} tokens, but you only have ${result.balance}.` },
+        402
+      );
+    }
+    if (result.conflict) {
       return jsonResponse({ error: `"${subdomainCode}.tiny.vin" is already taken, try another.` }, 409);
     }
+    return shortUrlResponse(subdomainCode, "subdomain");
   }
 
   if (customCode) {
-    try {
-      await insertUrl(env, { code: customCode, kind: "custom-path", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(customCode, "custom-path");
-    } catch {
+    const result = await createShortUrl(env, { code: customCode, kind: "custom-path", originalUrl: validation.url, createdBy });
+    if (result.insufficientBalance) {
+      return jsonResponse(
+        { error: `Adding a custom path costs ${result.cost} tokens, but you only have ${result.balance}.` },
+        402
+      );
+    }
+    if (result.conflict) {
       return jsonResponse({ error: `"${customCode}" is already taken, try another.` }, 409);
     }
+    return shortUrlResponse(customCode, "custom-path");
   }
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const code = generateCode();
-    try {
-      await insertUrl(env, { code, kind: "generated-path", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(code, "generated-path");
-    } catch {
-      // code collision, retry with a new random code
+    const result = await createShortUrl(env, { code, kind: "generated-path", originalUrl: validation.url, createdBy });
+    if (result.insufficientBalance) {
+      return jsonResponse(
+        { error: `Creating another tiny URL costs ${result.cost} tokens, but you only have ${result.balance}.` },
+        402
+      );
     }
+    if (result.conflict) continue;
+    return shortUrlResponse(code, "generated-path");
   }
 
   return jsonResponse({ error: "Could not generate a unique code, try again" }, 500);
@@ -561,6 +648,75 @@ async function handleDeleteUrl(code, kind, env, session) {
   return jsonResponse({ ok: true });
 }
 
+async function handleTokens(env, session) {
+  const identityId = await getIdentityId(env, session.provider, session.email);
+  const balance = await getTokenBalance(env, identityId);
+
+  const { results: billedUrls } = await env.DB.prepare(
+    `SELECT code, kind, original_url FROM urls
+     WHERE created_by = ? AND paid_through_at IS NOT NULL
+     ORDER BY created_at ASC`
+  )
+    .bind(identityId)
+    .all();
+
+  const breakdown = billedUrls.map((row) => ({
+    kind: row.kind,
+    code: row.code,
+    shortUrl: formatShortUrl(row.code, row.kind),
+    originalUrl: row.original_url,
+    monthlyCost: TOKEN_COSTS[row.kind].upkeep,
+  }));
+
+  let monthlyBurn = breakdown.reduce((sum, entry) => sum + entry.monthlyCost, 0);
+
+  const generatedPathCount = await countGeneratedPaths(env, identityId);
+  const generatedPathBillable = Math.max(0, generatedPathCount - GENERATED_PATH_FREE_LIMIT);
+  if (generatedPathBillable > 0) {
+    const monthlyCost = generatedPathBillable * GENERATED_PATH_UPKEEP_PER_EXTRA;
+    monthlyBurn += monthlyCost;
+    breakdown.push({
+      kind: "generated-path",
+      count: generatedPathCount,
+      freeLimit: GENERATED_PATH_FREE_LIMIT,
+      billableCount: generatedPathBillable,
+      monthlyCost,
+    });
+  }
+
+  const { results: historyRows } = await env.DB.prepare(
+    "SELECT amount, reason, code, kind, created_at FROM token_transactions WHERE identity_id = ? ORDER BY created_at DESC, id DESC"
+  )
+    .bind(identityId)
+    .all();
+
+  const history = historyRows.map((row) => ({
+    amount: row.amount,
+    reason: row.reason,
+    code: row.code,
+    kind: row.kind,
+    shortUrl: row.code && row.kind ? formatShortUrl(row.code, row.kind) : null,
+    createdAt: row.created_at,
+  }));
+
+  return jsonResponse({
+    balance,
+    monthlyBurn,
+    breakdown,
+    history,
+    generatedPathCount,
+    costs: {
+      "custom-path": TOKEN_COSTS["custom-path"],
+      subdomain: TOKEN_COSTS.subdomain,
+      "generated-path": {
+        freeLimit: GENERATED_PATH_FREE_LIMIT,
+        create: GENERATED_PATH_CREATE_COST,
+        upkeepPerExtra: GENERATED_PATH_UPKEEP_PER_EXTRA,
+      },
+    },
+  });
+}
+
 async function recordRedirectEvent(env, { code, kind, request }) {
   try {
     const headers = JSON.stringify(Object.fromEntries(request.headers.entries()));
@@ -614,13 +770,22 @@ function handleAuthStart(url, env) {
 }
 
 async function getOrCreateIdentityId(env, provider, username) {
-  await env.DB.prepare(
-    "INSERT INTO login_identities (provider, username) VALUES (?, ?) ON CONFLICT (provider, username) DO NOTHING"
+  const now = Date.now();
+  const result = await env.DB.prepare(
+    `INSERT INTO login_identities (provider, username, token_balance, generated_path_billed_through_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT (provider, username) DO NOTHING`
   )
-    .bind(provider, username)
+    .bind(provider, username, SIGNUP_BONUS_TOKENS, now + ONE_MONTH_MS)
     .run();
 
-  return getIdentityId(env, provider, username);
+  const identityId = await getIdentityId(env, provider, username);
+
+  if (result.meta.changes > 0) {
+    await logTokenEvent(env, identityId, SIGNUP_BONUS_TOKENS, "signup_bonus");
+  }
+
+  return identityId;
 }
 
 async function recordLogin(env, provider, username, ipAddress) {
@@ -667,6 +832,93 @@ async function handleAuthCallback(url, request, env) {
     });
   } catch {
     return Response.redirect(`${url.origin}/login?error=oauth_failed`, 302);
+  }
+}
+
+async function billUrlUpkeep(env, row, now) {
+  let paidThroughAt = row.paid_through_at;
+
+  while (paidThroughAt <= now) {
+    const upkeepCost = TOKEN_COSTS[row.kind].upkeep;
+    const balance = await getTokenBalance(env, row.created_by);
+    if (balance < upkeepCost) {
+      await env.DB.prepare("DELETE FROM urls WHERE code = ? AND kind = ?").bind(row.code, row.kind).run();
+      await logTokenEvent(env, row.created_by, 0, "deleted_insufficient_balance", { code: row.code, kind: row.kind });
+      return;
+    }
+    await debitTokens(env, row.created_by, upkeepCost, `upkeep_${row.kind}`, { code: row.code, kind: row.kind });
+    paidThroughAt += ONE_MONTH_MS;
+  }
+
+  await env.DB.prepare("UPDATE urls SET paid_through_at = ? WHERE code = ? AND kind = ?")
+    .bind(paidThroughAt, row.code, row.kind)
+    .run();
+}
+
+async function billGeneratedPathPool(env, identityId, now) {
+  const identity = await env.DB.prepare("SELECT generated_path_billed_through_at FROM login_identities WHERE id = ?")
+    .bind(identityId)
+    .first();
+  let billedThroughAt = identity.generated_path_billed_through_at;
+
+  while (billedThroughAt <= now) {
+    let count = await countGeneratedPaths(env, identityId);
+    let upkeepCost = generatedPathMonthlyUpkeep(count);
+
+    if (upkeepCost > 0) {
+      let balance = await getTokenBalance(env, identityId);
+      while (balance < upkeepCost && count > GENERATED_PATH_FREE_LIMIT) {
+        const oldest = await env.DB.prepare(
+          "SELECT code FROM urls WHERE created_by = ? AND kind = 'generated-path' ORDER BY created_at ASC LIMIT 1"
+        )
+          .bind(identityId)
+          .first();
+        if (!oldest) break;
+
+        await env.DB.prepare("DELETE FROM urls WHERE code = ? AND kind = 'generated-path'").bind(oldest.code).run();
+        await logTokenEvent(env, identityId, 0, "deleted_insufficient_balance", {
+          code: oldest.code,
+          kind: "generated-path",
+        });
+        count -= 1;
+        upkeepCost = generatedPathMonthlyUpkeep(count);
+        balance = await getTokenBalance(env, identityId);
+      }
+
+      if (upkeepCost > 0) {
+        await debitTokens(env, identityId, upkeepCost, "upkeep_generated-path");
+      }
+    }
+
+    billedThroughAt += ONE_MONTH_MS;
+  }
+
+  await env.DB.prepare("UPDATE login_identities SET generated_path_billed_through_at = ? WHERE id = ?")
+    .bind(billedThroughAt, identityId)
+    .run();
+}
+
+async function runMonthlyBilling(env) {
+  const now = Date.now();
+
+  const { results: urlRows } = await env.DB.prepare(
+    "SELECT code, kind, created_by, paid_through_at FROM urls WHERE paid_through_at IS NOT NULL AND paid_through_at <= ?"
+  )
+    .bind(now)
+    .all();
+
+  for (const row of urlRows) {
+    await billUrlUpkeep(env, row, now);
+  }
+
+  const { results: identityRows } = await env.DB.prepare(
+    "SELECT id FROM login_identities WHERE generated_path_billed_through_at IS NOT NULL AND generated_path_billed_through_at <= ?"
+  )
+    .bind(now)
+    .all();
+
+  for (const row of identityRows) {
+    await billGeneratedPathPool(env, row.id, now);
   }
 }
 
@@ -722,6 +974,10 @@ export default {
       return withAuth(request, env, (session) => handleStats(env, session));
     }
 
+    if (request.method === "GET" && url.pathname === "/api/tokens") {
+      return withAuth(request, env, (session) => handleTokens(env, session));
+    }
+
     const deleteMatch = url.pathname.match(DELETE_URL_PATTERN);
     if (request.method === "DELETE" && deleteMatch) {
       const kindParam = url.searchParams.get("kind");
@@ -735,5 +991,9 @@ export default {
     }
 
     return env.ASSETS.fetch(request);
+  },
+
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runMonthlyBilling(env));
   },
 };

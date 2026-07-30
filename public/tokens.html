@@ -3,13 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>tiny.vin</title>
-  <meta name="description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://tiny.vin">
-  <meta property="og:site_name" content="tiny.vin">
-  <meta property="og:title" content="tiny.vin">
-  <meta property="og:description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
+  <title>tiny.vin — Tokens</title>
+  <meta name="description" content="See your token balance, monthly upkeep breakdown, and full token history.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <script src="theme-init.js"></script>
@@ -66,43 +61,23 @@
     <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
   </div>
   <p class="token-indicator" id="token-indicator" hidden></p>
-  <h2 class="section-heading">ADD URL</h2>
-  <main class="generate-section">
-    <div class="controls">
-      <input type="text" id="url-input" placeholder="Paste or write a URL">
-      <button id="generate-btn">Make it Tiny</button>
-    </div>
-    <p id="url-result"></p>
+  <h2 class="section-heading">TOKENS</h2>
+  <section class="stats-summary" id="tokens-summary"></section>
+  <main class="tokens-page">
+    <section class="tokens-section">
+      <h3 class="api-docs-heading">Monthly upkeep breakdown</h3>
+      <div class="token-list" id="tokens-breakdown"></div>
+    </section>
+    <section class="tokens-section">
+      <h3 class="api-docs-heading">Token history</h3>
+      <div class="token-list" id="tokens-history"></div>
+    </section>
   </main>
-  <section class="history-panel" id="history-panel">
-    <div id="history-list"></div>
-  </section>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
-  <footer>Simple project by Anders &amp; Claude &middot; v57</footer>
-  <div class="modal-overlay" id="confirm-modal-overlay" hidden>
-    <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-message">
-      <p class="modal-title" id="confirm-modal-title">Are you sure?</p>
-      <p class="modal-message" id="confirm-modal-message"></p>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn modal-btn--cancel" id="confirm-modal-cancel">Cancel</button>
-        <button type="button" class="modal-btn" id="confirm-modal-confirm">Confirm</button>
-      </div>
-    </div>
-  </div>
-  <div class="modal-overlay" id="qr-modal-overlay" hidden>
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="qr-modal-title">
-      <p class="modal-title" id="qr-modal-title">QR Code</p>
-      <div class="qr-modal-image" id="qr-modal-image"></div>
-      <p class="qr-modal-url" id="qr-modal-url"></p>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn modal-btn--cancel" id="qr-modal-close">Close</button>
-      </div>
-    </div>
-  </div>
+  <footer>Simple project by Anders &amp; Claude</footer>
   <script src="cards.js"></script>
   <script src="token-indicator.js"></script>
-  <script src="qrcode-lib.js"></script>
-  <script src="script.js"></script>
+  <script src="tokens.js"></script>
   <script src="theme.js"></script>
   <script src="nav.js"></script>
 </body>

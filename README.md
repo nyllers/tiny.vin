@@ -60,6 +60,20 @@ If the database was created before this feature existed, apply `migrations/0005_
 
 The `generated-path`/`custom-path` split is separate and newer: if the database predates it, apply `migrations/0008_split_path_kind.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0008_split_path_kind.sql --remote`) in addition to `schema.sql`. It converts every existing `kind = 'path'` row to `'generated-path'` — reclassifying specific rows to `'custom-path'` afterward is manual, one-off data entry, since the migration has no way to know which existing codes were originally hand-picked.
 
+## Token economy
+
+Every account has a token balance (100 on signup), spent on creating and keeping tiny URLs/subdomains alive. The `/tokens` page (linked from the nav) shows your balance, current monthly upkeep, a breakdown of everything contributing to it, and a full history of every token event.
+
+Pricing:
+
+- **Custom path**: 25 tokens to create, 10 tokens/month upkeep, first month included in the creation cost.
+- **Subdomain**: 50 tokens to create, 20 tokens/month upkeep, first month included in the creation cost.
+- **Generated path**: your first 5 (at any given moment) are entirely free — 0 to create, 0 upkeep. The 6th and beyond cost 10 tokens to create, and upkeep is `max(0, current generated-path count - 5)` tokens/month, recomputed fresh every billing cycle from however many you currently hold — not tracked per row. For example, holding 7 generated paths costs 2 tokens/month; deleting 2 of them brings it back to 0 immediately (well, from the next billing cycle).
+
+Custom-path/subdomain upkeep is tracked per row via `urls.paid_through_at` (NULL means never individually billed — every row that existed before this feature shipped is grandfathered free forever, and generated-path rows are always NULL since their upkeep is billed as a pool, not per row). Generated-path upkeep is tracked per account via `login_identities.generated_path_billed_through_at`. A daily cron (`triggers.crons` in `wrangler.jsonc`, handled by the Worker's `scheduled()` export) catches up any billing cycles that have come due, debiting `login_identities.token_balance` and logging each change to `token_transactions` — an append-only ledger with no `_history` twin (unlike every other table), since it's never updated or deleted and so already is its own history. If an account can't afford upkeep when it comes due, the Worker deletes just enough of the affected URLs (oldest first, for generated paths) to make the remaining upkeep affordable, logging a `deleted_insufficient_balance` transaction for each.
+
+If the database was created before this existed, apply `migrations/0010_add_token_economy.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0010_add_token_economy.sql --remote`) in addition to `schema.sql`. It also grants the 100-token signup bonus retroactively to every existing account and gives them a month's grace before generated-path pool billing starts.
+
 ## Redirect statistics
 
 Every successful redirect (path or subdomain) is logged to `redirect_events`: which code/kind was hit, a timestamp, and as much request detail as a Worker can see — IP, country, user agent, referer, the full request headers, and Cloudflare's whole `request.cf` object (geo, TLS, bot-management score, ASN, etc.), each as a JSON blob. `(code, kind)` is a foreign key into `urls(code, kind)` with `ON DELETE CASCADE`, so it's a proper many-to-one relationship (many events per short URL) and deleting a short URL cleans up its stats too — D1 enforces foreign keys by default, so this isn't just documentation. Recording happens in the background via `ctx.waitUntil()` so it never adds latency to the redirect itself, and it's best-effort (a logging failure never blocks or breaks the redirect).

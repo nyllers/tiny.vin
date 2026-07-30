@@ -2,6 +2,8 @@ CREATE TABLE IF NOT EXISTS login_identities (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   provider TEXT NOT NULL,
   username TEXT NOT NULL,
+  token_balance INTEGER NOT NULL DEFAULT 0,
+  generated_path_billed_through_at INTEGER,
   UNIQUE (provider, username)
 );
 
@@ -11,6 +13,7 @@ CREATE TABLE IF NOT EXISTS urls (
   original_url TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   created_by INTEGER REFERENCES login_identities(id),
+  paid_through_at INTEGER,
   PRIMARY KEY (code, kind)
 );
 
@@ -45,6 +48,18 @@ CREATE TABLE IF NOT EXISTS api_keys (
   created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS token_transactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  identity_id INTEGER NOT NULL REFERENCES login_identities(id),
+  amount INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  code TEXT,
+  kind TEXT,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_token_transactions_identity ON token_transactions(identity_id);
+
 -- Audit history: one "<table>_history" per tracked table above, holding a
 -- copy of each row's content immediately before it was updated or deleted.
 -- Populated entirely by triggers, so this happens regardless of which code
@@ -59,21 +74,23 @@ CREATE TABLE IF NOT EXISTS login_identities_history (
   id INTEGER,
   provider TEXT,
   username TEXT,
+  token_balance INTEGER,
+  generated_path_billed_through_at INTEGER,
   history_created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TRIGGER IF NOT EXISTS login_identities_history_update
 AFTER UPDATE ON login_identities
 BEGIN
-  INSERT INTO login_identities_history (id, provider, username)
-  VALUES (OLD.id, OLD.provider, OLD.username);
+  INSERT INTO login_identities_history (id, provider, username, token_balance, generated_path_billed_through_at)
+  VALUES (OLD.id, OLD.provider, OLD.username, OLD.token_balance, OLD.generated_path_billed_through_at);
 END;
 
 CREATE TRIGGER IF NOT EXISTS login_identities_history_delete
 AFTER DELETE ON login_identities
 BEGIN
-  INSERT INTO login_identities_history (id, provider, username)
-  VALUES (OLD.id, OLD.provider, OLD.username);
+  INSERT INTO login_identities_history (id, provider, username, token_balance, generated_path_billed_through_at)
+  VALUES (OLD.id, OLD.provider, OLD.username, OLD.token_balance, OLD.generated_path_billed_through_at);
 END;
 
 CREATE TABLE IF NOT EXISTS urls_history (
@@ -83,21 +100,22 @@ CREATE TABLE IF NOT EXISTS urls_history (
   original_url TEXT,
   created_at INTEGER,
   created_by INTEGER,
+  paid_through_at INTEGER,
   history_created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TRIGGER IF NOT EXISTS urls_history_update
 AFTER UPDATE ON urls
 BEGIN
-  INSERT INTO urls_history (code, kind, original_url, created_at, created_by)
-  VALUES (OLD.code, OLD.kind, OLD.original_url, OLD.created_at, OLD.created_by);
+  INSERT INTO urls_history (code, kind, original_url, created_at, created_by, paid_through_at)
+  VALUES (OLD.code, OLD.kind, OLD.original_url, OLD.created_at, OLD.created_by, OLD.paid_through_at);
 END;
 
 CREATE TRIGGER IF NOT EXISTS urls_history_delete
 AFTER DELETE ON urls
 BEGIN
-  INSERT INTO urls_history (code, kind, original_url, created_at, created_by)
-  VALUES (OLD.code, OLD.kind, OLD.original_url, OLD.created_at, OLD.created_by);
+  INSERT INTO urls_history (code, kind, original_url, created_at, created_by, paid_through_at)
+  VALUES (OLD.code, OLD.kind, OLD.original_url, OLD.created_at, OLD.created_by, OLD.paid_through_at);
 END;
 
 CREATE TABLE IF NOT EXISTS login_events_history (

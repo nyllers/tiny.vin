@@ -156,6 +156,13 @@ footer {
   text-align: center;
 }
 
+.token-indicator {
+  margin: 2.5rem 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .legal-links a {
   color: var(--muted);
   font-size: 0.7rem;
@@ -785,6 +792,69 @@ footer {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
+}
+
+.tokens-page {
+  width: 100%;
+  max-width: 740px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.tokens-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.token-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.token-line-item,
+.token-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+}
+
+.token-line-label {
+  color: var(--heading);
+  word-break: break-all;
+}
+
+.token-line-cost {
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.token-history-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.token-history-amount {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.token-history-amount--credit {
+  color: var(--heading);
+}
+
+.token-history-amount--debit {
+  color: var(--muted);
 }
 
 .breakdown-card-title {
