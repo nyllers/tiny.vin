@@ -46,7 +46,7 @@ curl -X POST https://tiny.vin/api/shorten \
   -d '{"url": "https://example.com"}'
 ```
 
-Add `"path": "my-page"` to the body for a custom path, or `"subdomain": "my-name"` for a subdomain — same fields as picking "Add Path"/"Add Subdomain" in the browser. The response carries the fully-qualified short URL both in the JSON body (`shortUrl`, scheme-less) and as a standard `Location` header (with scheme), e.g. `Location: https://tiny.vin/aZ3xQ72K`.
+Add `"path": "my-page"` to the body for a custom path, or `"subdomain": "my-name"` for a subdomain — same fields as picking "Add Path"/"Add Subdomain" in the browser. On success the response is `201 Created` with an empty body; the fully-qualified short URL is in the `Location` header, e.g. `Location: https://tiny.vin/aZ3xQ72K`. Errors (invalid URL, taken code, etc.) still come back as a JSON body with an `error` message.
 
 If the database was created before this existed, apply `migrations/0009_add_api_keys.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0009_add_api_keys.sql --remote`) in addition to `schema.sql`.
 

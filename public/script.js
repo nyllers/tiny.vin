@@ -113,6 +113,11 @@ function openQrModal(url) {
   document.addEventListener("keydown", onKeydown);
 }
 
+function codeFromLocation(location) {
+  const url = new URL(location);
+  return url.hostname === "tiny.vin" ? url.pathname.slice(1) : url.hostname.replace(/\.tiny\.vin$/, "");
+}
+
 async function generateUrl() {
   const input = document.getElementById("url-input");
   const result = document.getElementById("url-result");
@@ -141,9 +146,9 @@ async function generateUrl() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ url }),
     });
-    const data = await response.json();
 
     if (!response.ok) {
+      const data = await response.json();
       setError(data.error || "Something went wrong.");
       return;
     }
@@ -151,7 +156,7 @@ async function generateUrl() {
     input.value = "";
     setStatus("");
     updateGenerateButtonState();
-    loadHistory(data.code);
+    loadHistory(codeFromLocation(response.headers.get("Location")));
   } catch {
     setError("Network error, try again.");
   }
@@ -294,15 +299,15 @@ function createInlineCodeInputRow({ group, bodyKey, prefixText, suffixText, plac
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ url: group.originalUrl, [bodyKey]: value }),
       });
-      const data = await response.json();
 
       if (!response.ok) {
+        const data = await response.json();
         error.textContent = data.error || "Something went wrong.";
         saveBtn.disabled = false;
         return;
       }
 
-      loadHistory(data.code);
+      loadHistory(codeFromLocation(response.headers.get("Location")));
     } catch {
       error.textContent = "Network error, try again.";
       saveBtn.disabled = false;

@@ -249,9 +249,9 @@ async function insertUrl(env, { code, kind, originalUrl, createdBy }) {
     .run();
 }
 
-function shortUrlResponse(code, kind, originalUrl) {
+function shortUrlResponse(code, kind) {
   const shortUrl = formatShortUrl(code, kind);
-  return jsonResponse({ code, kind, originalUrl, shortUrl }, 200, { Location: `https://${shortUrl}` });
+  return new Response(null, { status: 201, headers: { Location: `https://${shortUrl}` } });
 }
 
 async function handleShorten(request, env, session) {
@@ -297,7 +297,7 @@ async function handleShorten(request, env, session) {
   if (subdomainCode) {
     try {
       await insertUrl(env, { code: subdomainCode, kind: "subdomain", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(subdomainCode, "subdomain", validation.url);
+      return shortUrlResponse(subdomainCode, "subdomain");
     } catch {
       return jsonResponse({ error: `"${subdomainCode}.tiny.vin" is already taken, try another.` }, 409);
     }
@@ -306,7 +306,7 @@ async function handleShorten(request, env, session) {
   if (customCode) {
     try {
       await insertUrl(env, { code: customCode, kind: "custom-path", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(customCode, "custom-path", validation.url);
+      return shortUrlResponse(customCode, "custom-path");
     } catch {
       return jsonResponse({ error: `"${customCode}" is already taken, try another.` }, 409);
     }
@@ -316,7 +316,7 @@ async function handleShorten(request, env, session) {
     const code = generateCode();
     try {
       await insertUrl(env, { code, kind: "generated-path", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(code, "generated-path", validation.url);
+      return shortUrlResponse(code, "generated-path");
     } catch {
       // code collision, retry with a new random code
     }

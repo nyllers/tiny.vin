@@ -1,24 +1,7 @@
 const SHORTEN_EXAMPLES = [
-  {
-    id: "generated-path",
-    body: { url: "https://example.com" },
-    response: {
-      code: "aZ3xQ72K",
-      kind: "generated-path",
-      originalUrl: "https://example.com",
-      shortUrl: "tiny.vin/aZ3xQ72K",
-    },
-  },
-  {
-    id: "custom-path",
-    body: { url: "https://example.com", path: "my-page" },
-    response: { code: "my-page", kind: "custom-path", originalUrl: "https://example.com", shortUrl: "tiny.vin/my-page" },
-  },
-  {
-    id: "subdomain",
-    body: { url: "https://example.com", subdomain: "my-name" },
-    response: { code: "my-name", kind: "subdomain", originalUrl: "https://example.com", shortUrl: "my-name.tiny.vin" },
-  },
+  { id: "generated-path", body: { url: "https://example.com" }, shortUrl: "tiny.vin/aZ3xQ72K" },
+  { id: "custom-path", body: { url: "https://example.com", path: "my-page" }, shortUrl: "tiny.vin/my-page" },
+  { id: "subdomain", body: { url: "https://example.com", subdomain: "my-name" }, shortUrl: "my-name.tiny.vin" },
 ];
 
 function curlExample(key, body) {
@@ -31,20 +14,14 @@ function curlExample(key, body) {
   ].join("\n");
 }
 
-function responseExample(response) {
-  return [
-    "HTTP/1.1 200 OK",
-    `Location: https://${response.shortUrl}`,
-    "Content-Type: application/json",
-    "",
-    JSON.stringify(response),
-  ].join("\n");
+function responseExample(shortUrl) {
+  return ["HTTP/1.1 201 Created", `Location: https://${shortUrl}`].join("\n");
 }
 
 function updateExamples(key) {
   for (const example of SHORTEN_EXAMPLES) {
     document.getElementById(`example-${example.id}`).textContent = curlExample(key, example.body);
-    document.getElementById(`response-${example.id}`).textContent = responseExample(example.response);
+    document.getElementById(`response-${example.id}`).textContent = responseExample(example.shortUrl);
   }
 }
 
