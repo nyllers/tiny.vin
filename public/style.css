@@ -238,6 +238,10 @@ footer {
   margin-top: 20px;
 }
 
+#api-page-heading {
+  margin-top: 20px;
+}
+
 .url-cards {
   display: flex;
   flex-wrap: wrap;
