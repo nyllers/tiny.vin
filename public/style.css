@@ -615,7 +615,6 @@ footer {
   gap: 10px;
   width: 100%;
   max-width: calc(740px - 2rem);
-  margin-bottom: 1.5rem;
 }
 
 .stat-tile {
@@ -841,6 +840,20 @@ footer {
   margin-top: 0.25rem;
   font-size: 0.7rem;
   color: var(--muted);
+}
+
+.url-chart-axis {
+  display: flex;
+  margin-top: 0.25rem;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.url-chart-axis span {
+  flex: 1;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .modal-overlay {
