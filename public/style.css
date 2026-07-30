@@ -733,8 +733,16 @@ footer {
 
 .api-key-row {
   width: 100%;
-  max-width: 26rem;
   justify-content: center;
+}
+
+.api-key-row .url-card-copy-group {
+  flex: none;
+  min-width: 0;
+}
+
+.api-page .copy-link-btn:hover {
+  opacity: 0.75;
 }
 
 .api-docs-heading {
@@ -768,6 +776,20 @@ footer {
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+.api-example-wrapper {
+  position: relative;
+}
+
+.api-example-wrapper .api-example {
+  padding-right: 2.5rem;
+}
+
+.api-example-copy {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
 }
 
 .breakdown-card-title {

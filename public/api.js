@@ -25,6 +25,16 @@ function updateExamples(key) {
   }
 }
 
+function setupExampleCopyButtons() {
+  for (const example of SHORTEN_EXAMPLES) {
+    const pre = document.getElementById(`example-${example.id}`);
+    const copyBtn = createCopyIconButton();
+    copyBtn.classList.add("api-example-copy");
+    copyBtn.addEventListener("click", () => copyTextToClipboard(pre.textContent, pre));
+    pre.parentElement.appendChild(copyBtn);
+  }
+}
+
 function renderApiKeySection(key) {
   const section = document.getElementById("api-key-section");
   section.textContent = "";
@@ -83,4 +93,5 @@ async function loadApiKey() {
   renderApiKeySection(data ? data.key : null);
 }
 
+setupExampleCopyButtons();
 loadApiKey();
