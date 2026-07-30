@@ -175,6 +175,93 @@ function createDailyChartCard(days) {
   return card;
 }
 
+const URL_CHART_LIMIT = 10;
+
+function createUrlBreakdownChart(urls) {
+  const barCount = urls.length;
+  const barWidth = (DAILY_CHART_WIDTH - DAILY_CHART_BAR_GAP * (barCount - 1)) / barCount;
+  const maxCount = Math.max(...urls.map((u) => u.totalClicks), 1);
+  const labelSpace = 11;
+  const baseline_y = DAILY_CHART_HEIGHT - 1;
+  const plotHeight = baseline_y - labelSpace;
+  const peakIndex = urls.reduce((best, u, i) => (u.totalClicks > urls[best].totalClicks ? i : best), 0);
+
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${DAILY_CHART_WIDTH} ${DAILY_CHART_HEIGHT}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("class", "daily-chart");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Redirects per original URL");
+
+  const baseline = document.createElementNS(SVG_NS, "line");
+  baseline.setAttribute("x1", "0");
+  baseline.setAttribute("x2", String(DAILY_CHART_WIDTH));
+  baseline.setAttribute("y1", String(baseline_y));
+  baseline.setAttribute("y2", String(baseline_y));
+  baseline.setAttribute("class", "daily-chart-baseline");
+  svg.appendChild(baseline);
+
+  urls.forEach((urlGroup, i) => {
+    const x = i * (barWidth + DAILY_CHART_BAR_GAP);
+    const barHeight = urlGroup.totalClicks > 0 ? Math.max((urlGroup.totalClicks / maxCount) * (plotHeight - 2), 3) : 0;
+    const barTop = baseline_y - barHeight;
+
+    const col = document.createElementNS(SVG_NS, "g");
+    col.setAttribute("class", "daily-chart-col");
+
+    if (barHeight > 0) {
+      const bar = document.createElementNS(SVG_NS, "path");
+      bar.setAttribute("class", "daily-chart-bar");
+      bar.setAttribute("d", roundedTopBarPath(x, barTop, barWidth, barHeight, 4));
+      col.appendChild(bar);
+    }
+
+    if (urlGroup.totalClicks > 0 && i === peakIndex) {
+      const peakLabel = document.createElementNS(SVG_NS, "text");
+      peakLabel.setAttribute("class", "chart-value-label");
+      peakLabel.setAttribute("x", String(x + barWidth / 2));
+      peakLabel.setAttribute("y", String(barTop - 3));
+      peakLabel.setAttribute("text-anchor", "middle");
+      peakLabel.textContent = String(urlGroup.totalClicks);
+      col.appendChild(peakLabel);
+    }
+
+    const hit = document.createElementNS(SVG_NS, "rect");
+    hit.setAttribute("class", "daily-chart-hit");
+    hit.setAttribute("x", String(x));
+    hit.setAttribute("y", "0");
+    hit.setAttribute("width", String(barWidth));
+    hit.setAttribute("height", String(DAILY_CHART_HEIGHT));
+    hit.setAttribute("tabindex", "0");
+    hit.setAttribute("role", "img");
+    const label = `${urlGroup.originalUrl}: ${urlGroup.totalClicks} redirect${urlGroup.totalClicks === 1 ? "" : "s"}`;
+    hit.setAttribute("aria-label", label);
+
+    const titleEl = document.createElementNS(SVG_NS, "title");
+    titleEl.textContent = label;
+    hit.appendChild(titleEl);
+
+    col.appendChild(hit);
+    svg.appendChild(col);
+  });
+
+  return svg;
+}
+
+function createUrlBreakdownChartCard(urls) {
+  const card = document.createElement("div");
+  card.className = "url-card";
+
+  const title = document.createElement("p");
+  title.className = "breakdown-card-title";
+  title.textContent = "Redirects per URL";
+
+  const chart = createUrlBreakdownChart(urls.slice(0, URL_CHART_LIMIT));
+
+  card.append(title, chart);
+  return card;
+}
+
 function createSummaryTile(label, value) {
   const tile = document.createElement("div");
   tile.className = "stat-tile";
@@ -216,8 +303,15 @@ async function loadStats() {
     return;
   }
 
+  const breakdownCards = [];
   if (data.dailyRedirects.some((d) => d.count > 0)) {
-    list.append(createCardsSection("BREAKDOWN", [data.dailyRedirects], createDailyChartCard));
+    breakdownCards.push(createDailyChartCard(data.dailyRedirects));
+  }
+  if (data.totalClicks > 0) {
+    breakdownCards.push(createUrlBreakdownChartCard(data.urls));
+  }
+  if (breakdownCards.length > 0) {
+    list.append(createCardsSectionFromElements("BREAKDOWN", breakdownCards));
   }
 
   list.append(createCardsSection("REDIRECTS BY URL", data.urls, createStatCard));
