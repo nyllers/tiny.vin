@@ -176,7 +176,7 @@ function createDailyChartCard(days) {
 }
 
 const URL_CHART_LIMIT = 10;
-const URL_CHART_LABEL_MAX_CHARS = 6;
+const URL_CHART_LABEL_MAX_CHARS = 8;
 
 function truncateCode(code) {
   return code.length > URL_CHART_LABEL_MAX_CHARS ? `${code.slice(0, URL_CHART_LABEL_MAX_CHARS)}…` : code;
