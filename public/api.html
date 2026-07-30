@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>tiny.vin — Statistics</title>
-  <meta name="description" content="View redirect statistics for the tiny URLs you've created on tiny.vin.">
+  <title>tiny.vin — API</title>
+  <meta name="description" content="Generate an API key and create tiny URLs from the command line with curl.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <script src="theme-init.js"></script>
@@ -52,15 +52,30 @@
     <button type="button" class="theme-btn" data-theme-value="light">Light</button>
     <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
   </div>
-  <h2 class="section-heading" id="stats-page-heading">STATISTICS</h2>
-  <section class="stats-summary" id="stats-summary"></section>
-  <section class="history-panel" id="stats-panel">
-    <div id="stats-list"></div>
-  </section>
+  <h2 class="section-heading">API</h2>
+  <main class="api-page">
+    <section class="api-key-section" id="api-key-section"></section>
+    <section class="api-docs">
+      <h3 class="api-docs-heading">Create a generated short URL</h3>
+      <pre class="api-example" id="example-generated-path"></pre>
+      <p class="api-example-label">Response</p>
+      <pre class="api-example" id="response-generated-path"></pre>
+
+      <h3 class="api-docs-heading">Create a custom path</h3>
+      <pre class="api-example" id="example-custom-path"></pre>
+      <p class="api-example-label">Response</p>
+      <pre class="api-example" id="response-custom-path"></pre>
+
+      <h3 class="api-docs-heading">Create a subdomain</h3>
+      <pre class="api-example" id="example-subdomain"></pre>
+      <p class="api-example-label">Response</p>
+      <pre class="api-example" id="response-subdomain"></pre>
+    </section>
+  </main>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
   <footer>Simple project by Anders &amp; Claude</footer>
   <script src="cards.js"></script>
-  <script src="stats.js"></script>
+  <script src="api.js"></script>
   <script src="theme.js"></script>
   <script src="nav.js"></script>
 </body>

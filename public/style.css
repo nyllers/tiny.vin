@@ -700,6 +700,71 @@ footer {
   font-size: 0.9rem;
 }
 
+.api-page {
+  width: 100%;
+  max-width: 740px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.api-key-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+}
+
+.api-key-intro {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.api-key-row {
+  width: 100%;
+  max-width: 26rem;
+  justify-content: center;
+}
+
+.api-docs-heading {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.api-docs-heading:first-child {
+  margin-top: 0;
+}
+
+.api-example {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.api-example-label {
+  margin: 0.75rem 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .breakdown-card-title {
   margin: 0;
   font-size: 0.75rem;

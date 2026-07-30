@@ -39,6 +39,12 @@ CREATE TABLE IF NOT EXISTS redirect_events (
 
 CREATE INDEX IF NOT EXISTS idx_redirect_events_code ON redirect_events(code, kind);
 
+CREATE TABLE IF NOT EXISTS api_keys (
+  identity_id INTEGER PRIMARY KEY REFERENCES login_identities(id),
+  key TEXT NOT NULL UNIQUE,
+  created_at INTEGER NOT NULL
+);
+
 -- Audit history: one "<table>_history" per tracked table above, holding a
 -- copy of each row's content immediately before it was updated or deleted.
 -- Populated entirely by triggers, so this happens regardless of which code
@@ -148,4 +154,26 @@ BEGIN
     (id, code, kind, requested_at, ip_address, country, user_agent, referer, headers, cf_data)
   VALUES
     (OLD.id, OLD.code, OLD.kind, OLD.requested_at, OLD.ip_address, OLD.country, OLD.user_agent, OLD.referer, OLD.headers, OLD.cf_data);
+END;
+
+CREATE TABLE IF NOT EXISTS api_keys_history (
+  history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  identity_id INTEGER,
+  key TEXT,
+  created_at INTEGER,
+  history_created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TRIGGER IF NOT EXISTS api_keys_history_update
+AFTER UPDATE ON api_keys
+BEGIN
+  INSERT INTO api_keys_history (identity_id, key, created_at)
+  VALUES (OLD.identity_id, OLD.key, OLD.created_at);
+END;
+
+CREATE TRIGGER IF NOT EXISTS api_keys_history_delete
+AFTER DELETE ON api_keys
+BEGIN
+  INSERT INTO api_keys_history (identity_id, key, created_at)
+  VALUES (OLD.identity_id, OLD.key, OLD.created_at);
 END;
