@@ -457,6 +457,23 @@ footer {
   border-radius: 999px;
 }
 
+.donate-nav {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+}
+
+#donate-button-container img {
+  display: block;
+  cursor: pointer;
+}
+
+#donate-button-container img:hover {
+  opacity: 0.85;
+}
+
 .theme-btn {
   padding: 0.25rem 0.75rem;
   font-size: 0.75rem;

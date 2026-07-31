@@ -91,6 +91,11 @@ function loginPage(errorCode) {
     <button type="button" class="theme-btn" data-theme-value="light">Light</button>
     <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
   </div>
+  <div class="donate-nav">
+    <div id="donate-button-container">
+      <div id="donate-button"></div>
+    </div>
+  </div>
   <main class="panel">
     <p class="heading-large">tiny<span class="heading-large-accent-dot">.</span>vin</p>
     <p class="login-instruction">Sign in and paste or enter a URL to shorten it. Then share it &ndash; it's available to everyone!</p>
@@ -114,6 +119,8 @@ function loginPage(errorCode) {
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
   <footer>Simple project by Anders &amp; Claude</footer>
   <script src="/theme.js"></script>
+  <script src="https://www.paypalobjects.com/donate/sdk/donate-sdk.js" charset="UTF-8"></script>
+  <script src="/donate-button.js"></script>
 </body>
 </html>`;
 }
