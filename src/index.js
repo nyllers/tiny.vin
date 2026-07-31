@@ -92,9 +92,7 @@ function loginPage(errorCode) {
     <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
   </div>
   <div class="donate-nav">
-    <div id="donate-button-container">
-      <div id="donate-button"></div>
-    </div>
+    <div id="donate-button-container"></div>
   </div>
   <main class="panel">
     <p class="heading-large">tiny<span class="heading-large-accent-dot">.</span>vin</p>

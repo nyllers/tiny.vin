@@ -467,6 +467,8 @@ footer {
 
 #donate-button-container img {
   display: block;
+  width: 70px;
+  height: 32px;
   cursor: pointer;
 }
 
