@@ -93,6 +93,20 @@ async function generateUrl() {
     return;
   }
 
+  const tokenInfo = window.tokenInfo || (typeof loadTokenIndicator === "function" ? await loadTokenIndicator() : null);
+  if (tokenInfo) {
+    const gpCosts = tokenInfo.costs["generated-path"];
+    if (tokenInfo.generatedPathCount >= gpCosts.freeLimit) {
+      const confirmed = await confirmAction(
+        `Your first ${gpCosts.freeLimit} generated paths are free. This will be number ${
+          tokenInfo.generatedPathCount + 1
+        }, so it costs ${gpCosts.create} tokens now and ${gpCosts.upkeepPerExtra} token/month to keep.`,
+        { confirmLabel: "Create" }
+      );
+      if (!confirmed) return;
+    }
+  }
+
   setStatus("Checking that page exists...");
 
   try {
@@ -112,6 +126,7 @@ async function generateUrl() {
     setStatus("");
     updateGenerateButtonState();
     loadHistory(codeFromLocation(response.headers.get("Location")));
+    if (typeof loadTokenIndicator === "function") loadTokenIndicator();
   } catch {
     setError("Network error, try again.");
   }
@@ -176,6 +191,35 @@ async function deleteUrl(code, kind, shortUrl) {
       return;
     }
     loadHistory();
+    if (typeof loadTokenIndicator === "function") loadTokenIndicator();
+  } catch {
+    alert("Network error, try again.");
+  }
+}
+
+function createReactivateButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-btn cancel-btn";
+  button.innerHTML = `<span>Reactivate</span>`;
+  return button;
+}
+
+async function reactivateUrl(code, kind, cost) {
+  const confirmed = await confirmAction(`Reactivating this costs ${cost} token${cost === 1 ? "" : "s"}.`, {
+    confirmLabel: "Reactivate",
+  });
+  if (!confirmed) return;
+
+  try {
+    const response = await fetch(`/api/urls/${code}/reactivate?kind=${kind}`, { method: "POST" });
+    if (!response.ok) {
+      const data = await response.json();
+      alert(data.error || "Could not reactivate that URL, try again.");
+      return;
+    }
+    loadHistory();
+    if (typeof loadTokenIndicator === "function") loadTokenIndicator();
   } catch {
     alert("Network error, try again.");
   }
@@ -186,14 +230,22 @@ function createShortUrlRow(shortUrlItem) {
   shortCopyRow.className = "url-card-copy-row";
 
   const shortUrlGroup = createCopyableTextGroup(shortUrlItem.shortUrl);
-
-  const qrBtn = createQrIconButton();
-  qrBtn.addEventListener("click", () => openQrModal(`https://${shortUrlItem.shortUrl}`));
-
   const deleteBtn = createDeleteIconButton();
   deleteBtn.addEventListener("click", () => deleteUrl(shortUrlItem.code, shortUrlItem.kind, shortUrlItem.shortUrl));
 
-  shortCopyRow.append(qrBtn, shortUrlGroup, deleteBtn);
+  if (shortUrlItem.deactivatedAt) {
+    shortCopyRow.classList.add("url-card-copy-row--deactivated");
+    const reactivateBtn = createReactivateButton();
+    reactivateBtn.addEventListener("click", () =>
+      reactivateUrl(shortUrlItem.code, shortUrlItem.kind, shortUrlItem.reactivateCost)
+    );
+    shortCopyRow.append(reactivateBtn, shortUrlGroup, deleteBtn);
+  } else {
+    const qrBtn = createQrIconButton();
+    qrBtn.addEventListener("click", () => openQrModal(`https://${shortUrlItem.shortUrl}`));
+    shortCopyRow.append(qrBtn, shortUrlGroup, deleteBtn);
+  }
+
   return shortCopyRow;
 }
 
@@ -245,6 +297,17 @@ function createInlineCodeInputRow({ group, bodyKey, prefixText, suffixText, plac
       return;
     }
 
+    const kind = bodyKey === "path" ? "custom-path" : "subdomain";
+    const tokenInfo = window.tokenInfo || (typeof loadTokenIndicator === "function" ? await loadTokenIndicator() : null);
+    if (tokenInfo) {
+      const costs = tokenInfo.costs[kind];
+      const confirmed = await confirmAction(
+        `This costs ${costs.create} tokens now and ${costs.upkeep} token${costs.upkeep === 1 ? "" : "s"}/month to keep.`,
+        { confirmLabel: "Save" }
+      );
+      if (!confirmed) return;
+    }
+
     saveBtn.disabled = true;
     error.textContent = "";
 
@@ -263,6 +326,7 @@ function createInlineCodeInputRow({ group, bodyKey, prefixText, suffixText, plac
       }
 
       loadHistory(codeFromLocation(response.headers.get("Location")));
+      if (typeof loadTokenIndicator === "function") loadTokenIndicator();
     } catch {
       error.textContent = "Network error, try again.";
       saveBtn.disabled = false;

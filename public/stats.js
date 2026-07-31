@@ -284,19 +284,6 @@ function createUrlBreakdownChartCard(entries) {
   return card;
 }
 
-function createSummaryTile(label, value) {
-  const tile = document.createElement("div");
-  tile.className = "stat-tile";
-  const valueEl = document.createElement("span");
-  valueEl.className = "stat-tile-value";
-  valueEl.textContent = value;
-  const labelEl = document.createElement("span");
-  labelEl.className = "stat-tile-label";
-  labelEl.textContent = label;
-  tile.append(valueEl, labelEl);
-  return tile;
-}
-
 async function loadStats() {
   const summary = document.getElementById("stats-summary");
   const panel = document.getElementById("stats-panel");

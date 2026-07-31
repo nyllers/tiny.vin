@@ -8,6 +8,19 @@ async function fetchJsonOrNull(url) {
   }
 }
 
+function createSummaryTile(label, value) {
+  const tile = document.createElement("div");
+  tile.className = "stat-tile";
+  const valueEl = document.createElement("span");
+  valueEl.className = "stat-tile-value";
+  valueEl.textContent = value;
+  const labelEl = document.createElement("span");
+  labelEl.className = "stat-tile-label";
+  labelEl.textContent = label;
+  tile.append(valueEl, labelEl);
+  return tile;
+}
+
 function createOriginalUrlRow(originalUrl) {
   const row = document.createElement("div");
   row.className = "url-card-row";

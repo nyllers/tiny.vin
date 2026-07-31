@@ -156,6 +156,13 @@ footer {
   text-align: center;
 }
 
+.token-indicator {
+  margin: 2.5rem 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .legal-links a {
   color: var(--muted);
   font-size: 0.7rem;
@@ -390,6 +397,11 @@ footer {
   align-items: center;
   justify-content: space-between;
   gap: 0.4rem;
+}
+
+.url-card-copy-row--deactivated .url-card-value {
+  color: var(--muted);
+  text-decoration: line-through;
 }
 
 .url-card-row--tiny > .url-card-copy-row {
@@ -785,6 +797,107 @@ footer {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
+}
+
+.tokens-page {
+  width: 100%;
+  max-width: 740px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.tokens-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.token-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.token-line-item,
+.token-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+}
+
+.token-line-label {
+  color: var(--heading);
+  word-break: break-all;
+}
+
+.token-line-cost {
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.token-history-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.token-history-amount {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.token-history-amount--credit {
+  color: var(--heading);
+}
+
+.token-history-amount--debit {
+  color: var(--muted);
+}
+
+.token-packages {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.5rem;
+}
+
+.token-package {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.token-package:hover {
+  border-color: var(--heading);
+}
+
+.token-package:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.token-package-tokens {
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.token-package-price {
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 .breakdown-card-title {

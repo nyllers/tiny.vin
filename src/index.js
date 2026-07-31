@@ -9,10 +9,28 @@ const CODE_PATTERN = /^\/([A-Za-z0-9]{1,32})$/;
 const SUBDOMAIN_REDIRECT_PATTERN = /^\/subdomain\/([a-z0-9-]{1,63})$/;
 const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
 const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9-]+)$/;
-const RESERVED_CODES = new Set(["login", "subdomain", "stats", "privacy", "terms", "api"]);
-const PROTECTED_PAGES = new Set(["/", "/stats", "/stats.html", "/api", "/api.html"]);
+const REACTIVATE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9-]+)\/reactivate$/;
+const RESERVED_CODES = new Set(["login", "subdomain", "stats", "privacy", "terms", "api", "tokens"]);
+const PROTECTED_PAGES = new Set(["/", "/stats", "/stats.html", "/api", "/api.html", "/tokens", "/tokens.html"]);
 const API_KEY_PATTERN = /^tvk_[0-9a-f]{48}$/;
 const VALID_KINDS = new Set(["generated-path", "custom-path", "subdomain"]);
+
+const TOKEN_COSTS = {
+  "custom-path": { create: 25, upkeep: 10 },
+  subdomain: { create: 50, upkeep: 20 },
+};
+const GENERATED_PATH_FREE_LIMIT = 5;
+const GENERATED_PATH_CREATE_COST = 10;
+const GENERATED_PATH_UPKEEP_PER_EXTRA = 1;
+const SIGNUP_BONUS_TOKENS = 100;
+const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+const LOW_BALANCE_WARNING_DAYS = 50;
+const TOKEN_PACKAGES = [
+  { tokens: 100, priceUsdCents: 200 },
+  { tokens: 500, priceUsdCents: 900 },
+  { tokens: 1200, priceUsdCents: 2100 },
+  { tokens: 3000, priceUsdCents: 5000 },
+];
 
 const LOGIN_ERRORS = {
   oauth_failed: "Something went wrong signing in. Please try again.",
@@ -241,17 +259,81 @@ function formatShortUrl(code, kind) {
   return kind === "subdomain" ? `${code}.tiny.vin` : `tiny.vin/${code}`;
 }
 
-async function insertUrl(env, { code, kind, originalUrl, createdBy }) {
+async function insertUrl(env, { code, kind, originalUrl, createdBy, paidThroughAt = null }) {
   await env.DB.prepare(
-    "INSERT INTO urls (code, kind, original_url, created_at, created_by) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO urls (code, kind, original_url, created_at, created_by, paid_through_at) VALUES (?, ?, ?, ?, ?, ?)"
   )
-    .bind(code, kind, originalUrl, Date.now(), createdBy)
+    .bind(code, kind, originalUrl, Date.now(), createdBy, paidThroughAt)
     .run();
 }
 
 function shortUrlResponse(code, kind) {
   const shortUrl = formatShortUrl(code, kind);
   return new Response(null, { status: 201, headers: { Location: `https://${shortUrl}` } });
+}
+
+async function getTokenBalance(env, identityId) {
+  const row = await env.DB.prepare("SELECT token_balance FROM login_identities WHERE id = ?")
+    .bind(identityId)
+    .first();
+  return row ? row.token_balance : 0;
+}
+
+async function logTokenEvent(env, identityId, amount, reason, { code = null, kind = null } = {}) {
+  await env.DB.prepare(
+    "INSERT INTO token_transactions (identity_id, amount, reason, code, kind, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+  )
+    .bind(identityId, amount, reason, code, kind, Date.now())
+    .run();
+}
+
+async function debitTokens(env, identityId, amount, reason, extra = {}) {
+  await env.DB.prepare("UPDATE login_identities SET token_balance = token_balance - ? WHERE id = ?")
+    .bind(amount, identityId)
+    .run();
+  await logTokenEvent(env, identityId, -amount, reason, extra);
+}
+
+async function countGeneratedPaths(env, identityId) {
+  const row = await env.DB.prepare(
+    "SELECT COUNT(*) AS cnt FROM urls WHERE created_by = ? AND kind = 'generated-path' AND deactivated_at IS NULL"
+  )
+    .bind(identityId)
+    .first();
+  return row.cnt;
+}
+
+function generatedPathMonthlyUpkeep(count) {
+  return Math.max(0, count - GENERATED_PATH_FREE_LIMIT) * GENERATED_PATH_UPKEEP_PER_EXTRA;
+}
+
+async function createShortUrl(env, { code, kind, originalUrl, createdBy }) {
+  const balance = await getTokenBalance(env, createdBy);
+
+  let cost;
+  let paidThroughAt = null;
+  if (kind === "generated-path") {
+    const existingCount = await countGeneratedPaths(env, createdBy);
+    cost = existingCount >= GENERATED_PATH_FREE_LIMIT ? GENERATED_PATH_CREATE_COST : 0;
+  } else {
+    cost = TOKEN_COSTS[kind].create;
+    paidThroughAt = Date.now() + ONE_MONTH_MS;
+  }
+
+  if (balance < cost) {
+    return { insufficientBalance: true, balance, cost };
+  }
+
+  try {
+    await insertUrl(env, { code, kind, originalUrl, createdBy, paidThroughAt });
+  } catch {
+    return { conflict: true };
+  }
+
+  if (cost > 0) {
+    await debitTokens(env, createdBy, cost, `create_${kind}`, { code, kind });
+  }
+  return { ok: true };
 }
 
 async function handleShorten(request, env, session) {
@@ -295,31 +377,44 @@ async function handleShorten(request, env, session) {
   const createdBy = await getOrCreateIdentityId(env, session.provider, session.email);
 
   if (subdomainCode) {
-    try {
-      await insertUrl(env, { code: subdomainCode, kind: "subdomain", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(subdomainCode, "subdomain");
-    } catch {
+    const result = await createShortUrl(env, { code: subdomainCode, kind: "subdomain", originalUrl: validation.url, createdBy });
+    if (result.insufficientBalance) {
+      return jsonResponse(
+        { error: `Adding a subdomain costs ${result.cost} tokens, but you only have ${result.balance}.` },
+        402
+      );
+    }
+    if (result.conflict) {
       return jsonResponse({ error: `"${subdomainCode}.tiny.vin" is already taken, try another.` }, 409);
     }
+    return shortUrlResponse(subdomainCode, "subdomain");
   }
 
   if (customCode) {
-    try {
-      await insertUrl(env, { code: customCode, kind: "custom-path", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(customCode, "custom-path");
-    } catch {
+    const result = await createShortUrl(env, { code: customCode, kind: "custom-path", originalUrl: validation.url, createdBy });
+    if (result.insufficientBalance) {
+      return jsonResponse(
+        { error: `Adding a custom path costs ${result.cost} tokens, but you only have ${result.balance}.` },
+        402
+      );
+    }
+    if (result.conflict) {
       return jsonResponse({ error: `"${customCode}" is already taken, try another.` }, 409);
     }
+    return shortUrlResponse(customCode, "custom-path");
   }
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const code = generateCode();
-    try {
-      await insertUrl(env, { code, kind: "generated-path", originalUrl: validation.url, createdBy });
-      return shortUrlResponse(code, "generated-path");
-    } catch {
-      // code collision, retry with a new random code
+    const result = await createShortUrl(env, { code, kind: "generated-path", originalUrl: validation.url, createdBy });
+    if (result.insufficientBalance) {
+      return jsonResponse(
+        { error: `Creating another tiny URL costs ${result.cost} tokens, but you only have ${result.balance}.` },
+        402
+      );
     }
+    if (result.conflict) continue;
+    return shortUrlResponse(code, "generated-path");
   }
 
   return jsonResponse({ error: "Could not generate a unique code, try again" }, 500);
@@ -388,7 +483,7 @@ async function handleHistory(env, session) {
   const identityId = await getIdentityId(env, session.provider, session.email);
 
   const { results } = await env.DB.prepare(
-    "SELECT code, kind, original_url, created_at FROM urls WHERE created_by = ? ORDER BY created_at DESC"
+    "SELECT code, kind, original_url, created_at, deactivated_at FROM urls WHERE created_by = ? ORDER BY created_at DESC"
   )
     .bind(identityId)
     .all();
@@ -398,6 +493,8 @@ async function handleHistory(env, session) {
     kind: row.kind,
     shortUrl: formatShortUrl(row.code, row.kind),
     createdAt: row.created_at,
+    deactivatedAt: row.deactivated_at,
+    reactivateCost: row.kind === "generated-path" ? GENERATED_PATH_UPKEEP_PER_EXTRA : TOKEN_COSTS[row.kind].upkeep,
   }));
 
   const urls = Array.from(groups, ([originalUrl, shortUrls]) => ({
@@ -561,6 +658,240 @@ async function handleDeleteUrl(code, kind, env, session) {
   return jsonResponse({ ok: true });
 }
 
+async function handleReactivateUrl(code, kind, env, session) {
+  const identityId = await getIdentityId(env, session.provider, session.email);
+
+  const row = await env.DB.prepare("SELECT deactivated_at FROM urls WHERE code = ? AND kind = ? AND created_by = ?")
+    .bind(code, kind, identityId)
+    .first();
+
+  if (!row) {
+    return jsonResponse({ error: "Not found" }, 404);
+  }
+  if (!row.deactivated_at) {
+    return jsonResponse({ error: "This URL is already active." }, 400);
+  }
+
+  const cost = kind === "generated-path" ? GENERATED_PATH_UPKEEP_PER_EXTRA : TOKEN_COSTS[kind].upkeep;
+  const balance = await getTokenBalance(env, identityId);
+  if (balance < cost) {
+    return jsonResponse({ error: `Reactivating this costs ${cost} tokens, but you only have ${balance}.` }, 402);
+  }
+
+  const paidThroughAt = kind === "generated-path" ? null : Date.now() + ONE_MONTH_MS;
+  await env.DB.prepare("UPDATE urls SET deactivated_at = NULL, paid_through_at = ? WHERE code = ? AND kind = ?")
+    .bind(paidThroughAt, code, kind)
+    .run();
+
+  await debitTokens(env, identityId, cost, `reactivate_${kind}`, { code, kind });
+
+  return jsonResponse({ ok: true });
+}
+
+async function handleTokens(env, session) {
+  const identityId = await getIdentityId(env, session.provider, session.email);
+  const balance = await getTokenBalance(env, identityId);
+
+  const { results: billedUrls } = await env.DB.prepare(
+    `SELECT code, kind, original_url FROM urls
+     WHERE created_by = ? AND paid_through_at IS NOT NULL AND deactivated_at IS NULL
+     ORDER BY created_at ASC`
+  )
+    .bind(identityId)
+    .all();
+
+  const breakdown = billedUrls.map((row) => ({
+    kind: row.kind,
+    code: row.code,
+    shortUrl: formatShortUrl(row.code, row.kind),
+    originalUrl: row.original_url,
+    monthlyCost: TOKEN_COSTS[row.kind].upkeep,
+  }));
+
+  let monthlyBurn = breakdown.reduce((sum, entry) => sum + entry.monthlyCost, 0);
+
+  const generatedPathCount = await countGeneratedPaths(env, identityId);
+  const generatedPathBillable = Math.max(0, generatedPathCount - GENERATED_PATH_FREE_LIMIT);
+  if (generatedPathBillable > 0) {
+    const monthlyCost = generatedPathBillable * GENERATED_PATH_UPKEEP_PER_EXTRA;
+    monthlyBurn += monthlyCost;
+    breakdown.push({
+      kind: "generated-path",
+      count: generatedPathCount,
+      freeLimit: GENERATED_PATH_FREE_LIMIT,
+      billableCount: generatedPathBillable,
+      monthlyCost,
+    });
+  }
+
+  const { results: historyRows } = await env.DB.prepare(
+    "SELECT amount, reason, code, kind, created_at FROM token_transactions WHERE identity_id = ? ORDER BY created_at DESC, id DESC"
+  )
+    .bind(identityId)
+    .all();
+
+  const history = historyRows.map((row) => ({
+    amount: row.amount,
+    reason: row.reason,
+    code: row.code,
+    kind: row.kind,
+    shortUrl: row.code && row.kind ? formatShortUrl(row.code, row.kind) : null,
+    createdAt: row.created_at,
+  }));
+
+  return jsonResponse({
+    balance,
+    monthlyBurn,
+    breakdown,
+    history,
+    generatedPathCount,
+    costs: {
+      "custom-path": TOKEN_COSTS["custom-path"],
+      subdomain: TOKEN_COSTS.subdomain,
+      "generated-path": {
+        freeLimit: GENERATED_PATH_FREE_LIMIT,
+        create: GENERATED_PATH_CREATE_COST,
+        upkeepPerExtra: GENERATED_PATH_UPKEEP_PER_EXTRA,
+      },
+    },
+    packages: TOKEN_PACKAGES,
+  });
+}
+
+async function createLemonSqueezyCheckout(env, { identityId, tokens, priceUsdCents }) {
+  const body = {
+    data: {
+      type: "checkouts",
+      attributes: {
+        custom_price: priceUsdCents,
+        product_options: {
+          name: `${tokens} tiny.vin tokens`,
+          redirect_url: `${env.SITE_URL}/tokens?purchase=success`,
+        },
+        checkout_data: {
+          custom: { identity_id: String(identityId), tokens: String(tokens) },
+        },
+      },
+      relationships: {
+        store: { data: { type: "stores", id: String(env.LEMONSQUEEZY_STORE_ID) } },
+        variant: { data: { type: "variants", id: String(env.LEMONSQUEEZY_VARIANT_ID) } },
+      },
+    },
+  };
+
+  const response = await fetch("https://api.lemonsqueezy.com/v1/checkouts", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.LEMONSQUEEZY_API_KEY}`,
+      Accept: "application/vnd.api+json",
+      "Content-Type": "application/vnd.api+json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Lemon Squeezy checkout creation failed: ${response.status}`);
+  }
+
+  const checkout = await response.json();
+  return checkout.data.attributes.url;
+}
+
+async function handleTokenCheckout(request, env, session) {
+  if (!env.LEMONSQUEEZY_API_KEY || !env.LEMONSQUEEZY_STORE_ID || !env.LEMONSQUEEZY_VARIANT_ID) {
+    return jsonResponse({ error: "Token purchases aren't set up yet." }, 503);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
+  }
+
+  const pkg = TOKEN_PACKAGES.find((p) => p.tokens === body.tokens);
+  if (!pkg) {
+    return jsonResponse({ error: "Invalid token package" }, 400);
+  }
+
+  const identityId = await getOrCreateIdentityId(env, session.provider, session.email);
+
+  try {
+    const checkoutUrl = await createLemonSqueezyCheckout(env, {
+      identityId,
+      tokens: pkg.tokens,
+      priceUsdCents: pkg.priceUsdCents,
+    });
+    return jsonResponse({ url: checkoutUrl });
+  } catch {
+    return jsonResponse({ error: "Could not start checkout, try again." }, 502);
+  }
+}
+
+async function verifyLemonSqueezySignature(rawBody, signatureHeader, secret) {
+  if (!signatureHeader || !/^[0-9a-f]+$/i.test(signatureHeader) || signatureHeader.length % 2 !== 0) return false;
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["verify"]
+  );
+
+  const signatureBytes = new Uint8Array(signatureHeader.match(/.{2}/g).map((byte) => parseInt(byte, 16)));
+
+  return crypto.subtle.verify("HMAC", key, signatureBytes, new TextEncoder().encode(rawBody));
+}
+
+async function handleLemonSqueezyWebhook(request, env) {
+  if (!env.LEMONSQUEEZY_WEBHOOK_SECRET) {
+    return new Response("Not configured", { status: 503 });
+  }
+
+  const rawBody = await request.text();
+  const signatureHeader = request.headers.get("X-Signature") || "";
+
+  const valid = await verifyLemonSqueezySignature(rawBody, signatureHeader, env.LEMONSQUEEZY_WEBHOOK_SECRET);
+  if (!valid) {
+    return new Response("Invalid signature", { status: 400 });
+  }
+
+  let event;
+  try {
+    event = JSON.parse(rawBody);
+  } catch {
+    return new Response("Invalid JSON", { status: 400 });
+  }
+
+  const eventName = event.meta?.event_name;
+  const orderId = event.data?.id;
+
+  try {
+    await env.DB.prepare("INSERT INTO payment_webhook_events (event_key, created_at) VALUES (?, ?)")
+      .bind(`${eventName}:${orderId}`, Date.now())
+      .run();
+  } catch {
+    // UNIQUE constraint hit: already delivered (or retried) this event, skip reprocessing
+    return new Response("OK", { status: 200 });
+  }
+
+  if (eventName === "order_created" && event.data?.attributes?.status === "paid") {
+    const customData = event.meta?.custom_data || {};
+    const identityId = Number(customData.identity_id);
+    const tokens = Number(customData.tokens);
+
+    if (identityId && tokens > 0) {
+      await env.DB.prepare("UPDATE login_identities SET token_balance = token_balance + ? WHERE id = ?")
+        .bind(tokens, identityId)
+        .run();
+      await logTokenEvent(env, identityId, tokens, "purchase");
+    }
+  }
+
+  return new Response("OK", { status: 200 });
+}
+
 async function recordRedirectEvent(env, { code, kind, request }) {
   try {
     const headers = JSON.stringify(Object.fromEntries(request.headers.entries()));
@@ -585,7 +916,7 @@ async function recordRedirectEvent(env, { code, kind, request }) {
 async function handleRedirect(code, kinds, env, ctx, request) {
   const placeholders = kinds.map(() => "?").join(", ");
   const row = await env.DB.prepare(
-    `SELECT kind, original_url FROM urls WHERE code = ? AND kind IN (${placeholders})`
+    `SELECT kind, original_url FROM urls WHERE code = ? AND kind IN (${placeholders}) AND deactivated_at IS NULL`
   )
     .bind(code, ...kinds)
     .first();
@@ -614,13 +945,22 @@ function handleAuthStart(url, env) {
 }
 
 async function getOrCreateIdentityId(env, provider, username) {
-  await env.DB.prepare(
-    "INSERT INTO login_identities (provider, username) VALUES (?, ?) ON CONFLICT (provider, username) DO NOTHING"
+  const now = Date.now();
+  const result = await env.DB.prepare(
+    `INSERT INTO login_identities (provider, username, token_balance, generated_path_billed_through_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT (provider, username) DO NOTHING`
   )
-    .bind(provider, username)
+    .bind(provider, username, SIGNUP_BONUS_TOKENS, now + ONE_MONTH_MS)
     .run();
 
-  return getIdentityId(env, provider, username);
+  const identityId = await getIdentityId(env, provider, username);
+
+  if (result.meta.changes > 0) {
+    await logTokenEvent(env, identityId, SIGNUP_BONUS_TOKENS, "signup_bonus");
+  }
+
+  return identityId;
 }
 
 async function recordLogin(env, provider, username, ipAddress) {
@@ -668,6 +1008,179 @@ async function handleAuthCallback(url, request, env) {
   } catch {
     return Response.redirect(`${url.origin}/login?error=oauth_failed`, 302);
   }
+}
+
+async function billUrlUpkeep(env, row, now) {
+  let paidThroughAt = row.paid_through_at;
+
+  while (paidThroughAt <= now) {
+    const upkeepCost = TOKEN_COSTS[row.kind].upkeep;
+    const balance = await getTokenBalance(env, row.created_by);
+    if (balance < upkeepCost) {
+      await env.DB.prepare("UPDATE urls SET deactivated_at = ? WHERE code = ? AND kind = ?")
+        .bind(now, row.code, row.kind)
+        .run();
+      await logTokenEvent(env, row.created_by, 0, "deactivated_insufficient_balance", {
+        code: row.code,
+        kind: row.kind,
+      });
+      return;
+    }
+    await debitTokens(env, row.created_by, upkeepCost, `upkeep_${row.kind}`, { code: row.code, kind: row.kind });
+    paidThroughAt += ONE_MONTH_MS;
+  }
+
+  await env.DB.prepare("UPDATE urls SET paid_through_at = ? WHERE code = ? AND kind = ?")
+    .bind(paidThroughAt, row.code, row.kind)
+    .run();
+}
+
+async function getBillableGeneratedPaths(env, identityId) {
+  const { results } = await env.DB.prepare(
+    `SELECT code FROM urls WHERE created_by = ? AND kind = 'generated-path' AND deactivated_at IS NULL
+     ORDER BY created_at DESC`
+  )
+    .bind(identityId)
+    .all();
+  return results.slice(0, Math.max(0, results.length - GENERATED_PATH_FREE_LIMIT));
+}
+
+async function billGeneratedPathPool(env, identityId, now) {
+  const identity = await env.DB.prepare("SELECT generated_path_billed_through_at FROM login_identities WHERE id = ?")
+    .bind(identityId)
+    .first();
+  let billedThroughAt = identity.generated_path_billed_through_at;
+
+  while (billedThroughAt <= now) {
+    let billable = await getBillableGeneratedPaths(env, identityId);
+    const balance = await getTokenBalance(env, identityId);
+    const affordableCount = Math.min(billable.length, Math.floor(balance / GENERATED_PATH_UPKEEP_PER_EXTRA));
+
+    while (billable.length > affordableCount) {
+      const newest = billable[0]; // newest-first order, so this evicts the most recently created one
+      await env.DB.prepare("UPDATE urls SET deactivated_at = ? WHERE code = ? AND kind = 'generated-path'")
+        .bind(now, newest.code)
+        .run();
+      await logTokenEvent(env, identityId, 0, "deactivated_insufficient_balance", {
+        code: newest.code,
+        kind: "generated-path",
+      });
+      billable = billable.slice(1);
+    }
+
+    for (const url of billable) {
+      await debitTokens(env, identityId, GENERATED_PATH_UPKEEP_PER_EXTRA, "upkeep_generated-path", {
+        code: url.code,
+        kind: "generated-path",
+      });
+    }
+
+    billedThroughAt += ONE_MONTH_MS;
+  }
+
+  await env.DB.prepare("UPDATE login_identities SET generated_path_billed_through_at = ? WHERE id = ?")
+    .bind(billedThroughAt, identityId)
+    .run();
+}
+
+async function purgeExpiredDeactivations(env, now) {
+  const cutoff = now - ONE_MONTH_MS;
+  const { results } = await env.DB.prepare(
+    "SELECT code, kind, created_by FROM urls WHERE deactivated_at IS NOT NULL AND deactivated_at <= ?"
+  )
+    .bind(cutoff)
+    .all();
+
+  for (const row of results) {
+    await env.DB.prepare("DELETE FROM urls WHERE code = ? AND kind = ?").bind(row.code, row.kind).run();
+    await logTokenEvent(env, row.created_by, 0, "purged_after_grace_period", { code: row.code, kind: row.kind });
+  }
+}
+
+async function computeMonthlyBurn(env, identityId) {
+  const { results: billedUrls } = await env.DB.prepare(
+    "SELECT kind FROM urls WHERE created_by = ? AND paid_through_at IS NOT NULL AND deactivated_at IS NULL"
+  )
+    .bind(identityId)
+    .all();
+
+  const urlUpkeep = billedUrls.reduce((sum, row) => sum + TOKEN_COSTS[row.kind].upkeep, 0);
+  const generatedPathCount = await countGeneratedPaths(env, identityId);
+  return urlUpkeep + generatedPathMonthlyUpkeep(generatedPathCount);
+}
+
+async function sendLowBalanceEmail(env, toEmail, { balance, monthlyBurn, daysRemaining }) {
+  if (!env.EMAIL) return false;
+  try {
+    await env.EMAIL.send({
+      to: toEmail,
+      from: { email: "tokens@tiny.vin", name: "tiny.vin" },
+      subject: "Your tiny.vin tokens are running low",
+      text: `You have ${balance} tokens left, spending ${monthlyBurn} a month. At this rate you'll run out in about ${daysRemaining} days.\n\nReview your tokens: ${env.SITE_URL}/tokens`,
+      html: `<p>You have <strong>${balance} tokens</strong> left, spending <strong>${monthlyBurn}</strong> a month. At this rate you'll run out in about <strong>${daysRemaining} days</strong>.</p><p><a href="${env.SITE_URL}/tokens">Review your tokens</a></p>`,
+    });
+    return true;
+  } catch {
+    // never let an email failure block billing, but don't claim it was sent either
+    return false;
+  }
+}
+
+async function checkLowBalanceWarning(env, identityId) {
+  const identity = await env.DB.prepare(
+    "SELECT username, token_balance, low_balance_email_sent_at FROM login_identities WHERE id = ?"
+  )
+    .bind(identityId)
+    .first();
+
+  const monthlyBurn = await computeMonthlyBurn(env, identityId);
+  const daysRemaining = monthlyBurn > 0 ? (identity.token_balance / monthlyBurn) * 30 : null;
+  const isLow = daysRemaining !== null && daysRemaining <= LOW_BALANCE_WARNING_DAYS;
+
+  if (isLow && !identity.low_balance_email_sent_at) {
+    const sent = await sendLowBalanceEmail(env, identity.username, {
+      balance: identity.token_balance,
+      monthlyBurn,
+      daysRemaining: Math.floor(daysRemaining),
+    });
+    if (sent) {
+      await env.DB.prepare("UPDATE login_identities SET low_balance_email_sent_at = ? WHERE id = ?")
+        .bind(Date.now(), identityId)
+        .run();
+    }
+  } else if (!isLow && identity.low_balance_email_sent_at) {
+    await env.DB.prepare("UPDATE login_identities SET low_balance_email_sent_at = NULL WHERE id = ?")
+      .bind(identityId)
+      .run();
+  }
+}
+
+async function runMonthlyBilling(env) {
+  const now = Date.now();
+
+  const { results: urlRows } = await env.DB.prepare(
+    `SELECT code, kind, created_by, paid_through_at FROM urls
+     WHERE paid_through_at IS NOT NULL AND paid_through_at <= ? AND deactivated_at IS NULL`
+  )
+    .bind(now)
+    .all();
+
+  for (const row of urlRows) {
+    await billUrlUpkeep(env, row, now);
+  }
+
+  const { results: identityRows } = await env.DB.prepare(
+    "SELECT id FROM login_identities WHERE generated_path_billed_through_at IS NOT NULL AND generated_path_billed_through_at <= ?"
+  )
+    .bind(now)
+    .all();
+
+  for (const row of identityRows) {
+    await billGeneratedPathPool(env, row.id, now);
+    await checkLowBalanceWarning(env, row.id);
+  }
+
+  await purgeExpiredDeactivations(env, now);
 }
 
 export default {
@@ -722,6 +1235,25 @@ export default {
       return withAuth(request, env, (session) => handleStats(env, session));
     }
 
+    if (request.method === "GET" && url.pathname === "/api/tokens") {
+      return withAuth(request, env, (session) => handleTokens(env, session));
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/tokens/checkout") {
+      return withAuth(request, env, (session) => handleTokenCheckout(request, env, session));
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/lemonsqueezy/webhook") {
+      return handleLemonSqueezyWebhook(request, env);
+    }
+
+    const reactivateMatch = url.pathname.match(REACTIVATE_URL_PATTERN);
+    if (request.method === "POST" && reactivateMatch) {
+      const kindParam = url.searchParams.get("kind");
+      const kind = VALID_KINDS.has(kindParam) ? kindParam : "generated-path";
+      return withAuth(request, env, (session) => handleReactivateUrl(reactivateMatch[1], kind, env, session));
+    }
+
     const deleteMatch = url.pathname.match(DELETE_URL_PATTERN);
     if (request.method === "DELETE" && deleteMatch) {
       const kindParam = url.searchParams.get("kind");
@@ -735,5 +1267,9 @@ export default {
     }
 
     return env.ASSETS.fetch(request);
+  },
+
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runMonthlyBilling(env));
   },
 };
