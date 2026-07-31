@@ -3,7 +3,11 @@ function donateButtonImageSrc() {
   return theme === "dark" ? "/donate-button-dark.svg" : "/donate-button-light.svg";
 }
 
-if (window.PayPal) {
+function renderDonateButton() {
+  if (!window.PayPal) return;
+  var container = document.getElementById("donate-button-container");
+  if (!container) return;
+  container.innerHTML = '<div id="donate-button"></div>';
   PayPal.Donation.Button({
     env: "production",
     hosted_button_id: "MDJZUR6T8QP3Y",
@@ -15,9 +19,8 @@ if (window.PayPal) {
   }).render("#donate-button");
 }
 
+renderDonateButton();
+
 document.querySelectorAll(".theme-toggle .theme-btn").forEach(function (btn) {
-  btn.addEventListener("click", function () {
-    var img = document.getElementById("donate-button");
-    if (img) img.src = donateButtonImageSrc();
-  });
+  btn.addEventListener("click", renderDonateButton);
 });
