@@ -91,6 +91,17 @@ function loginPage(errorCode) {
     <button type="button" class="theme-btn" data-theme-value="light">Light</button>
     <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
   </div>
+  <div class="donate-nav">
+    <form action="https://www.paypal.com/donate" method="post" target="_blank" rel="noopener">
+      <input type="hidden" name="hosted_button_id" value="MDJZUR6T8QP3Y">
+      <button type="submit" class="donate-btn">
+        <svg class="donate-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 21s-6.7-4.35-9.5-8.28C.8 9.9 1.6 5.9 5.1 4.6c2-.75 4.1.05 5.1 1.9.9-1.85 3-2.65 5-1.9 3.5 1.3 4.3 5.3 1.6 8.12C18.7 16.65 12 21 12 21z"></path>
+        </svg>
+        <span>Donate</span>
+      </button>
+    </form>
+  </div>
   <main class="panel">
     <p class="heading-large">tiny<span class="heading-large-accent-dot">.</span>vin</p>
     <p class="login-instruction">Sign in and paste or enter a URL to shorten it. Then share it &ndash; it's available to everyone!</p>

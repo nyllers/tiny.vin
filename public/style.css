@@ -457,6 +457,50 @@ footer {
   border-radius: 999px;
 }
 
+.donate-nav {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+}
+
+.donate-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: #fff;
+  background: var(--heading);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.donate-btn:hover {
+  opacity: 0.85;
+}
+
+.donate-icon {
+  width: 0.8rem;
+  height: 0.8rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 30rem) {
+  .donate-btn span {
+    display: none;
+  }
+
+  .donate-btn {
+    padding: 0.45rem;
+  }
+}
+
 .theme-btn {
   padding: 0.25rem 0.75rem;
   font-size: 0.75rem;
