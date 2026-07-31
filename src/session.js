@@ -57,7 +57,6 @@ async function createSessionCookie(user, secret) {
   const payload = {
     email: user.email,
     name: user.name,
-    provider: user.provider,
     exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE,
   };
   const payloadB64 = base64UrlEncode(new TextEncoder().encode(JSON.stringify(payload)));

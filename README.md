@@ -31,7 +31,9 @@ Required secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET` (
 
 Sign out via `/auth/logout` (linked at the bottom of the homepage).
 
-Every successful login is recorded in D1: `login_identities` holds one row per (provider, username) pair, and `login_events` holds a timestamped row per login, referencing that identity. This is on top of the base schema — if the database was created before this branch existed, apply `migrations/0002_add_login_tracking.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0002_add_login_tracking.sql --remote`) in addition to `schema.sql`.
+Every successful login is recorded in D1: `login_identities` holds one row per email address, and `login_events` holds a timestamped row per login, referencing that identity. This is on top of the base schema — if the database was created before this branch existed, apply `migrations/0002_add_login_tracking.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0002_add_login_tracking.sql --remote`) in addition to `schema.sql`.
+
+`login_identities` originally also had a `provider` column (this project has only ever supported Google sign-in, so it never carried real information) and its email column was originally named `username`. If the database predates this cleanup, apply `migrations/0010_login_identities_email.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0010_login_identities_email.sql --remote`) in addition to `schema.sql`. This migration rebuilds `login_identities` and `login_identities_history` (SQLite can't drop a column that's part of a UNIQUE constraint or referenced by a trigger), so back up first if the data matters.
 
 ## API access
 
