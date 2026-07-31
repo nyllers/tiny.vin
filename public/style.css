@@ -474,6 +474,13 @@ footer {
   opacity: 0.85;
 }
 
+@media (max-width: 22rem) {
+  #donate-button-container img {
+    width: 58px;
+    height: 20px;
+  }
+}
+
 .theme-btn {
   padding: 0.25rem 0.75rem;
   font-size: 0.75rem;
