@@ -39,7 +39,7 @@ async function fetchUserInfo(accessToken) {
   });
   if (!response.ok) throw new Error("Google user info request failed");
   const data = await response.json();
-  return { email: data.email, name: data.name, provider: "google" };
+  return { email: data.email, name: data.name };
 }
 
 export { buildAuthorizeUrl, exchangeCodeForToken, fetchUserInfo };

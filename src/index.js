@@ -297,7 +297,7 @@ async function handleShorten(request, env, session) {
     subdomainCode = subdomainValidation.code;
   }
 
-  const createdBy = await getOrCreateIdentityId(env, session.provider, session.email);
+  const createdBy = await getOrCreateIdentityId(env, session.email);
 
   if (subdomainCode) {
     try {
@@ -330,11 +330,9 @@ async function handleShorten(request, env, session) {
   return jsonResponse({ error: "Could not generate a unique code, try again" }, 500);
 }
 
-async function getIdentityId(env, provider, username) {
-  const identity = await env.DB.prepare(
-    "SELECT id FROM login_identities WHERE provider = ? AND username = ?"
-  )
-    .bind(provider, username)
+async function getIdentityId(env, email) {
+  const identity = await env.DB.prepare("SELECT id FROM login_identities WHERE email = ?")
+    .bind(email)
     .first();
 
   return identity ? identity.id : null;
@@ -344,7 +342,7 @@ async function getIdentityByApiKey(env, key) {
   if (!API_KEY_PATTERN.test(key)) return null;
 
   const identity = await env.DB.prepare(
-    `SELECT li.provider, li.username
+    `SELECT li.email
      FROM api_keys ak
      JOIN login_identities li ON li.id = ak.identity_id
      WHERE ak.key = ?`
@@ -352,11 +350,11 @@ async function getIdentityByApiKey(env, key) {
     .bind(key)
     .first();
 
-  return identity ? { provider: identity.provider, email: identity.username } : null;
+  return identity ? { email: identity.email } : null;
 }
 
 async function handleGetApiKey(env, session) {
-  const identityId = await getIdentityId(env, session.provider, session.email);
+  const identityId = await getIdentityId(env, session.email);
   const row = identityId
     ? await env.DB.prepare("SELECT key FROM api_keys WHERE identity_id = ?").bind(identityId).first()
     : null;
@@ -365,7 +363,7 @@ async function handleGetApiKey(env, session) {
 }
 
 async function handleCreateApiKey(env, session) {
-  const identityId = await getOrCreateIdentityId(env, session.provider, session.email);
+  const identityId = await getOrCreateIdentityId(env, session.email);
   const key = generateApiKey();
 
   await env.DB.prepare(
@@ -390,7 +388,7 @@ function groupByOriginalUrl(rows, buildEntry) {
 }
 
 async function handleHistory(env, session) {
-  const identityId = await getIdentityId(env, session.provider, session.email);
+  const identityId = await getIdentityId(env, session.email);
 
   const { results } = await env.DB.prepare(
     "SELECT code, kind, original_url, created_at FROM urls WHERE created_by = ? ORDER BY created_at DESC"
@@ -451,7 +449,7 @@ function topCounts(counts, limit) {
 }
 
 async function handleStats(env, session) {
-  const identityId = await getIdentityId(env, session.provider, session.email);
+  const identityId = await getIdentityId(env, session.email);
 
   const { results } = await env.DB.prepare(
     `SELECT u.code, u.kind, u.original_url, u.created_at,
@@ -551,7 +549,7 @@ async function handleStats(env, session) {
 }
 
 async function handleDeleteUrl(code, kind, env, session) {
-  const identityId = await getIdentityId(env, session.provider, session.email);
+  const identityId = await getIdentityId(env, session.email);
 
   const result = await env.DB.prepare(
     "DELETE FROM urls WHERE code = ? AND kind = ? AND created_by = ?"
@@ -618,19 +616,17 @@ function handleAuthStart(url, env) {
   });
 }
 
-async function getOrCreateIdentityId(env, provider, username) {
-  await env.DB.prepare(
-    "INSERT INTO login_identities (provider, username) VALUES (?, ?) ON CONFLICT (provider, username) DO NOTHING"
-  )
-    .bind(provider, username)
+async function getOrCreateIdentityId(env, email) {
+  await env.DB.prepare("INSERT INTO login_identities (email) VALUES (?) ON CONFLICT (email) DO NOTHING")
+    .bind(email)
     .run();
 
-  return getIdentityId(env, provider, username);
+  return getIdentityId(env, email);
 }
 
-async function recordLogin(env, provider, username, ipAddress) {
+async function recordLogin(env, email, ipAddress) {
   try {
-    const identityId = await getOrCreateIdentityId(env, provider, username);
+    const identityId = await getOrCreateIdentityId(env, email);
 
     await env.DB.prepare(
       "INSERT INTO login_events (identity_id, logged_in_at, ip_address) VALUES (?, ?, ?)"
@@ -659,7 +655,7 @@ async function handleAuthCallback(url, request, env) {
     if (!user.email) throw new Error("No email returned by provider");
 
     const ipAddress = request.headers.get("CF-Connecting-IP");
-    await recordLogin(env, user.provider, user.email, ipAddress);
+    await recordLogin(env, user.email, ipAddress);
 
     const sessionCookie = await createSessionCookie(user, env.SESSION_SECRET);
 
