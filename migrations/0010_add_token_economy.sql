@@ -11,14 +11,27 @@
 --    this account. Existing accounts get one month's grace from today;
 --    new accounts get the same grace starting at signup (set in
 --    application code alongside the signup bonus).
--- 3. Add urls.paid_through_at: the epoch-ms timestamp a custom-path or
+-- 3. Add login_identities.low_balance_email_sent_at: epoch-ms timestamp of
+--    the last "you're about to run out of tokens" warning email, or NULL
+--    if none is currently outstanding. Cleared back to NULL once the
+--    account's balance recovers, so a fresh warning can fire again if it
+--    drops low a second time — this is a dedup guard, not a log; the
+--    actual send history is implicit in the emails themselves.
+-- 4. Add urls.paid_through_at: the epoch-ms timestamp a custom-path or
 --    subdomain row's individual upkeep is paid through. NULL means "never
 --    individually billed" — every row that exists before this migration
 --    gets NULL (grandfathered, free forever), and generated-path rows
 --    always get NULL too, since generated-path upkeep is billed as a pool
 --    per account (see below), not per row. Every new custom-path/subdomain
 --    row created after this migration always gets a concrete value.
--- 4. Pricing:
+-- 5. Add urls.deactivated_at: epoch-ms timestamp a row was switched off
+--    for non-payment, or NULL while active. A deactivated row stops
+--    redirecting and stops counting toward its owner's generated-path
+--    pool, but keeps its (code, kind) reserved for the owner, who can pay
+--    one month's upkeep to reactivate it. If it's still deactivated 30
+--    days later, application code purges it for good, freeing the code
+--    for anyone.
+-- 6. Pricing:
 --    - custom-path: 25 tokens to create, 10 tokens/month upkeep per row,
 --      first month included in the creation cost (paid_through_at starts
 --      one month out).
@@ -32,23 +45,33 @@
 --      row) — so deleting excess generated-path URLs immediately lowers
 --      next month's bill, matching how the count, not any specific row,
 --      determines the price.
--- 5. Add token_transactions: an append-only ledger of every balance change
---    (signup bonus, creation cost, monthly upkeep, forced deletion). This
---    table intentionally has NO "_history" twin, unlike every other table
---    in this schema — it's never updated or deleted, so it already IS the
---    history; a twin would just be an always-empty copy of itself.
--- 6. urls_history and login_identities_history gain matching columns, and
+-- 7. Add token_transactions: an append-only ledger of every balance change
+--    (signup bonus, purchase, creation cost, monthly upkeep, deactivation,
+--    reactivation, purge). This table intentionally has NO "_history"
+--    twin, unlike every other table in this schema — it's never updated
+--    or deleted, so it already IS the history; a twin would just be an
+--    always-empty copy of itself.
+-- 8. Add payment_webhook_events: idempotency guard for the payment
+--    webhook. Each incoming event's id is inserted here before its effects
+--    are applied; a UNIQUE-constraint conflict means the payment provider
+--    already delivered (or retried) this event, so it's skipped. No
+--    "_history" twin, for the same reason as token_transactions.
+-- 9. urls_history and login_identities_history gain matching columns, and
 --    their triggers are dropped and recreated to capture them — "CREATE
 --    TRIGGER IF NOT EXISTS" would otherwise silently leave the old
 --    (narrower) trigger bodies in place on an existing database.
 
 ALTER TABLE login_identities ADD COLUMN token_balance INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE login_identities ADD COLUMN generated_path_billed_through_at INTEGER;
+ALTER TABLE login_identities ADD COLUMN low_balance_email_sent_at INTEGER;
 ALTER TABLE login_identities_history ADD COLUMN token_balance INTEGER;
 ALTER TABLE login_identities_history ADD COLUMN generated_path_billed_through_at INTEGER;
+ALTER TABLE login_identities_history ADD COLUMN low_balance_email_sent_at INTEGER;
 
 ALTER TABLE urls ADD COLUMN paid_through_at INTEGER;
+ALTER TABLE urls ADD COLUMN deactivated_at INTEGER;
 ALTER TABLE urls_history ADD COLUMN paid_through_at INTEGER;
+ALTER TABLE urls_history ADD COLUMN deactivated_at INTEGER;
 
 UPDATE login_identities SET token_balance = 100, generated_path_billed_through_at = unixepoch() * 1000 + 2592000000;
 
@@ -56,32 +79,36 @@ DROP TRIGGER IF EXISTS login_identities_history_update;
 CREATE TRIGGER login_identities_history_update
 AFTER UPDATE ON login_identities
 BEGIN
-  INSERT INTO login_identities_history (id, provider, username, token_balance, generated_path_billed_through_at)
-  VALUES (OLD.id, OLD.provider, OLD.username, OLD.token_balance, OLD.generated_path_billed_through_at);
+  INSERT INTO login_identities_history
+    (id, provider, username, token_balance, generated_path_billed_through_at, low_balance_email_sent_at)
+  VALUES
+    (OLD.id, OLD.provider, OLD.username, OLD.token_balance, OLD.generated_path_billed_through_at, OLD.low_balance_email_sent_at);
 END;
 
 DROP TRIGGER IF EXISTS login_identities_history_delete;
 CREATE TRIGGER login_identities_history_delete
 AFTER DELETE ON login_identities
 BEGIN
-  INSERT INTO login_identities_history (id, provider, username, token_balance, generated_path_billed_through_at)
-  VALUES (OLD.id, OLD.provider, OLD.username, OLD.token_balance, OLD.generated_path_billed_through_at);
+  INSERT INTO login_identities_history
+    (id, provider, username, token_balance, generated_path_billed_through_at, low_balance_email_sent_at)
+  VALUES
+    (OLD.id, OLD.provider, OLD.username, OLD.token_balance, OLD.generated_path_billed_through_at, OLD.low_balance_email_sent_at);
 END;
 
 DROP TRIGGER IF EXISTS urls_history_update;
 CREATE TRIGGER urls_history_update
 AFTER UPDATE ON urls
 BEGIN
-  INSERT INTO urls_history (code, kind, original_url, created_at, created_by, paid_through_at)
-  VALUES (OLD.code, OLD.kind, OLD.original_url, OLD.created_at, OLD.created_by, OLD.paid_through_at);
+  INSERT INTO urls_history (code, kind, original_url, created_at, created_by, paid_through_at, deactivated_at)
+  VALUES (OLD.code, OLD.kind, OLD.original_url, OLD.created_at, OLD.created_by, OLD.paid_through_at, OLD.deactivated_at);
 END;
 
 DROP TRIGGER IF EXISTS urls_history_delete;
 CREATE TRIGGER urls_history_delete
 AFTER DELETE ON urls
 BEGIN
-  INSERT INTO urls_history (code, kind, original_url, created_at, created_by, paid_through_at)
-  VALUES (OLD.code, OLD.kind, OLD.original_url, OLD.created_at, OLD.created_by, OLD.paid_through_at);
+  INSERT INTO urls_history (code, kind, original_url, created_at, created_by, paid_through_at, deactivated_at)
+  VALUES (OLD.code, OLD.kind, OLD.original_url, OLD.created_at, OLD.created_by, OLD.paid_through_at, OLD.deactivated_at);
 END;
 
 CREATE TABLE IF NOT EXISTS token_transactions (
@@ -95,6 +122,12 @@ CREATE TABLE IF NOT EXISTS token_transactions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_token_transactions_identity ON token_transactions(identity_id);
+
+CREATE TABLE IF NOT EXISTS payment_webhook_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_key TEXT NOT NULL UNIQUE,
+  created_at INTEGER NOT NULL
+);
 
 INSERT INTO token_transactions (identity_id, amount, reason, created_at)
 SELECT id, 100, 'signup_bonus_retroactive', unixepoch() * 1000

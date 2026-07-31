@@ -5,21 +5,34 @@ function formatDate(ts) {
 const TOKEN_REASON_LABELS = {
   signup_bonus: "Signup bonus",
   signup_bonus_retroactive: "Signup bonus",
+  purchase: "Purchased tokens",
   "create_generated-path": "Created",
   "create_custom-path": "Created",
   create_subdomain: "Created",
   "upkeep_generated-path": "Generated path upkeep",
   "upkeep_custom-path": "Custom path upkeep",
   upkeep_subdomain: "Subdomain upkeep",
-  deleted_insufficient_balance: "Deleted (insufficient balance)",
+  "reactivate_generated-path": "Reactivated",
+  "reactivate_custom-path": "Reactivated",
+  reactivate_subdomain: "Reactivated",
+  deactivated_insufficient_balance: "Deactivated (insufficient balance)",
+  purged_after_grace_period: "Removed (grace period expired)",
 };
+
+const URL_REFERENCING_REASONS = new Set([
+  "create_generated-path",
+  "create_custom-path",
+  "create_subdomain",
+  "reactivate_generated-path",
+  "reactivate_custom-path",
+  "reactivate_subdomain",
+  "deactivated_insufficient_balance",
+  "purged_after_grace_period",
+]);
 
 function describeTransaction(entry) {
   const label = TOKEN_REASON_LABELS[entry.reason] || entry.reason;
-  if (entry.shortUrl && (entry.reason.startsWith("create_") || entry.reason === "deleted_insufficient_balance")) {
-    return `${label}: ${entry.shortUrl}`;
-  }
-  return label;
+  return entry.shortUrl && URL_REFERENCING_REASONS.has(entry.reason) ? `${label}: ${entry.shortUrl}` : label;
 }
 
 function createBreakdownRow(entry) {
@@ -70,8 +83,61 @@ function createEmptyMessage(text) {
   return empty;
 }
 
+async function buyTokens(tokens, button) {
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/tokens/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tokens }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.url) {
+      alert(data.error || "Could not start checkout, try again.");
+      button.disabled = false;
+      return;
+    }
+    window.location.href = data.url;
+  } catch {
+    alert("Network error, try again.");
+    button.disabled = false;
+  }
+}
+
+function createPackageButton(pkg) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "token-package";
+
+  const tokens = document.createElement("span");
+  tokens.className = "token-package-tokens";
+  tokens.textContent = `${pkg.tokens} tokens`;
+
+  const price = document.createElement("span");
+  price.className = "token-package-price";
+  price.textContent = `$${(pkg.priceUsdCents / 100).toFixed(2)}`;
+
+  button.append(tokens, price);
+  button.addEventListener("click", () => buyTokens(pkg.tokens, button));
+  return button;
+}
+
+function showPurchaseStatus() {
+  const statusEl = document.getElementById("purchase-status");
+  const purchase = new URLSearchParams(window.location.search).get("purchase");
+
+  if (purchase === "success") {
+    statusEl.textContent = "Purchase complete — your tokens will appear shortly.";
+    statusEl.hidden = false;
+  } else if (purchase === "cancelled") {
+    statusEl.textContent = "Checkout cancelled.";
+    statusEl.hidden = false;
+  }
+}
+
 async function loadTokens() {
   const summary = document.getElementById("tokens-summary");
+  const packagesEl = document.getElementById("token-packages");
   const breakdownEl = document.getElementById("tokens-breakdown");
   const historyEl = document.getElementById("tokens-history");
 
@@ -80,6 +146,9 @@ async function loadTokens() {
 
   summary.textContent = "";
   summary.append(createSummaryTile("Balance", data.balance), createSummaryTile("Monthly Upkeep", data.monthlyBurn));
+
+  packagesEl.textContent = "";
+  packagesEl.append(...data.packages.map(createPackageButton));
 
   breakdownEl.textContent = "";
   if (data.breakdown.length === 0) {
@@ -96,4 +165,5 @@ async function loadTokens() {
   }
 }
 
+showPurchaseStatus();
 loadTokens();

@@ -399,6 +399,11 @@ footer {
   gap: 0.4rem;
 }
 
+.url-card-copy-row--deactivated .url-card-value {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
 .url-card-row--tiny > .url-card-copy-row {
   padding-bottom: calc(0.15rem + 1px);
   border-bottom: 1px solid var(--card-border);
@@ -854,6 +859,44 @@ footer {
 }
 
 .token-history-amount--debit {
+  color: var(--muted);
+}
+
+.token-packages {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.5rem;
+}
+
+.token-package {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.token-package:hover {
+  border-color: var(--heading);
+}
+
+.token-package:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.token-package-tokens {
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.token-package-price {
+  font-size: 0.8rem;
   color: var(--muted);
 }
 

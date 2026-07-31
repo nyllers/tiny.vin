@@ -62,7 +62,7 @@ The `generated-path`/`custom-path` split is separate and newer: if the database 
 
 ## Token economy
 
-Every account has a token balance (100 on signup), spent on creating and keeping tiny URLs/subdomains alive. The `/tokens` page (linked from the nav) shows your balance, current monthly upkeep, a breakdown of everything contributing to it, and a full history of every token event.
+Every account has a token balance (100 on signup), spent on creating and keeping tiny URLs/subdomains alive. The `/tokens` page (linked from the nav) shows your balance, current monthly upkeep, a breakdown of everything contributing to it, a full history of every token event, and lets you buy more. Confirmation modals on "Make it Tiny" (once you're past the free generated-path limit) and on "Save" for a custom path/subdomain show the exact cost before you commit.
 
 Pricing:
 
@@ -70,9 +70,30 @@ Pricing:
 - **Subdomain**: 50 tokens to create, 20 tokens/month upkeep, first month included in the creation cost.
 - **Generated path**: your first 5 (at any given moment) are entirely free — 0 to create, 0 upkeep. The 6th and beyond cost 10 tokens to create, and upkeep is `max(0, current generated-path count - 5)` tokens/month, recomputed fresh every billing cycle from however many you currently hold — not tracked per row. For example, holding 7 generated paths costs 2 tokens/month; deleting 2 of them brings it back to 0 immediately (well, from the next billing cycle).
 
-Custom-path/subdomain upkeep is tracked per row via `urls.paid_through_at` (NULL means never individually billed — every row that existed before this feature shipped is grandfathered free forever, and generated-path rows are always NULL since their upkeep is billed as a pool, not per row). Generated-path upkeep is tracked per account via `login_identities.generated_path_billed_through_at`. A daily cron (`triggers.crons` in `wrangler.jsonc`, handled by the Worker's `scheduled()` export) catches up any billing cycles that have come due, debiting `login_identities.token_balance` and logging each change to `token_transactions` — an append-only ledger with no `_history` twin (unlike every other table), since it's never updated or deleted and so already is its own history. If an account can't afford upkeep when it comes due, the Worker deletes just enough of the affected URLs (oldest first, for generated paths) to make the remaining upkeep affordable, logging a `deleted_insufficient_balance` transaction for each.
+Custom-path/subdomain upkeep is tracked per row via `urls.paid_through_at` (NULL means never individually billed — every row that existed before this feature shipped is grandfathered free forever, and generated-path rows are always NULL since their upkeep is billed as a pool, not per row). Generated-path upkeep is tracked per account via `login_identities.generated_path_billed_through_at`. A daily cron (`triggers.crons` in `wrangler.jsonc`, handled by the Worker's `scheduled()` export) catches up any billing cycles that have come due, debiting `login_identities.token_balance` and logging each change to `token_transactions` — an append-only ledger with no `_history` twin (unlike every other table), since it's never updated or deleted and so already is its own history.
+
+**Insufficient balance**: rather than deleting a URL outright, the Worker deactivates it (`urls.deactivated_at`) — it stops redirecting and stops counting toward its owner's pricing, but the owner can still see it (struck through, in their own URL list) and pay one month's upkeep to reactivate it. For the generated-path pool specifically, the *newest* URLs are deactivated first (oldest ones are protected, since they're closer to "grandfathered"). A URL still deactivated 30 days later is purged for good by the same daily cron, freeing its code/subdomain for anyone. Every deactivation, reactivation, and purge is its own logged transaction, and generated-path upkeep is logged as one transaction per contributing URL (not one combined charge), so the history stays fully attributable.
 
 If the database was created before this existed, apply `migrations/0010_add_token_economy.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0010_add_token_economy.sql --remote`) in addition to `schema.sql`. It also grants the 100-token signup bonus retroactively to every existing account and gives them a month's grace before generated-path pool billing starts.
+
+### Buying tokens
+
+100 tokens for $2, 500 for $9, 1200 for $21, or 3000 for $50, via [Lemon Squeezy](https://www.lemonsqueezy.com) Checkout (a merchant of record, so it handles sales tax/VAT — no Stripe-style tax setup needed). Implemented with plain `fetch()` calls against Lemon Squeezy's REST API rather than their SDK, consistent with the rest of this project having no build step.
+
+One-time setup, outside this repo:
+
+1. Create a Lemon Squeezy account and store, then one product with one variant (the price you give it doesn't matter — every checkout overrides it via `custom_price`).
+2. Create an API key (Settings → API) and set it as `LEMONSQUEEZY_API_KEY`.
+3. Set `LEMONSQUEEZY_STORE_ID` and `LEMONSQUEEZY_VARIANT_ID` to that store's and variant's ids.
+4. Add a webhook (Settings → Webhooks) pointed at `https://tiny.vin/api/lemonsqueezy/webhook`, subscribed to at least `order_created`, and set its signing secret as `LEMONSQUEEZY_WEBHOOK_SECRET`.
+
+`POST /api/tokens/checkout` creates a checkout (passing the buyer's identity and token count through `checkout_data.custom`) and returns its URL for the browser to redirect to. The webhook verifies `X-Signature` (HMAC-SHA256 hex digest of the raw body, via Web Crypto) before crediting anything, and guards against duplicate/retried deliveries with a `payment_webhook_events` idempotency table keyed on the event name + order id.
+
+### Low-balance email warning
+
+Every time the daily billing cron finishes an account's monthly bill, it checks whether the balance would run out within 50 days at the current monthly burn rate, and if so, emails that account's address (the same Google email used to sign in) with a link to `/tokens` — using the `send_email` Workers binding (`EMAIL` in `wrangler.jsonc`), so no API key is needed. `login_identities.low_balance_email_sent_at` dedupes this to one email per "episode": it's cleared once the balance recovers above the threshold, so a fresh warning can fire again later if it drops low a second time.
+
+This needs the `tiny.vin` domain onboarded onto Cloudflare Email Sending first: `wrangler email sending enable tiny.vin` (one-time, against the live Cloudflare account).
 
 ## Redirect statistics
 
