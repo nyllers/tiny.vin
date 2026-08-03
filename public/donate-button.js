@@ -24,3 +24,20 @@ renderDonateButton();
 document.querySelectorAll(".theme-toggle .theme-btn").forEach(function (btn) {
   btn.addEventListener("click", renderDonateButton);
 });
+
+function randomNudgeDelayMs() {
+  return (60 + Math.random() * 120) * 1000;
+}
+
+function scheduleDonateNudge() {
+  setTimeout(function () {
+    var nav = document.querySelector(".donate-nav");
+    if (nav) nav.classList.add("donate-nav--nudged");
+    setTimeout(function () {
+      if (nav) nav.classList.remove("donate-nav--nudged");
+      scheduleDonateNudge();
+    }, randomNudgeDelayMs());
+  }, randomNudgeDelayMs());
+}
+
+scheduleDonateNudge();

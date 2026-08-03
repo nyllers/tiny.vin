@@ -465,6 +465,10 @@ footer {
   z-index: 20;
 }
 
+.donate-nav--nudged {
+  transform: translateX(calc(-50% - 1px));
+}
+
 #donate-button-container img {
   display: block;
   width: 70px;
