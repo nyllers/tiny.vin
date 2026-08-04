@@ -259,8 +259,8 @@ function createDailyChartCard(days) {
   const card = document.createElement("div");
   card.className = "url-card";
 
-  const header = createCardHeader("Redirects Last 14 Days", () =>
-    openChartModal("Redirects Last 14 Days", () => {
+  const header = createCardHeader("Number of Redirects", () =>
+    openChartModal("Number of Redirects", () => {
       const fragment = document.createDocumentFragment();
       fragment.append(buildDailyChart(days), createFullAxis(dailyEntries(days), (e) => e.label));
       return fragment;
@@ -345,8 +345,10 @@ function createRefererChartCard(referrers) {
   });
 }
 
-// World map: a plain equirectangular graticule (no coastline data bundled
-// with the project) with a dot per distinct lat/lng, radius scaled by count.
+// World map: an equirectangular projection with the real (simplified)
+// landmass outline from public-domain Natural Earth data behind a dot per
+// distinct lat/lng, radius scaled by count. See world-map-path.js for the
+// outline's provenance.
 const MAP_WIDTH = 360;
 const MAP_HEIGHT = 180;
 
@@ -360,7 +362,7 @@ function createWorldMapSvg(points) {
   svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
   svg.setAttribute("class", "world-map");
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "Redirect locations, last 14 days");
+  svg.setAttribute("aria-label", "Redirected geographic locations, last 14 days");
 
   const background = document.createElementNS(SVG_NS, "rect");
   background.setAttribute("x", "0");
@@ -369,6 +371,11 @@ function createWorldMapSvg(points) {
   background.setAttribute("height", String(MAP_HEIGHT));
   background.setAttribute("class", "world-map-bg");
   svg.appendChild(background);
+
+  const land = document.createElementNS(SVG_NS, "path");
+  land.setAttribute("d", WORLD_LAND_PATH);
+  land.setAttribute("class", "world-map-land");
+  svg.appendChild(land);
 
   for (let lng = -180; lng <= 180; lng += 30) {
     const x = lng + 180;
@@ -423,10 +430,10 @@ function createWorldMapSvg(points) {
 
 function createWorldMapCard(points) {
   const card = document.createElement("div");
-  card.className = "url-card";
+  card.className = "url-card url-card--span-2";
 
-  const header = createCardHeader("Redirect Locations", () =>
-    openChartModal("Redirect Locations", () => {
+  const header = createCardHeader("Redirected Geographic Locations", () =>
+    openChartModal("Redirected Geographic Locations", () => {
       const fragment = document.createDocumentFragment();
       fragment.append(createWorldMapSvg(points));
       return fragment;
@@ -482,12 +489,9 @@ async function loadStats() {
   if (data.dailyRedirects.some((d) => d.count > 0)) {
     breakdownCards.push(createDailyChartCard(data.dailyRedirects));
   }
-  const urlChartEntries = flattenShortUrls(data.urls);
+  const urlChartEntries = flattenShortUrls(data.urlBreakdown14d || []);
   if (urlChartEntries.length > 0) {
     breakdownCards.push(createUrlBreakdownChartCard(urlChartEntries));
-  }
-  if (data.mapPoints && data.mapPoints.length > 0) {
-    breakdownCards.push(createWorldMapCard(data.mapPoints));
   }
   if (data.browsers && data.browsers.length > 0) {
     breakdownCards.push(createBrowserChartCard(data.browsers.slice(0, BAR_CHART_LIMIT)));
@@ -495,11 +499,14 @@ async function loadStats() {
   if (data.topReferrers && data.topReferrers.length > 0) {
     breakdownCards.push(createRefererChartCard(data.topReferrers.slice(0, BAR_CHART_LIMIT)));
   }
+  if (data.mapPoints && data.mapPoints.length > 0) {
+    breakdownCards.push(createWorldMapCard(data.mapPoints));
+  }
   if (breakdownCards.length > 0) {
-    list.append(createCardsSectionFromElements("BREAKDOWN", breakdownCards));
+    list.append(createCardsSectionFromElements("BREAKDOWN LAST 14 DAYS", breakdownCards));
   }
 
-  list.append(createCardsSection("REDIRECTS BY URL", data.urls, createStatCard));
+  list.append(createCardsSection("TOTAL REDIRECTS BY URL", data.urls, createStatCard));
 }
 
 loadStats();

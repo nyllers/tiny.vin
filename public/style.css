@@ -253,6 +253,10 @@ footer {
   }
 }
 
+.url-card--span-2 {
+  grid-column: 1 / -1;
+}
+
 .url-card {
   display: flex;
   flex-direction: column;
@@ -908,6 +912,11 @@ footer {
   fill: var(--bg);
 }
 
+.world-map-land {
+  fill: var(--input-border);
+  stroke: none;
+}
+
 .world-map-grid {
   stroke: var(--card-border);
   stroke-width: 0.5;
@@ -915,7 +924,8 @@ footer {
 
 .world-map-grid--prime,
 .world-map-grid--equator {
-  stroke: var(--input-border);
+  stroke: var(--muted);
+  stroke-opacity: 0.5;
 }
 
 .world-map-border {

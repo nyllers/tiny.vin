@@ -454,33 +454,34 @@ async function handleStats(env, session) {
   const identityId = await getIdentityId(env, session.email);
   const cutoff = Date.now() - STATS_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
-  // Per-URL click counts/last-click power both the "Redirects per URL" chart
-  // and the individual URL cards' mini bars, so both stay windowed the same way.
+  // Lifetime per-URL click counts/last-click, for the "Total Redirects by
+  // URL" cards - deliberately not windowed, unlike every chart below.
   const { results } = await env.DB.prepare(
     `SELECT u.code, u.kind, u.original_url, u.created_at,
             COUNT(re.id) AS clicks,
             MAX(re.requested_at) AS last_click
      FROM urls u
-     LEFT JOIN redirect_events re
-       ON re.code = u.code AND re.kind = u.kind AND re.requested_at >= ?
+     LEFT JOIN redirect_events re ON re.code = u.code AND re.kind = u.kind
      WHERE u.created_by = ?
      GROUP BY u.code, u.kind
      ORDER BY u.created_at DESC`
   )
-    .bind(cutoff, identityId)
-    .all();
-
-  // The top "Redirects" summary tile is a lifetime count, deliberately not
-  // windowed, so it needs its own unfiltered query.
-  const { results: lifetimeRows } = await env.DB.prepare(
-    `SELECT COUNT(*) AS cnt
-     FROM redirect_events re
-     JOIN urls u ON u.code = re.code AND u.kind = re.kind
-     WHERE u.created_by = ?`
-  )
     .bind(identityId)
     .all();
-  const totalClicksLifetime = lifetimeRows[0]?.cnt || 0;
+
+  // Same shape, windowed to the last 14 days, feeding only the "Redirects
+  // per URL" chart (a bar chart, so it follows the same window as the rest).
+  const { results: recentResults } = await env.DB.prepare(
+    `SELECT u.code, u.kind, u.original_url,
+            COUNT(re.id) AS clicks
+     FROM urls u
+     LEFT JOIN redirect_events re
+       ON re.code = u.code AND re.kind = u.kind AND re.requested_at >= ?
+     WHERE u.created_by = ?
+     GROUP BY u.code, u.kind`
+  )
+    .bind(cutoff, identityId)
+    .all();
 
   const { results: topCountryRows } = await env.DB.prepare(
     `SELECT re.country AS country, COUNT(*) AS cnt
@@ -556,10 +557,24 @@ async function handleStats(env, session) {
     lastClickAt: row.last_click,
   }));
 
+  let totalClicksLifetime = 0;
   const urls = Array.from(groups, ([originalUrl, shortUrls]) => {
     const groupTotal = shortUrls.reduce((sum, s) => sum + s.clicks, 0);
+    totalClicksLifetime += groupTotal;
     return { originalUrl, totalClicks: groupTotal, shortUrls };
   }).sort((a, b) => b.totalClicks - a.totalClicks);
+
+  const recentGroups = groupByOriginalUrl(recentResults, (row) => ({
+    code: row.code,
+    kind: row.kind,
+    shortUrl: formatShortUrl(row.code, row.kind),
+    clicks: row.clicks,
+  }));
+  const urlBreakdown14d = Array.from(recentGroups, ([originalUrl, shortUrls]) => ({
+    originalUrl,
+    totalClicks: shortUrls.reduce((sum, s) => sum + s.clicks, 0),
+    shortUrls,
+  })).sort((a, b) => b.totalClicks - a.totalClicks);
 
   return jsonResponse({
     totalLinks: results.length,
@@ -570,6 +585,7 @@ async function handleStats(env, session) {
     devices: topCounts(deviceCounts, 10),
     dailyRedirects,
     mapPoints: mapPointRows.map((row) => ({ lat: row.lat, lng: row.lng, count: row.cnt })),
+    urlBreakdown14d,
     urls,
   });
 }
