@@ -63,9 +63,9 @@ function formatDayLabel(dateStr) {
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
-const DAILY_CHART_WIDTH = 220;
-const DAILY_CHART_HEIGHT = 64;
-const DAILY_CHART_BAR_GAP = 2;
+const CHART_WIDTH = 220;
+const CHART_HEIGHT = 64;
+const CHART_BAR_GAP = 2;
 
 function roundedTopBarPath(x, y, width, height, radius) {
   const r = Math.max(0, Math.min(radius, width / 2, height));
@@ -82,33 +82,36 @@ function roundedTopBarPath(x, y, width, height, radius) {
   );
 }
 
-function createDailyChart(days) {
-  const barCount = days.length;
-  const barWidth = (DAILY_CHART_WIDTH - DAILY_CHART_BAR_GAP * (barCount - 1)) / barCount;
-  const maxCount = Math.max(...days.map((d) => d.count), 1);
+// Generic bar chart: entries = [{ label, count }]. Used by the daily chart,
+// the per-URL breakdown, and the new browser/referer breakdowns alike -
+// only the aria-label wording and how each entry's label is formatted differ.
+function createBarChart(entries, { ariaLabel, describeEntry }) {
+  const barCount = entries.length;
+  const barWidth = (CHART_WIDTH - CHART_BAR_GAP * (barCount - 1)) / barCount;
+  const maxCount = Math.max(...entries.map((e) => e.count), 1);
   const labelSpace = 11;
-  const baseline_y = DAILY_CHART_HEIGHT - 1;
+  const baseline_y = CHART_HEIGHT - 1;
   const plotHeight = baseline_y - labelSpace;
-  const peakIndex = days.reduce((best, d, i) => (d.count > days[best].count ? i : best), 0);
+  const peakIndex = entries.reduce((best, e, i) => (e.count > entries[best].count ? i : best), 0);
 
   const svg = document.createElementNS(SVG_NS, "svg");
-  svg.setAttribute("viewBox", `0 0 ${DAILY_CHART_WIDTH} ${DAILY_CHART_HEIGHT}`);
+  svg.setAttribute("viewBox", `0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`);
   svg.setAttribute("preserveAspectRatio", "none");
   svg.setAttribute("class", "daily-chart");
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "Redirects last 14 days");
+  svg.setAttribute("aria-label", ariaLabel);
 
   const baseline = document.createElementNS(SVG_NS, "line");
   baseline.setAttribute("x1", "0");
-  baseline.setAttribute("x2", String(DAILY_CHART_WIDTH));
+  baseline.setAttribute("x2", String(CHART_WIDTH));
   baseline.setAttribute("y1", String(baseline_y));
   baseline.setAttribute("y2", String(baseline_y));
   baseline.setAttribute("class", "daily-chart-baseline");
   svg.appendChild(baseline);
 
-  days.forEach((day, i) => {
-    const x = i * (barWidth + DAILY_CHART_BAR_GAP);
-    const barHeight = day.count > 0 ? Math.max((day.count / maxCount) * (plotHeight - 2), 3) : 0;
+  entries.forEach((entry, i) => {
+    const x = i * (barWidth + CHART_BAR_GAP);
+    const barHeight = entry.count > 0 ? Math.max((entry.count / maxCount) * (plotHeight - 2), 3) : 0;
     const barTop = baseline_y - barHeight;
 
     const col = document.createElementNS(SVG_NS, "g");
@@ -121,13 +124,13 @@ function createDailyChart(days) {
       col.appendChild(bar);
     }
 
-    if (day.count > 0 && i === peakIndex) {
+    if (entry.count > 0 && i === peakIndex) {
       const peakLabel = document.createElementNS(SVG_NS, "text");
       peakLabel.setAttribute("class", "chart-value-label");
       peakLabel.setAttribute("x", String(x + barWidth / 2));
       peakLabel.setAttribute("y", String(barTop - 3));
       peakLabel.setAttribute("text-anchor", "middle");
-      peakLabel.textContent = String(day.count);
+      peakLabel.textContent = String(entry.count);
       col.appendChild(peakLabel);
     }
 
@@ -136,10 +139,10 @@ function createDailyChart(days) {
     hit.setAttribute("x", String(x));
     hit.setAttribute("y", "0");
     hit.setAttribute("width", String(barWidth));
-    hit.setAttribute("height", String(DAILY_CHART_HEIGHT));
+    hit.setAttribute("height", String(CHART_HEIGHT));
     hit.setAttribute("tabindex", "0");
     hit.setAttribute("role", "img");
-    const label = `${formatDayLabel(day.date)}: ${day.count} redirect${day.count === 1 ? "" : "s"}`;
+    const label = describeEntry(entry);
     hit.setAttribute("aria-label", label);
 
     const titleEl = document.createElementNS(SVG_NS, "title");
@@ -153,15 +156,118 @@ function createDailyChart(days) {
   return svg;
 }
 
+// Compact axis: truncates each entry's label to fit the available space,
+// used in the small card view.
+function createCompactAxis(entries, labelFor, maxTotalChars) {
+  const axis = document.createElement("div");
+  axis.className = "url-chart-axis";
+  const perEntryChars = entries.length === 0 ? maxTotalChars : Math.floor(maxTotalChars / entries.length);
+  for (const entry of entries) {
+    const span = document.createElement("span");
+    const text = labelFor(entry);
+    span.textContent = perEntryChars <= 3 ? " " : text.length > perEntryChars ? `${text.slice(0, perEntryChars - 1)}…` : text;
+    axis.append(span);
+  }
+  return axis;
+}
+
+// Full axis: every label shown in full, wrapping instead of truncating.
+// Used in the expanded modal view, which has the width to spare.
+function createFullAxis(entries, labelFor) {
+  const axis = document.createElement("div");
+  axis.className = "url-chart-axis url-chart-axis--wide";
+  for (const entry of entries) {
+    const span = document.createElement("span");
+    span.textContent = labelFor(entry);
+    axis.append(span);
+  }
+  return axis;
+}
+
+function createExpandButton(onExpand) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-btn chart-expand-btn";
+  button.title = "Expand";
+  button.setAttribute("aria-label", "Expand chart");
+  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+    <path d="M15 3h6v6"></path>
+    <path d="M9 21H3v-6"></path>
+    <path d="M21 3l-7 7"></path>
+    <path d="M3 21l7-7"></path>
+  </svg>`;
+  button.addEventListener("click", onExpand);
+  return button;
+}
+
+function createCardHeader(titleText, onExpand) {
+  const header = document.createElement("div");
+  header.className = "breakdown-card-header";
+  const title = document.createElement("p");
+  title.className = "breakdown-card-title";
+  title.textContent = titleText;
+  header.append(title, createExpandButton(onExpand));
+  return header;
+}
+
+function openChartModal(title, buildContent) {
+  const overlay = document.getElementById("chart-modal-overlay");
+  const titleEl = document.getElementById("chart-modal-title");
+  const body = document.getElementById("chart-modal-body");
+  const closeBtn = document.getElementById("chart-modal-close");
+  const previouslyFocused = document.activeElement;
+
+  titleEl.textContent = title;
+  body.textContent = "";
+  body.appendChild(buildContent());
+  overlay.hidden = false;
+  closeBtn.focus();
+
+  function close() {
+    overlay.hidden = true;
+    closeBtn.removeEventListener("click", close);
+    overlay.removeEventListener("click", onOverlayClick);
+    document.removeEventListener("keydown", onKeydown);
+    if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
+  }
+
+  function onOverlayClick(event) {
+    if (event.target === overlay) close();
+  }
+
+  function onKeydown(event) {
+    if (event.key === "Escape") close();
+  }
+
+  closeBtn.addEventListener("click", close);
+  overlay.addEventListener("click", onOverlayClick);
+  document.addEventListener("keydown", onKeydown);
+}
+
+function dailyEntries(days) {
+  return days.map((d) => ({ label: formatDayLabel(d.date), count: d.count, date: d.date }));
+}
+
+function buildDailyChart(days) {
+  return createBarChart(dailyEntries(days), {
+    ariaLabel: `Redirects last ${days.length} days`,
+    describeEntry: (e) => `${e.label}: ${e.count} redirect${e.count === 1 ? "" : "s"}`,
+  });
+}
+
 function createDailyChartCard(days) {
   const card = document.createElement("div");
   card.className = "url-card";
 
-  const title = document.createElement("p");
-  title.className = "breakdown-card-title";
-  title.textContent = "Redirects Last 14 Days";
+  const header = createCardHeader("Number of Redirects", () =>
+    openChartModal("Number of Redirects", () => {
+      const fragment = document.createDocumentFragment();
+      fragment.append(buildDailyChart(days), createFullAxis(dailyEntries(days), (e) => e.label));
+      return fragment;
+    })
+  );
 
-  const chart = createDailyChart(days);
+  const chart = buildDailyChart(days);
 
   const axis = document.createElement("div");
   axis.className = "daily-chart-axis";
@@ -171,116 +277,170 @@ function createDailyChartCard(days) {
   lastLabel.textContent = formatDayLabel(days[days.length - 1].date);
   axis.append(firstLabel, lastLabel);
 
-  card.append(title, chart, axis);
+  card.append(header, chart, axis);
   return card;
 }
 
-const URL_CHART_LIMIT = 10;
-const URL_CHART_LABEL_MAX_CHARS = 32;
-
-function truncateCode(code, maxChars) {
-  if (maxChars <= 3) return " ";
-  return code.length > maxChars ? `${code.slice(0, maxChars - 1)}…` : code;
-}
+const BAR_CHART_LIMIT = 10;
+const BAR_CHART_LABEL_MAX_CHARS = 32;
 
 function flattenShortUrls(urls) {
   return urls
     .flatMap((group) => group.shortUrls.map((shortUrlItem) => ({ ...shortUrlItem, originalUrl: group.originalUrl })))
     .filter((entry) => entry.clicks > 0)
     .sort((a, b) => b.clicks - a.clicks)
-    .slice(0, URL_CHART_LIMIT);
+    .slice(0, BAR_CHART_LIMIT);
 }
 
-function createUrlBreakdownChart(entries) {
-  const barCount = entries.length;
-  const barWidth = (DAILY_CHART_WIDTH - DAILY_CHART_BAR_GAP * (barCount - 1)) / barCount;
-  const maxCount = Math.max(...entries.map((e) => e.clicks), 1);
-  const labelSpace = 11;
-  const baseline_y = DAILY_CHART_HEIGHT - 1;
-  const plotHeight = baseline_y - labelSpace;
-  const peakIndex = entries.reduce((best, e, i) => (e.clicks > entries[best].clicks ? i : best), 0);
+// Shared builder for the three "top N, similar bar chart" cards: redirects
+// per URL, per browser, and per referer. `labelFor`/`describeEntry` adapt it
+// to each dataset's shape.
+function createBreakdownChartCard(titleText, entries, { chartAriaLabel, labelFor, describeEntry, modalTitle }) {
+  const card = document.createElement("div");
+  card.className = "url-card";
 
+  const barEntries = entries.map((e) => ({ ...e, count: e.count ?? e.clicks }));
+
+  const header = createCardHeader(titleText, () =>
+    openChartModal(modalTitle || titleText, () => {
+      const fragment = document.createDocumentFragment();
+      fragment.append(
+        createBarChart(barEntries, { ariaLabel: chartAriaLabel, describeEntry }),
+        createFullAxis(barEntries, labelFor)
+      );
+      return fragment;
+    })
+  );
+
+  const chart = createBarChart(barEntries, { ariaLabel: chartAriaLabel, describeEntry });
+  const axis = createCompactAxis(barEntries, labelFor, BAR_CHART_LABEL_MAX_CHARS);
+
+  card.append(header, chart, axis);
+  return card;
+}
+
+function createUrlBreakdownChartCard(entries) {
+  return createBreakdownChartCard("Redirects per URL", entries, {
+    chartAriaLabel: "Redirects per URL",
+    labelFor: (e) => e.code,
+    describeEntry: (e) => `${e.shortUrl} (${e.originalUrl}): ${e.count} redirect${e.count === 1 ? "" : "s"}`,
+  });
+}
+
+function createBrowserChartCard(browsers) {
+  const entries = browsers.map((b) => ({ label: b.name, count: b.count }));
+  return createBreakdownChartCard("Redirects by Browser", entries, {
+    chartAriaLabel: "Redirects by browser",
+    labelFor: (e) => e.label,
+    describeEntry: (e) => `${e.label}: ${e.count} redirect${e.count === 1 ? "" : "s"}`,
+  });
+}
+
+function createRefererChartCard(referrers) {
+  const entries = referrers.map((r) => ({ label: r.name, count: r.count }));
+  return createBreakdownChartCard("Redirects by Referer", entries, {
+    chartAriaLabel: "Redirects by referer",
+    labelFor: (e) => e.label,
+    describeEntry: (e) => `${e.label}: ${e.count} redirect${e.count === 1 ? "" : "s"}`,
+  });
+}
+
+// World map: an equirectangular projection with the real (simplified)
+// landmass outline from public-domain Natural Earth data behind a dot per
+// distinct lat/lng, radius scaled by count. See world-map-path.js for the
+// outline's provenance.
+const MAP_WIDTH = 360;
+const MAP_HEIGHT = 180;
+
+function projectLatLng(lat, lng) {
+  return { x: lng + 180, y: 90 - lat };
+}
+
+function createWorldMapSvg(points) {
   const svg = document.createElementNS(SVG_NS, "svg");
-  svg.setAttribute("viewBox", `0 0 ${DAILY_CHART_WIDTH} ${DAILY_CHART_HEIGHT}`);
-  svg.setAttribute("preserveAspectRatio", "none");
-  svg.setAttribute("class", "daily-chart");
+  svg.setAttribute("viewBox", `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  svg.setAttribute("class", "world-map");
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "Redirects per URL");
+  svg.setAttribute("aria-label", "Redirected geographic locations, last 14 days");
 
-  const baseline = document.createElementNS(SVG_NS, "line");
-  baseline.setAttribute("x1", "0");
-  baseline.setAttribute("x2", String(DAILY_CHART_WIDTH));
-  baseline.setAttribute("y1", String(baseline_y));
-  baseline.setAttribute("y2", String(baseline_y));
-  baseline.setAttribute("class", "daily-chart-baseline");
-  svg.appendChild(baseline);
+  const background = document.createElementNS(SVG_NS, "rect");
+  background.setAttribute("x", "0");
+  background.setAttribute("y", "0");
+  background.setAttribute("width", String(MAP_WIDTH));
+  background.setAttribute("height", String(MAP_HEIGHT));
+  background.setAttribute("class", "world-map-bg");
+  svg.appendChild(background);
 
-  entries.forEach((entry, i) => {
-    const x = i * (barWidth + DAILY_CHART_BAR_GAP);
-    const barHeight = Math.max((entry.clicks / maxCount) * (plotHeight - 2), 3);
-    const barTop = baseline_y - barHeight;
+  const land = document.createElementNS(SVG_NS, "path");
+  land.setAttribute("d", WORLD_LAND_PATH);
+  land.setAttribute("class", "world-map-land");
+  svg.appendChild(land);
 
-    const col = document.createElementNS(SVG_NS, "g");
-    col.setAttribute("class", "daily-chart-col");
+  for (let lng = -180; lng <= 180; lng += 30) {
+    const x = lng + 180;
+    const line = document.createElementNS(SVG_NS, "line");
+    line.setAttribute("x1", String(x));
+    line.setAttribute("x2", String(x));
+    line.setAttribute("y1", "0");
+    line.setAttribute("y2", String(MAP_HEIGHT));
+    line.setAttribute("class", lng === 0 ? "world-map-grid world-map-grid--prime" : "world-map-grid");
+    svg.appendChild(line);
+  }
 
-    const bar = document.createElementNS(SVG_NS, "path");
-    bar.setAttribute("class", "daily-chart-bar");
-    bar.setAttribute("d", roundedTopBarPath(x, barTop, barWidth, barHeight, 4));
-    col.appendChild(bar);
+  for (let lat = -90; lat <= 90; lat += 30) {
+    const y = 90 - lat;
+    const line = document.createElementNS(SVG_NS, "line");
+    line.setAttribute("x1", "0");
+    line.setAttribute("x2", String(MAP_WIDTH));
+    line.setAttribute("y1", String(y));
+    line.setAttribute("y2", String(y));
+    line.setAttribute("class", lat === 0 ? "world-map-grid world-map-grid--equator" : "world-map-grid");
+    svg.appendChild(line);
+  }
 
-    if (i === peakIndex) {
-      const peakLabel = document.createElementNS(SVG_NS, "text");
-      peakLabel.setAttribute("class", "chart-value-label");
-      peakLabel.setAttribute("x", String(x + barWidth / 2));
-      peakLabel.setAttribute("y", String(barTop - 3));
-      peakLabel.setAttribute("text-anchor", "middle");
-      peakLabel.textContent = String(entry.clicks);
-      col.appendChild(peakLabel);
-    }
+  const border = document.createElementNS(SVG_NS, "rect");
+  border.setAttribute("x", "0.5");
+  border.setAttribute("y", "0.5");
+  border.setAttribute("width", String(MAP_WIDTH - 1));
+  border.setAttribute("height", String(MAP_HEIGHT - 1));
+  border.setAttribute("class", "world-map-border");
+  svg.appendChild(border);
 
-    const hit = document.createElementNS(SVG_NS, "rect");
-    hit.setAttribute("class", "daily-chart-hit");
-    hit.setAttribute("x", String(x));
-    hit.setAttribute("y", "0");
-    hit.setAttribute("width", String(barWidth));
-    hit.setAttribute("height", String(DAILY_CHART_HEIGHT));
-    hit.setAttribute("tabindex", "0");
-    hit.setAttribute("role", "img");
-    const label = `${entry.shortUrl} (${entry.originalUrl}): ${entry.clicks} redirect${entry.clicks === 1 ? "" : "s"}`;
-    hit.setAttribute("aria-label", label);
+  const maxCount = Math.max(...points.map((p) => p.count), 1);
+  for (const point of points) {
+    const { x, y } = projectLatLng(point.lat, point.lng);
+    const radius = 1.5 + Math.sqrt(point.count / maxCount) * 3.5;
+
+    const dot = document.createElementNS(SVG_NS, "circle");
+    dot.setAttribute("cx", String(x));
+    dot.setAttribute("cy", String(y));
+    dot.setAttribute("r", String(radius));
+    dot.setAttribute("class", "world-map-dot");
 
     const titleEl = document.createElementNS(SVG_NS, "title");
-    titleEl.textContent = label;
-    hit.appendChild(titleEl);
+    titleEl.textContent = `${point.count} redirect${point.count === 1 ? "" : "s"}`;
+    dot.appendChild(titleEl);
 
-    col.appendChild(hit);
-    svg.appendChild(col);
-  });
+    svg.appendChild(dot);
+  }
 
   return svg;
 }
 
-function createUrlBreakdownChartCard(entries) {
+function createWorldMapCard(points) {
   const card = document.createElement("div");
-  card.className = "url-card";
+  card.className = "url-card url-card--span-2";
 
-  const title = document.createElement("p");
-  title.className = "breakdown-card-title";
-  title.textContent = "Redirects per URL";
+  const header = createCardHeader("Redirected Geographic Locations", () =>
+    openChartModal("Redirected Geographic Locations", () => {
+      const fragment = document.createDocumentFragment();
+      fragment.append(createWorldMapSvg(points));
+      return fragment;
+    })
+  );
 
-  const chart = createUrlBreakdownChart(entries);
-
-  const codeLabelMaxChars =
-    entries.length === 0 ? URL_CHART_LABEL_MAX_CHARS : Math.floor(URL_CHART_LABEL_MAX_CHARS / entries.length);
-  const axis = document.createElement("div");
-  axis.className = "url-chart-axis";
-  for (const entry of entries) {
-    const span = document.createElement("span");
-    span.textContent = truncateCode(entry.code, codeLabelMaxChars);
-    axis.append(span);
-  }
-
-  card.append(title, chart, axis);
+  card.append(header, createWorldMapSvg(points));
   return card;
 }
 
@@ -329,15 +489,24 @@ async function loadStats() {
   if (data.dailyRedirects.some((d) => d.count > 0)) {
     breakdownCards.push(createDailyChartCard(data.dailyRedirects));
   }
-  const urlChartEntries = flattenShortUrls(data.urls);
+  const urlChartEntries = flattenShortUrls(data.urlBreakdown14d || []);
   if (urlChartEntries.length > 0) {
     breakdownCards.push(createUrlBreakdownChartCard(urlChartEntries));
   }
+  if (data.browsers && data.browsers.length > 0) {
+    breakdownCards.push(createBrowserChartCard(data.browsers.slice(0, BAR_CHART_LIMIT)));
+  }
+  if (data.topReferrers && data.topReferrers.length > 0) {
+    breakdownCards.push(createRefererChartCard(data.topReferrers.slice(0, BAR_CHART_LIMIT)));
+  }
+  if (data.mapPoints && data.mapPoints.length > 0) {
+    breakdownCards.push(createWorldMapCard(data.mapPoints));
+  }
   if (breakdownCards.length > 0) {
-    list.append(createCardsSectionFromElements("BREAKDOWN", breakdownCards));
+    list.append(createCardsSectionFromElements("BREAKDOWN LAST 14 DAYS", breakdownCards));
   }
 
-  list.append(createCardsSection("REDIRECTS BY URL", data.urls, createStatCard));
+  list.append(createCardsSection("TOTAL REDIRECTS BY URL", data.urls, createStatCard));
 }
 
 loadStats();

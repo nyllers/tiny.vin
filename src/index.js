@@ -448,9 +448,14 @@ function topCounts(counts, limit) {
     .slice(0, limit);
 }
 
+const STATS_WINDOW_DAYS = 14;
+
 async function handleStats(env, session) {
   const identityId = await getIdentityId(env, session.email);
+  const cutoff = Date.now() - STATS_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
+  // Lifetime per-URL click counts/last-click, for the "Total Redirects by
+  // URL" cards - deliberately not windowed, unlike every chart below.
   const { results } = await env.DB.prepare(
     `SELECT u.code, u.kind, u.original_url, u.created_at,
             COUNT(re.id) AS clicks,
@@ -464,20 +469,32 @@ async function handleStats(env, session) {
     .bind(identityId)
     .all();
 
+  // Same shape, windowed to the last 14 days, feeding only the "Redirects
+  // per URL" chart (a bar chart, so it follows the same window as the rest).
+  const { results: recentResults } = await env.DB.prepare(
+    `SELECT u.code, u.kind, u.original_url,
+            COUNT(re.id) AS clicks
+     FROM urls u
+     LEFT JOIN redirect_events re
+       ON re.code = u.code AND re.kind = u.kind AND re.requested_at >= ?
+     WHERE u.created_by = ?
+     GROUP BY u.code, u.kind`
+  )
+    .bind(cutoff, identityId)
+    .all();
+
   const { results: topCountryRows } = await env.DB.prepare(
     `SELECT re.country AS country, COUNT(*) AS cnt
      FROM redirect_events re
      JOIN urls u ON u.code = re.code AND u.kind = re.kind
-     WHERE u.created_by = ? AND re.country IS NOT NULL
+     WHERE u.created_by = ? AND re.country IS NOT NULL AND re.requested_at >= ?
      GROUP BY re.country
      ORDER BY cnt DESC
      LIMIT 5`
   )
-    .bind(identityId)
+    .bind(identityId, cutoff)
     .all();
 
-  const dailyWindowDays = 14;
-  const dailyCutoff = Date.now() - dailyWindowDays * 24 * 60 * 60 * 1000;
   const { results: dailyRows } = await env.DB.prepare(
     `SELECT strftime('%Y-%m-%d', re.requested_at / 1000, 'unixepoch') AS day,
             COUNT(*) AS cnt
@@ -486,16 +503,27 @@ async function handleStats(env, session) {
      WHERE u.created_by = ? AND re.requested_at >= ?
      GROUP BY day`
   )
-    .bind(identityId, dailyCutoff)
+    .bind(identityId, cutoff)
     .all();
 
   const { results: eventRows } = await env.DB.prepare(
     `SELECT re.referer AS referer, re.user_agent AS user_agent
      FROM redirect_events re
      JOIN urls u ON u.code = re.code AND u.kind = re.kind
-     WHERE u.created_by = ?`
+     WHERE u.created_by = ? AND re.requested_at >= ?`
   )
-    .bind(identityId)
+    .bind(identityId, cutoff)
+    .all();
+
+  const { results: mapPointRows } = await env.DB.prepare(
+    `SELECT re.latitude AS lat, re.longitude AS lng, COUNT(*) AS cnt
+     FROM redirect_events re
+     JOIN urls u ON u.code = re.code AND u.kind = re.kind
+     WHERE u.created_by = ? AND re.requested_at >= ?
+       AND re.latitude IS NOT NULL AND re.longitude IS NOT NULL
+     GROUP BY re.latitude, re.longitude`
+  )
+    .bind(identityId, cutoff)
     .all();
 
   const referrerCounts = new Map();
@@ -515,7 +543,7 @@ async function handleStats(env, session) {
 
   const dailyByDate = new Map(dailyRows.map((row) => [row.day, row.cnt]));
   const dailyRedirects = [];
-  for (let i = dailyWindowDays - 1; i >= 0; i--) {
+  for (let i = STATS_WINDOW_DAYS - 1; i >= 0; i--) {
     const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     dailyRedirects.push({ date, count: dailyByDate.get(date) || 0 });
   }
@@ -529,21 +557,35 @@ async function handleStats(env, session) {
     lastClickAt: row.last_click,
   }));
 
-  let totalClicks = 0;
+  let totalClicksLifetime = 0;
   const urls = Array.from(groups, ([originalUrl, shortUrls]) => {
     const groupTotal = shortUrls.reduce((sum, s) => sum + s.clicks, 0);
-    totalClicks += groupTotal;
+    totalClicksLifetime += groupTotal;
     return { originalUrl, totalClicks: groupTotal, shortUrls };
   }).sort((a, b) => b.totalClicks - a.totalClicks);
 
+  const recentGroups = groupByOriginalUrl(recentResults, (row) => ({
+    code: row.code,
+    kind: row.kind,
+    shortUrl: formatShortUrl(row.code, row.kind),
+    clicks: row.clicks,
+  }));
+  const urlBreakdown14d = Array.from(recentGroups, ([originalUrl, shortUrls]) => ({
+    originalUrl,
+    totalClicks: shortUrls.reduce((sum, s) => sum + s.clicks, 0),
+    shortUrls,
+  })).sort((a, b) => b.totalClicks - a.totalClicks);
+
   return jsonResponse({
     totalLinks: results.length,
-    totalClicks,
+    totalClicks: totalClicksLifetime,
     topCountries: topCountryRows.map((row) => ({ name: row.country, count: row.cnt })),
-    topReferrers: topCounts(referrerCounts, 5),
+    topReferrers: topCounts(referrerCounts, 10),
     browsers: topCounts(browserCounts, 10),
     devices: topCounts(deviceCounts, 10),
     dailyRedirects,
+    mapPoints: mapPointRows.map((row) => ({ lat: row.lat, lng: row.lng, count: row.cnt })),
+    urlBreakdown14d,
     urls,
   });
 }
@@ -572,13 +614,15 @@ async function recordRedirectEvent(env, { code, kind, request }) {
     const userAgent = request.headers.get("User-Agent");
     const referer = request.headers.get("Referer");
     const country = request.cf?.country || null;
+    const latitude = request.cf?.latitude != null ? Number(request.cf.latitude) : null;
+    const longitude = request.cf?.longitude != null ? Number(request.cf.longitude) : null;
 
     await env.DB.prepare(
       `INSERT INTO redirect_events
-        (code, kind, requested_at, ip_address, country, user_agent, referer, headers, cf_data)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (code, kind, requested_at, ip_address, country, user_agent, referer, headers, cf_data, latitude, longitude)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-      .bind(code, kind, Date.now(), ipAddress, country, userAgent, referer, headers, cfData)
+      .bind(code, kind, Date.now(), ipAddress, country, userAgent, referer, headers, cfData, latitude, longitude)
       .run();
   } catch {
     // stats are best-effort; never block a redirect over it

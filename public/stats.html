@@ -62,7 +62,17 @@
   </section>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
   <footer>Simple project by Anders &amp; Claude</footer>
+  <div class="modal-overlay" id="chart-modal-overlay" hidden>
+    <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="chart-modal-title">
+      <p class="modal-title" id="chart-modal-title"></p>
+      <div class="chart-modal-body" id="chart-modal-body"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn modal-btn--cancel" id="chart-modal-close">Close</button>
+      </div>
+    </div>
+  </div>
   <script src="cards.js"></script>
+  <script src="world-map-path.js"></script>
   <script src="stats.js"></script>
   <script src="theme.js"></script>
   <script src="nav.js"></script>
