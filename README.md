@@ -35,6 +35,14 @@ Every successful login is recorded in D1: `login_identities` holds one row per e
 
 `login_identities` originally also had a `provider` column (this project has only ever supported Google sign-in, so it never carried real information) and its email column was originally named `username`. If the database predates this cleanup, apply `migrations/0010_login_identities_email.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0010_login_identities_email.sql --remote`) in addition to `schema.sql`. This migration rebuilds `login_identities` and `login_identities_history` (SQLite can't drop a column that's part of a UNIQUE constraint or referenced by a trigger), so back up first if the data matters.
 
+`login_identities.role` distinguishes regular users (`'user'`, the default for every new signup) from administrators (`'admin'`). There's no UI for this yet — promote an account by hand:
+
+```bash
+wrangler d1 execute tiny-vin-db --remote --command "UPDATE login_identities SET role = 'admin' WHERE email = 'you@example.com'"
+```
+
+If the database was created before this existed, apply `migrations/0012_add_login_identities_role.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0012_add_login_identities_role.sql --remote`) in addition to `schema.sql`. This migration also promotes every account that already existed at the time it runs to `'admin'`, since there was no user/admin distinction before it — review who that affects before running it against production.
+
 ## API access
 
 Signed-in accounts can create tiny URLs from the command line instead of the browser, via an API key. The `/api` page (linked from the nav) generates one while signed in — one key per account; regenerating immediately invalidates the previous one.
