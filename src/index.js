@@ -13,6 +13,8 @@ const RESERVED_CODES = new Set(["login", "subdomain", "stats", "privacy", "terms
 const PROTECTED_PAGES = new Set(["/", "/stats", "/stats.html", "/api", "/api.html"]);
 const API_KEY_PATTERN = /^tvk_[0-9a-f]{48}$/;
 const VALID_KINDS = new Set(["generated-path", "custom-path", "subdomain"]);
+const MIN_CUSTOM_PATH_LENGTH = 4;
+const MIN_CUSTOM_PATH_LENGTH_ADMIN = 1;
 
 const LOGIN_ERRORS = {
   oauth_failed: "Something went wrong signing in. Please try again.",
@@ -215,9 +217,9 @@ async function validateUrl(input) {
   return { url: input };
 }
 
-function validateSuffix(input) {
-  if (!/^[A-Za-z0-9]{1,32}$/.test(input)) {
-    return { error: "Custom short URLs can only contain letters and numbers (1-32 characters)." };
+function validateSuffix(input, minLength) {
+  if (!/^[A-Za-z0-9]+$/.test(input) || input.length < minLength || input.length > 32) {
+    return { error: `Custom short URLs can only contain letters and numbers (${minLength}-32 characters).` };
   }
 
   if (RESERVED_CODES.has(input.toLowerCase())) {
@@ -227,11 +229,12 @@ function validateSuffix(input) {
   return { code: input };
 }
 
-function validateSubdomain(input) {
-  if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(input)) {
+function validateSubdomain(input, minLength) {
+  const validChars = /^[a-z0-9-]+$/.test(input);
+  const noEdgeHyphen = input[0] !== "-" && input[input.length - 1] !== "-";
+  if (!validChars || !noEdgeHyphen || input.length < minLength || input.length > 63) {
     return {
-      error:
-        "Subdomains can only contain lowercase letters, numbers, and hyphens (not at the start or end), 1-63 characters.",
+      error: `Subdomains can only contain lowercase letters, numbers, and hyphens (not at the start or end), ${minLength}-63 characters.`,
     };
   }
 
@@ -278,19 +281,25 @@ async function handleShorten(request, env, session) {
   }
 
   const customSuffix = typeof body.path === "string" ? body.path.trim() : "";
+  const customSubdomain = typeof body.subdomain === "string" ? body.subdomain.trim() : "";
+
+  let minCustomPathLength = MIN_CUSTOM_PATH_LENGTH;
+  if (customSuffix || customSubdomain) {
+    minCustomPathLength = (await isAdmin(env, session.email)) ? MIN_CUSTOM_PATH_LENGTH_ADMIN : MIN_CUSTOM_PATH_LENGTH;
+  }
+
   let customCode = null;
   if (customSuffix) {
-    const suffixValidation = validateSuffix(customSuffix);
+    const suffixValidation = validateSuffix(customSuffix, minCustomPathLength);
     if (suffixValidation.error) {
       return jsonResponse({ error: suffixValidation.error }, 400);
     }
     customCode = suffixValidation.code;
   }
 
-  const customSubdomain = typeof body.subdomain === "string" ? body.subdomain.trim() : "";
   let subdomainCode = null;
   if (customSubdomain) {
-    const subdomainValidation = validateSubdomain(customSubdomain);
+    const subdomainValidation = validateSubdomain(customSubdomain, minCustomPathLength);
     if (subdomainValidation.error) {
       return jsonResponse({ error: subdomainValidation.error }, 400);
     }
@@ -336,6 +345,14 @@ async function getIdentityId(env, email) {
     .first();
 
   return identity ? identity.id : null;
+}
+
+async function isAdmin(env, email) {
+  const identity = await env.DB.prepare("SELECT role FROM login_identities WHERE email = ?")
+    .bind(email)
+    .first();
+
+  return identity?.role === "admin";
 }
 
 async function getIdentityByApiKey(env, key) {
