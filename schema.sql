@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS redirect_events (
   referer TEXT,
   headers TEXT NOT NULL,
   cf_data TEXT,
+  latitude REAL,
+  longitude REAL,
   FOREIGN KEY (code, kind) REFERENCES urls(code, kind) ON DELETE CASCADE
 );
 
@@ -132,6 +134,8 @@ CREATE TABLE IF NOT EXISTS redirect_events_history (
   referer TEXT,
   headers TEXT,
   cf_data TEXT,
+  latitude REAL,
+  longitude REAL,
   history_created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -139,18 +143,18 @@ CREATE TRIGGER IF NOT EXISTS redirect_events_history_update
 AFTER UPDATE ON redirect_events
 BEGIN
   INSERT INTO redirect_events_history
-    (id, code, kind, requested_at, ip_address, country, user_agent, referer, headers, cf_data)
+    (id, code, kind, requested_at, ip_address, country, user_agent, referer, headers, cf_data, latitude, longitude)
   VALUES
-    (OLD.id, OLD.code, OLD.kind, OLD.requested_at, OLD.ip_address, OLD.country, OLD.user_agent, OLD.referer, OLD.headers, OLD.cf_data);
+    (OLD.id, OLD.code, OLD.kind, OLD.requested_at, OLD.ip_address, OLD.country, OLD.user_agent, OLD.referer, OLD.headers, OLD.cf_data, OLD.latitude, OLD.longitude);
 END;
 
 CREATE TRIGGER IF NOT EXISTS redirect_events_history_delete
 AFTER DELETE ON redirect_events
 BEGIN
   INSERT INTO redirect_events_history
-    (id, code, kind, requested_at, ip_address, country, user_agent, referer, headers, cf_data)
+    (id, code, kind, requested_at, ip_address, country, user_agent, referer, headers, cf_data, latitude, longitude)
   VALUES
-    (OLD.id, OLD.code, OLD.kind, OLD.requested_at, OLD.ip_address, OLD.country, OLD.user_agent, OLD.referer, OLD.headers, OLD.cf_data);
+    (OLD.id, OLD.code, OLD.kind, OLD.requested_at, OLD.ip_address, OLD.country, OLD.user_agent, OLD.referer, OLD.headers, OLD.cf_data, OLD.latitude, OLD.longitude);
 END;
 
 CREATE TABLE IF NOT EXISTS api_keys_history (
