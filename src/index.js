@@ -218,8 +218,12 @@ async function validateUrl(input) {
 }
 
 function validateSuffix(input, minLength) {
-  if (!/^[A-Za-z0-9]+$/.test(input) || input.length < minLength || input.length > 32) {
-    return { error: `Custom short URLs can only contain letters and numbers (${minLength}-32 characters).` };
+  const validChars = /^[A-Za-z0-9-]+$/.test(input);
+  const noEdgeHyphen = input[0] !== "-" && input[input.length - 1] !== "-";
+  if (!validChars || !noEdgeHyphen || input.length < minLength || input.length > 32) {
+    return {
+      error: `Custom short URLs can only contain letters, numbers, and hyphens (not at the start or end), ${minLength}-32 characters.`,
+    };
   }
 
   if (RESERVED_CODES.has(input.toLowerCase())) {
