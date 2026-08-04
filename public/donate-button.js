@@ -24,3 +24,15 @@ renderDonateButton();
 document.querySelectorAll(".theme-toggle .theme-btn").forEach(function (btn) {
   btn.addEventListener("click", renderDonateButton);
 });
+
+function updateDonateVisibility() {
+  var nav = document.querySelector(".donate-nav");
+  if (!nav) return;
+  var scrollable = document.documentElement.scrollHeight > document.documentElement.clientHeight + 1;
+  var atTop = window.scrollY <= 0;
+  nav.classList.toggle("donate-nav--hidden", scrollable && !atTop);
+}
+
+window.addEventListener("scroll", updateDonateVisibility, { passive: true });
+window.addEventListener("resize", updateDonateVisibility);
+updateDonateVisibility();
