@@ -72,6 +72,21 @@ If the database was created before this feature existed, apply `migrations/0005_
 
 The `generated-path`/`custom-path` split is separate and newer: if the database predates it, apply `migrations/0008_split_path_kind.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0008_split_path_kind.sql --remote`) in addition to `schema.sql`. It converts every existing `kind = 'path'` row to `'generated-path'` — reclassifying specific rows to `'custom-path'` afterward is manual, one-off data entry, since the migration has no way to know which existing codes were originally hand-picked.
 
+## E-mail redirects
+
+The `/emails` page (linked from the nav) lets a signed-in account redirect `<alias>@tiny.vin` to any other e-mail address — `email_redirects` holds one row per alias (`alias` is the primary key, same relationship `urls.code` has to the domain), with `alias@tiny.vin` reserved words checked against the same `RESERVED_CODES` set used for paths. If the database was created before this existed, apply `migrations/0013_add_email_redirects.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0013_add_email_redirects.sql --remote`) in addition to `schema.sql`.
+
+**This needs Cloudflare Email Routing enabled on the zone**, which isn't part of this repo: enable it with `wrangler email routing enable tiny.vin`, or Dashboard → **Email Service** → **Email Routing** → **Enable**. This adds the required MX/TXT records. (On tiny.vin this has already been done.)
+
+Cloudflare's catch-all rule only supports **forward** or **drop** actions — it can't target a Worker, so there's no single rule that routes every address through `email_redirects`. Instead, `handleCreateEmailRedirect` creates one **Email Routing Rule** per alias via the API (a literal match on `<alias>@tiny.vin` → action **Send to Worker** → `tiny-vin`), and `handleDeleteEmailRedirect` deletes it again when the redirect is removed. The rule's id is stored in `email_redirects.cloudflare_rule_id`. The Worker's `email()` export (in `src/index.js`) then just looks up the recipient's local part in `email_redirects` and calls `message.forward()`.
+
+This makes Cloudflare API credentials **required**, not optional — without them there's no way to wire a new alias up to the Worker at all, so `POST /api/emails` returns `503` rather than silently creating a redirect that can never receive mail. Three values are needed:
+
+- `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_ZONE_ID` (the zone id for `tiny.vin`) — both visible on the domain's Cloudflare dashboard Overview page.
+- `CLOUDFLARE_API_TOKEN`, a token scoped to both **Account → Email Routing Addresses → Edit** and **Zone → Email Routing Rules → Edit** (routing rules are zone-scoped; destination addresses are account-scoped — two different permission groups on the same token).
+
+**Destinations must also be verified by Cloudflare before mail actually forwards there** — forwarding to an unverified address fails silently (no bounce to the sender), which is a platform anti-spam rule, not something this app can skip. With credentials configured, creating a redirect automatically registers the destination with Cloudflare (triggering their verification e-mail if it's a new address) and the page shows each redirect's live verified/pending status.
+
 ## Redirect statistics
 
 Every successful redirect (path or subdomain) is logged to `redirect_events`: which code/kind was hit, a timestamp, and as much request detail as a Worker can see — IP, country, latitude/longitude, user agent, referer, the full request headers, and Cloudflare's whole `request.cf` object (geo, TLS, bot-management score, ASN, etc.), each as a JSON blob. `(code, kind)` is a foreign key into `urls(code, kind)` with `ON DELETE CASCADE`, so it's a proper many-to-one relationship (many events per short URL) and deleting a short URL cleans up its stats too — D1 enforces foreign keys by default, so this isn't just documentation. Recording happens in the background via `ctx.waitUntil()` so it never adds latency to the redirect itself, and it's best-effort (a logging failure never blocks or breaks the redirect).

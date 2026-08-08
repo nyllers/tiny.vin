@@ -3,13 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>tiny.vin</title>
-  <meta name="description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://tiny.vin">
-  <meta property="og:site_name" content="tiny.vin">
-  <meta property="og:title" content="tiny.vin">
-  <meta property="og:description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
+  <title>tiny.vin — E-Mails</title>
+  <meta name="description" content="Redirect an e-mail alias at tiny.vin to any other address.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <script src="theme-init.js"></script>
@@ -67,19 +62,24 @@
   <div class="donate-nav">
     <div id="donate-button-container"></div>
   </div>
-  <h2 class="section-heading">GENERATE URL</h2>
+  <h2 class="section-heading">Add E-Mail redirect</h2>
   <main class="generate-section">
-    <div class="controls">
-      <input type="text" id="url-input" placeholder="Paste or write a URL">
-      <button id="generate-btn">Make it Tiny</button>
+    <div class="email-form-row">
+      <div class="email-alias-group">
+        <input type="text" id="email-alias-input" class="email-input" placeholder="alias" autocapitalize="off" autocorrect="off">
+        <span class="email-domain-suffix">@tiny.vin</span>
+      </div>
+      <span class="email-arrow" aria-hidden="true">&rarr;</span>
+      <input type="email" id="email-destination-input" class="email-input email-input--destination" placeholder="you@example.com">
+      <button id="email-generate-btn">Make it Tiny</button>
     </div>
-    <p id="url-result"></p>
+    <p id="email-result"></p>
   </main>
-  <section class="history-panel" id="history-panel">
-    <div id="history-list"></div>
+  <section class="history-panel" id="email-history-panel">
+    <div id="email-history-list"></div>
   </section>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
-  <footer>Simple project by Anders &amp; Claude &middot; v67</footer>
+  <footer>Simple project by Anders &amp; Claude</footer>
   <div class="modal-overlay" id="confirm-modal-overlay" hidden>
     <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-message">
       <p class="modal-title" id="confirm-modal-title">Are you sure?</p>
@@ -90,19 +90,8 @@
       </div>
     </div>
   </div>
-  <div class="modal-overlay" id="qr-modal-overlay" hidden>
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="qr-modal-title">
-      <p class="modal-title" id="qr-modal-title">QR Code</p>
-      <div class="qr-modal-image" id="qr-modal-image"></div>
-      <p class="qr-modal-url" id="qr-modal-url"></p>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn modal-btn--cancel" id="qr-modal-close">Close</button>
-      </div>
-    </div>
-  </div>
   <script src="cards.js"></script>
-  <script src="qrcode-lib.js"></script>
-  <script src="script.js"></script>
+  <script src="emails.js"></script>
   <script src="theme.js"></script>
   <script src="nav.js"></script>
   <script src="https://www.paypalobjects.com/donate/sdk/donate-sdk.js" charset="UTF-8"></script>
