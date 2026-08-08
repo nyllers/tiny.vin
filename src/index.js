@@ -15,6 +15,8 @@ const API_KEY_PATTERN = /^tvk_[0-9a-f]{48}$/;
 const VALID_KINDS = new Set(["generated-path", "custom-path", "subdomain"]);
 const MIN_CUSTOM_PATH_LENGTH = 4;
 const MIN_CUSTOM_PATH_LENGTH_ADMIN = 1;
+const MAX_URLS = 10;
+const MAX_URLS_ADMIN = 100;
 
 const LOGIN_ERRORS = {
   oauth_failed: "Something went wrong signing in. Please try again.",
@@ -284,13 +286,21 @@ async function handleShorten(request, env, session) {
     return jsonResponse({ error: validation.error }, 400);
   }
 
+  const createdBy = await getOrCreateIdentityId(env, session.email);
+  const admin = await isAdmin(env, session.email);
+
+  const maxUrls = admin ? MAX_URLS_ADMIN : MAX_URLS;
+  const urlCount = await countUrls(env, createdBy);
+  if (urlCount >= maxUrls) {
+    return jsonResponse(
+      { error: `You've reached the maximum of ${maxUrls} URLs. Delete one before creating another.` },
+      403
+    );
+  }
+
   const customSuffix = typeof body.path === "string" ? body.path.trim() : "";
   const customSubdomain = typeof body.subdomain === "string" ? body.subdomain.trim() : "";
-
-  let minCustomPathLength = MIN_CUSTOM_PATH_LENGTH;
-  if (customSuffix || customSubdomain) {
-    minCustomPathLength = (await isAdmin(env, session.email)) ? MIN_CUSTOM_PATH_LENGTH_ADMIN : MIN_CUSTOM_PATH_LENGTH;
-  }
+  const minCustomPathLength = admin ? MIN_CUSTOM_PATH_LENGTH_ADMIN : MIN_CUSTOM_PATH_LENGTH;
 
   let customCode = null;
   if (customSuffix) {
@@ -309,8 +319,6 @@ async function handleShorten(request, env, session) {
     }
     subdomainCode = subdomainValidation.code;
   }
-
-  const createdBy = await getOrCreateIdentityId(env, session.email);
 
   if (subdomainCode) {
     try {
@@ -357,6 +365,14 @@ async function isAdmin(env, email) {
     .first();
 
   return identity?.role === "admin";
+}
+
+async function countUrls(env, identityId) {
+  const row = await env.DB.prepare("SELECT COUNT(*) AS cnt FROM urls WHERE created_by = ?")
+    .bind(identityId)
+    .first();
+
+  return row.cnt;
 }
 
 async function getIdentityByApiKey(env, key) {
