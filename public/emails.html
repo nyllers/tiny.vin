@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>tiny.vin — Statistics</title>
-  <meta name="description" content="View redirect statistics for the tiny URLs you've created on tiny.vin.">
+  <title>tiny.vin — E-Mails</title>
+  <meta name="description" content="Redirect an e-mail alias at tiny.vin to any other address.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <script src="theme-init.js"></script>
@@ -62,25 +62,36 @@
   <div class="donate-nav">
     <div id="donate-button-container"></div>
   </div>
-  <h2 class="section-heading">STATISTICS</h2>
-  <section class="stats-summary" id="stats-summary"></section>
-  <section class="history-panel" id="stats-panel">
-    <div id="stats-list"></div>
+  <h2 class="section-heading">E-MAILS</h2>
+  <main class="generate-section">
+    <div class="email-form-row">
+      <div class="email-alias-group">
+        <input type="text" id="email-alias-input" class="email-input" placeholder="alias" autocapitalize="off" autocorrect="off">
+        <span class="email-domain-suffix">@tiny.vin</span>
+      </div>
+      <span class="email-arrow" aria-hidden="true">&rarr;</span>
+      <input type="email" id="email-destination-input" class="email-input email-input--destination" placeholder="you@example.com">
+      <button id="email-generate-btn">Redirect</button>
+    </div>
+    <p id="email-result"></p>
+  </main>
+  <section class="history-panel" id="email-history-panel">
+    <div id="email-history-list"></div>
   </section>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
   <footer>Simple project by Anders &amp; Claude</footer>
-  <div class="modal-overlay" id="chart-modal-overlay" hidden>
-    <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="chart-modal-title">
-      <p class="modal-title" id="chart-modal-title"></p>
-      <div class="chart-modal-body" id="chart-modal-body"></div>
+  <div class="modal-overlay" id="confirm-modal-overlay" hidden>
+    <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-message">
+      <p class="modal-title" id="confirm-modal-title">Are you sure?</p>
+      <p class="modal-message" id="confirm-modal-message"></p>
       <div class="modal-actions">
-        <button type="button" class="modal-btn modal-btn--cancel" id="chart-modal-close">Close</button>
+        <button type="button" class="modal-btn modal-btn--cancel" id="confirm-modal-cancel">Cancel</button>
+        <button type="button" class="modal-btn" id="confirm-modal-confirm">Confirm</button>
       </div>
     </div>
   </div>
   <script src="cards.js"></script>
-  <script src="world-map-path.js"></script>
-  <script src="stats.js"></script>
+  <script src="emails.js"></script>
   <script src="theme.js"></script>
   <script src="nav.js"></script>
   <script src="https://www.paypalobjects.com/donate/sdk/donate-sdk.js" charset="UTF-8"></script>

@@ -9,14 +9,18 @@ const CODE_PATTERN = /^\/([A-Za-z0-9]{1,32})$/;
 const SUBDOMAIN_REDIRECT_PATTERN = /^\/subdomain\/([a-z0-9-]{1,63})$/;
 const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
 const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9-]+)$/;
-const RESERVED_CODES = new Set(["login", "subdomain", "stats", "privacy", "terms", "api"]);
-const PROTECTED_PAGES = new Set(["/", "/stats", "/stats.html", "/api", "/api.html"]);
+const DELETE_EMAIL_PATTERN = /^\/api\/emails\/([a-z0-9-]+)$/;
+const RESERVED_CODES = new Set(["login", "subdomain", "stats", "privacy", "terms", "api", "emails"]);
+const PROTECTED_PAGES = new Set(["/", "/stats", "/stats.html", "/api", "/api.html", "/emails", "/emails.html"]);
 const API_KEY_PATTERN = /^tvk_[0-9a-f]{48}$/;
 const VALID_KINDS = new Set(["generated-path", "custom-path", "subdomain"]);
 const MIN_CUSTOM_PATH_LENGTH = 4;
 const MIN_CUSTOM_PATH_LENGTH_ADMIN = 1;
 const MAX_URLS = 10;
 const MAX_URLS_ADMIN = 100;
+const EMAIL_ALIAS_PATTERN = /^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$/;
+const EMAIL_ADDRESS_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_DOMAIN = "tiny.vin";
 
 const LOGIN_ERRORS = {
   oauth_failed: "Something went wrong signing in. Please try again.",
@@ -251,6 +255,32 @@ function validateSubdomain(input, minLength) {
   return { code: input };
 }
 
+function validateEmailAlias(input) {
+  if (!EMAIL_ALIAS_PATTERN.test(input) || input.length > 64) {
+    return {
+      error: "Aliases can only contain lowercase letters, numbers, and hyphens (not at the start or end), 1-64 characters.",
+    };
+  }
+
+  if (RESERVED_CODES.has(input)) {
+    return { error: `"${input}" is reserved, try another.` };
+  }
+
+  return { alias: input };
+}
+
+function validateDestinationEmail(input) {
+  if (!EMAIL_ADDRESS_PATTERN.test(input) || input.length > 254) {
+    return { error: "That doesn't look like a valid e-mail address." };
+  }
+
+  if (input.toLowerCase().endsWith(`@${EMAIL_DOMAIN}`)) {
+    return { error: `Can't redirect to another ${EMAIL_DOMAIN} address.` };
+  }
+
+  return { email: input.toLowerCase() };
+}
+
 function formatShortUrl(code, kind) {
   return kind === "subdomain" ? `${code}.tiny.vin` : `tiny.vin/${code}`;
 }
@@ -373,6 +403,57 @@ async function countUrls(env, identityId) {
     .first();
 
   return row.cnt;
+}
+
+// Cloudflare Email Routing requires every forwarding destination to be
+// verified before message.forward() will actually deliver to it - an
+// unverified destination fails silently, with no bounce to the sender.
+// These helpers keep that in sync via the Email Routing Addresses API.
+// CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID are optional: without them a
+// redirect still gets created, it just can't trigger or report verification
+// automatically (see README).
+function hasCloudflareApiCredentials(env) {
+  return Boolean(env.CLOUDFLARE_API_TOKEN && env.CLOUDFLARE_ACCOUNT_ID);
+}
+
+async function cloudflareApiRequest(env, path, options = {}) {
+  const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+  const data = await response.json();
+  if (!data.success) {
+    throw new Error(`Cloudflare API error: ${JSON.stringify(data.errors)}`);
+  }
+  return data.result;
+}
+
+async function listDestinationAddresses(env) {
+  return cloudflareApiRequest(env, `/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/email/routing/addresses?per_page=100`);
+}
+
+// Registers `email` as a destination address if the account doesn't already
+// know about it, which makes Cloudflare send it a verification link. Safe
+// to call repeatedly - a no-op if the address is already registered.
+async function ensureDestinationRegistered(env, email) {
+  const existing = await listDestinationAddresses(env);
+  const match = existing.find((address) => address.email.toLowerCase() === email);
+  if (match) return Boolean(match.verified);
+
+  await cloudflareApiRequest(env, `/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/email/routing/addresses`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+  return false;
+}
+
+async function getVerifiedDestinations(env) {
+  const addresses = await listDestinationAddresses(env);
+  return new Set(addresses.filter((address) => address.verified).map((address) => address.email.toLowerCase()));
 }
 
 async function getIdentityByApiKey(env, key) {
@@ -643,6 +724,99 @@ async function handleDeleteUrl(code, kind, env, session) {
   return jsonResponse({ ok: true });
 }
 
+async function handleCreateEmailRedirect(request, env, session) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
+  }
+
+  const aliasInput = typeof body.alias === "string" ? body.alias.trim().toLowerCase() : "";
+  const destinationInput = typeof body.destination === "string" ? body.destination.trim() : "";
+
+  const aliasValidation = validateEmailAlias(aliasInput);
+  if (aliasValidation.error) {
+    return jsonResponse({ error: aliasValidation.error }, 400);
+  }
+
+  const destinationValidation = validateDestinationEmail(destinationInput);
+  if (destinationValidation.error) {
+    return jsonResponse({ error: destinationValidation.error }, 400);
+  }
+
+  const { alias } = aliasValidation;
+  const { email: destination } = destinationValidation;
+  const createdBy = await getOrCreateIdentityId(env, session.email);
+
+  let verified = null;
+  if (hasCloudflareApiCredentials(env)) {
+    try {
+      verified = await ensureDestinationRegistered(env, destination);
+    } catch {
+      // Best-effort - the redirect is still created even if Cloudflare's
+      // API is unreachable; verification status just won't be known yet.
+    }
+  }
+
+  try {
+    await env.DB.prepare(
+      "INSERT INTO email_redirects (alias, destination, created_at, created_by) VALUES (?, ?, ?, ?)"
+    )
+      .bind(alias, destination, Date.now(), createdBy)
+      .run();
+  } catch {
+    return jsonResponse({ error: `"${alias}@${EMAIL_DOMAIN}" is already taken, try another.` }, 409);
+  }
+
+  return jsonResponse({ alias, destination, verified }, 201);
+}
+
+async function handleListEmailRedirects(env, session) {
+  const identityId = await getIdentityId(env, session.email);
+
+  const { results } = await env.DB.prepare(
+    "SELECT alias, destination, created_at FROM email_redirects WHERE created_by = ? ORDER BY created_at DESC"
+  )
+    .bind(identityId)
+    .all();
+
+  let verifiedDestinations = null;
+  if (hasCloudflareApiCredentials(env)) {
+    try {
+      verifiedDestinations = await getVerifiedDestinations(env);
+    } catch {
+      // Best-effort - fall back to unknown verification status below.
+    }
+  }
+
+  const redirects = results.map((row) => ({
+    alias: row.alias,
+    address: `${row.alias}@${EMAIL_DOMAIN}`,
+    destination: row.destination,
+    createdAt: row.created_at,
+    verified: verifiedDestinations ? verifiedDestinations.has(row.destination) : null,
+  }));
+
+  return jsonResponse({ redirects });
+}
+
+async function handleDeleteEmailRedirect(alias, env, session) {
+  const identityId = await getIdentityId(env, session.email);
+
+  const result = await env.DB.prepare(
+    "DELETE FROM email_redirects WHERE alias = ? AND created_by = ?"
+  )
+    .bind(alias, identityId)
+    .run();
+
+  if (!result.meta.changes) {
+    return jsonResponse({ error: "Not found" }, 404);
+  }
+
+  return jsonResponse({ ok: true });
+}
+
 async function recordRedirectEvent(env, { code, kind, request }) {
   try {
     const headers = JSON.stringify(Object.fromEntries(request.headers.entries()));
@@ -811,11 +985,43 @@ export default {
       return withAuth(request, env, (session) => handleDeleteUrl(deleteMatch[1], kind, env, session));
     }
 
+    if (request.method === "POST" && url.pathname === "/api/emails") {
+      return withAuth(request, env, (session) => handleCreateEmailRedirect(request, env, session));
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/emails") {
+      return withAuth(request, env, (session) => handleListEmailRedirects(env, session));
+    }
+
+    const deleteEmailMatch = url.pathname.match(DELETE_EMAIL_PATTERN);
+    if (request.method === "DELETE" && deleteEmailMatch) {
+      return withAuth(request, env, (session) => handleDeleteEmailRedirect(deleteEmailMatch[1], env, session));
+    }
+
     if (PROTECTED_PAGES.has(url.pathname)) {
       const session = await getSession(request, env.SESSION_SECRET);
       if (!session) return htmlResponse(loginPage());
     }
 
     return env.ASSETS.fetch(request);
+  },
+
+  async email(message, env, ctx) {
+    const alias = message.to.split("@")[0].toLowerCase();
+
+    const row = await env.DB.prepare("SELECT destination FROM email_redirects WHERE alias = ?")
+      .bind(alias)
+      .first();
+
+    if (!row) {
+      message.setReject("No such address");
+      return;
+    }
+
+    try {
+      await message.forward(row.destination);
+    } catch {
+      message.setReject("Unable to forward this message");
+    }
   },
 };

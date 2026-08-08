@@ -46,6 +46,13 @@ CREATE TABLE IF NOT EXISTS api_keys (
   created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS email_redirects (
+  alias TEXT PRIMARY KEY,
+  destination TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  created_by INTEGER REFERENCES login_identities(id)
+);
+
 -- Audit history: one "<table>_history" per tracked table above, holding a
 -- copy of each row's content immediately before it was updated or deleted.
 -- Populated entirely by triggers, so this happens regardless of which code
@@ -179,4 +186,27 @@ AFTER DELETE ON api_keys
 BEGIN
   INSERT INTO api_keys_history (identity_id, key, created_at)
   VALUES (OLD.identity_id, OLD.key, OLD.created_at);
+END;
+
+CREATE TABLE IF NOT EXISTS email_redirects_history (
+  history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  alias TEXT,
+  destination TEXT,
+  created_at INTEGER,
+  created_by INTEGER,
+  history_created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TRIGGER IF NOT EXISTS email_redirects_history_update
+AFTER UPDATE ON email_redirects
+BEGIN
+  INSERT INTO email_redirects_history (alias, destination, created_at, created_by)
+  VALUES (OLD.alias, OLD.destination, OLD.created_at, OLD.created_by);
+END;
+
+CREATE TRIGGER IF NOT EXISTS email_redirects_history_delete
+AFTER DELETE ON email_redirects
+BEGIN
+  INSERT INTO email_redirects_history (alias, destination, created_at, created_by)
+  VALUES (OLD.alias, OLD.destination, OLD.created_at, OLD.created_by);
 END;
