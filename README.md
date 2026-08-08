@@ -43,6 +43,8 @@ wrangler d1 execute tiny-vin-db --remote --command "UPDATE login_identities SET 
 
 If the database was created before this existed, apply `migrations/0012_add_login_identities_role.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0012_add_login_identities_role.sql --remote`) in addition to `schema.sql`. This migration also promotes every account that already existed at the time it runs to `'admin'`, since there was no user/admin distinction before it — review who that affects before running it against production.
 
+An account can hold at most 10 URLs total (`generated-path` + `custom-path` + `subdomain` combined), or 100 for `admin` accounts. `POST /api/urls` checks the account's current row count in `urls` before creating (or adding a path/subdomain to an existing one) and returns `403` once at the limit — deleting a URL frees up a slot.
+
 ## API access
 
 Signed-in accounts can create tiny URLs from the command line instead of the browser, via an API key. The `/api` page (linked from the nav) generates one while signed in — one key per account; regenerating immediately invalidates the previous one.
