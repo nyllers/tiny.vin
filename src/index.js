@@ -405,15 +405,18 @@ async function countUrls(env, identityId) {
   return row.cnt;
 }
 
-// Cloudflare Email Routing requires every forwarding destination to be
-// verified before message.forward() will actually deliver to it - an
-// unverified destination fails silently, with no bounce to the sender.
-// These helpers keep that in sync via the Email Routing Addresses API.
-// CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID are optional: without them a
-// redirect still gets created, it just can't trigger or report verification
-// automatically (see README).
+// Mail only reaches this Worker's email() handler for a given alias if a
+// Cloudflare Email Routing rule points that address at it - there's no
+// catch-all-to-Worker option, so each alias needs its own rule (see
+// createWorkerEmailRule below). Combined with destination-address
+// verification (Cloudflare forwards fail silently to unverified addresses),
+// this means CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_ZONE_ID
+// are required for this feature to do anything at all - without them,
+// handleCreateEmailRedirect refuses to create redirects (see README).
+const CLOUDFLARE_WORKER_NAME = "tiny-vin";
+
 function hasCloudflareApiCredentials(env) {
-  return Boolean(env.CLOUDFLARE_API_TOKEN && env.CLOUDFLARE_ACCOUNT_ID);
+  return Boolean(env.CLOUDFLARE_API_TOKEN && env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_ZONE_ID);
 }
 
 async function cloudflareApiRequest(env, path, options = {}) {
@@ -454,6 +457,28 @@ async function ensureDestinationRegistered(env, email) {
 async function getVerifiedDestinations(env) {
   const addresses = await listDestinationAddresses(env);
   return new Set(addresses.filter((address) => address.verified).map((address) => address.email.toLowerCase()));
+}
+
+// Email Routing Rules live under the zone (unlike the account-scoped
+// Addresses API above) - a catch-all rule can't target a Worker, only
+// "forward"/"drop", so each alias gets its own literal-match rule instead.
+async function createWorkerEmailRule(env, alias) {
+  const rule = await cloudflareApiRequest(env, `/zones/${env.CLOUDFLARE_ZONE_ID}/email/routing/rules`, {
+    method: "POST",
+    body: JSON.stringify({
+      name: `tiny.vin redirect: ${alias}`,
+      enabled: true,
+      matchers: [{ type: "literal", field: "to", value: `${alias}@${EMAIL_DOMAIN}` }],
+      actions: [{ type: "worker", value: [CLOUDFLARE_WORKER_NAME] }],
+    }),
+  });
+  return rule.id;
+}
+
+async function deleteWorkerEmailRule(env, ruleId) {
+  await cloudflareApiRequest(env, `/zones/${env.CLOUDFLARE_ZONE_ID}/email/routing/rules/${ruleId}`, {
+    method: "DELETE",
+  });
 }
 
 async function getIdentityByApiKey(env, key) {
@@ -745,27 +770,37 @@ async function handleCreateEmailRedirect(request, env, session) {
     return jsonResponse({ error: destinationValidation.error }, 400);
   }
 
+  if (!hasCloudflareApiCredentials(env)) {
+    return jsonResponse({ error: "E-mail redirects aren't set up on this server yet." }, 503);
+  }
+
   const { alias } = aliasValidation;
   const { email: destination } = destinationValidation;
   const createdBy = await getOrCreateIdentityId(env, session.email);
 
   let verified = null;
-  if (hasCloudflareApiCredentials(env)) {
-    try {
-      verified = await ensureDestinationRegistered(env, destination);
-    } catch {
-      // Best-effort - the redirect is still created even if Cloudflare's
-      // API is unreachable; verification status just won't be known yet.
-    }
+  try {
+    verified = await ensureDestinationRegistered(env, destination);
+  } catch {
+    // Best-effort - the redirect can still be created even if this call
+    // fails; verification status just won't be known yet.
+  }
+
+  let ruleId;
+  try {
+    ruleId = await createWorkerEmailRule(env, alias);
+  } catch {
+    return jsonResponse({ error: "Could not set up the redirect with Cloudflare, try again." }, 502);
   }
 
   try {
     await env.DB.prepare(
-      "INSERT INTO email_redirects (alias, destination, created_at, created_by) VALUES (?, ?, ?, ?)"
+      "INSERT INTO email_redirects (alias, destination, cloudflare_rule_id, created_at, created_by) VALUES (?, ?, ?, ?, ?)"
     )
-      .bind(alias, destination, Date.now(), createdBy)
+      .bind(alias, destination, ruleId, Date.now(), createdBy)
       .run();
   } catch {
+    await deleteWorkerEmailRule(env, ruleId).catch(() => {});
     return jsonResponse({ error: `"${alias}@${EMAIL_DOMAIN}" is already taken, try another.` }, 409);
   }
 
@@ -804,14 +839,27 @@ async function handleListEmailRedirects(env, session) {
 async function handleDeleteEmailRedirect(alias, env, session) {
   const identityId = await getIdentityId(env, session.email);
 
-  const result = await env.DB.prepare(
-    "DELETE FROM email_redirects WHERE alias = ? AND created_by = ?"
+  const row = await env.DB.prepare(
+    "SELECT cloudflare_rule_id FROM email_redirects WHERE alias = ? AND created_by = ?"
   )
+    .bind(alias, identityId)
+    .first();
+
+  if (!row) {
+    return jsonResponse({ error: "Not found" }, 404);
+  }
+
+  await env.DB.prepare("DELETE FROM email_redirects WHERE alias = ? AND created_by = ?")
     .bind(alias, identityId)
     .run();
 
-  if (!result.meta.changes) {
-    return jsonResponse({ error: "Not found" }, 404);
+  if (row.cloudflare_rule_id && hasCloudflareApiCredentials(env)) {
+    try {
+      await deleteWorkerEmailRule(env, row.cloudflare_rule_id);
+    } catch {
+      // Best-effort - a leftover Cloudflare rule is harmless: the alias is
+      // gone from D1, so the email() handler will reject mail for it anyway.
+    }
   }
 
   return jsonResponse({ ok: true });
