@@ -50,6 +50,8 @@ function createEmailCard(item, justCreatedAlias) {
     card.classList.add("url-card--flash");
   }
 
+  const destinationRow = createOriginalUrlRow(item.destination);
+
   const copyRow = document.createElement("div");
   copyRow.className = "url-card-copy-row";
   const addressGroup = createCopyableTextGroup(item.address);
@@ -62,9 +64,7 @@ function createEmailCard(item, justCreatedAlias) {
   row.className = "url-card-row url-card-row--tiny";
   row.append(copyRow);
 
-  const destinationRow = createOriginalUrlRow(`→ ${item.destination}`);
-
-  card.append(row, destinationRow);
+  card.append(destinationRow, row);
   return card;
 }
 
