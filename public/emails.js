@@ -43,15 +43,7 @@ async function deleteEmailRedirect(alias, address) {
   }
 }
 
-function createEmailCard(item, justCreatedAlias) {
-  const card = document.createElement("div");
-  card.className = "url-card";
-  if (item.alias === justCreatedAlias) {
-    card.classList.add("url-card--flash");
-  }
-
-  const destinationRow = createOriginalUrlRow(item.destination);
-
+function createEmailAliasRow(item) {
   const copyRow = document.createElement("div");
   copyRow.className = "url-card-copy-row";
   const addressGroup = createCopyableTextGroup(item.address);
@@ -59,10 +51,25 @@ function createEmailCard(item, justCreatedAlias) {
   const deleteBtn = createDeleteEmailButton();
   deleteBtn.addEventListener("click", () => deleteEmailRedirect(item.alias, item.address));
   copyRow.append(addressGroup, badge, deleteBtn);
+  return copyRow;
+}
+
+function createEmailCard(group, justCreatedAlias) {
+  const shouldFlash = group.aliases.some((item) => item.alias === justCreatedAlias);
+
+  const card = document.createElement("div");
+  card.className = "url-card";
+  if (shouldFlash) {
+    card.classList.add("url-card--flash");
+  }
+
+  const destinationRow = createOriginalUrlRow(group.destination);
 
   const row = document.createElement("div");
   row.className = "url-card-row url-card-row--tiny";
-  row.append(copyRow);
+  for (const item of group.aliases) {
+    row.append(createEmailAliasRow(item));
+  }
 
   card.append(destinationRow, row);
   return card;
