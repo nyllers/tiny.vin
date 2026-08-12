@@ -901,6 +901,35 @@ async function recordRedirectEvent(env, { code, kind, request }) {
   }
 }
 
+async function recordEmailRedirectEvent(env, { alias, destination, message, forwarded, rejectReason }) {
+  try {
+    const headers = JSON.stringify(Object.fromEntries(message.headers.entries()));
+    const subject = message.headers.get("subject");
+    const messageId = message.headers.get("message-id");
+
+    await env.DB.prepare(
+      `INSERT INTO email_redirect_events
+        (alias, destination, from_address, subject, message_id, size, forwarded, reject_reason, headers, requested_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(
+        alias,
+        destination,
+        message.from,
+        subject,
+        messageId,
+        message.rawSize,
+        forwarded ? 1 : 0,
+        rejectReason,
+        headers,
+        Date.now()
+      )
+      .run();
+  } catch {
+    // stats are best-effort; never block a forward over it
+  }
+}
+
 async function handleRedirect(code, kinds, env, ctx, request) {
   const placeholders = kinds.map(() => "?").join(", ");
   const row = await env.DB.prepare(
@@ -1079,10 +1108,18 @@ export default {
       return;
     }
 
+    let forwarded = true;
+    let rejectReason = null;
     try {
       await message.forward(row.destination);
     } catch {
-      message.setReject("Unable to forward this message");
+      forwarded = false;
+      rejectReason = "Unable to forward this message";
+      message.setReject(rejectReason);
     }
+
+    ctx.waitUntil(
+      recordEmailRedirectEvent(env, { alias, destination: row.destination, message, forwarded, rejectReason })
+    );
   },
 };
