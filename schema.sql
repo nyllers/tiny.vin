@@ -54,6 +54,23 @@ CREATE TABLE IF NOT EXISTS email_redirects (
   created_by INTEGER REFERENCES login_identities(id)
 );
 
+CREATE TABLE IF NOT EXISTS email_redirect_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  alias TEXT NOT NULL,
+  destination TEXT NOT NULL,
+  from_address TEXT,
+  subject TEXT,
+  message_id TEXT,
+  size INTEGER,
+  forwarded INTEGER NOT NULL,
+  reject_reason TEXT,
+  headers TEXT NOT NULL,
+  requested_at INTEGER NOT NULL,
+  FOREIGN KEY (alias) REFERENCES email_redirects(alias) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_redirect_events_alias ON email_redirect_events(alias);
+
 -- Audit history: one "<table>_history" per tracked table above, holding a
 -- copy of each row's content immediately before it was updated or deleted.
 -- Populated entirely by triggers, so this happens regardless of which code
@@ -211,4 +228,38 @@ AFTER DELETE ON email_redirects
 BEGIN
   INSERT INTO email_redirects_history (alias, destination, cloudflare_rule_id, created_at, created_by)
   VALUES (OLD.alias, OLD.destination, OLD.cloudflare_rule_id, OLD.created_at, OLD.created_by);
+END;
+
+CREATE TABLE IF NOT EXISTS email_redirect_events_history (
+  history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER,
+  alias TEXT,
+  destination TEXT,
+  from_address TEXT,
+  subject TEXT,
+  message_id TEXT,
+  size INTEGER,
+  forwarded INTEGER,
+  reject_reason TEXT,
+  headers TEXT,
+  requested_at INTEGER,
+  history_created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TRIGGER IF NOT EXISTS email_redirect_events_history_update
+AFTER UPDATE ON email_redirect_events
+BEGIN
+  INSERT INTO email_redirect_events_history
+    (id, alias, destination, from_address, subject, message_id, size, forwarded, reject_reason, headers, requested_at)
+  VALUES
+    (OLD.id, OLD.alias, OLD.destination, OLD.from_address, OLD.subject, OLD.message_id, OLD.size, OLD.forwarded, OLD.reject_reason, OLD.headers, OLD.requested_at);
+END;
+
+CREATE TRIGGER IF NOT EXISTS email_redirect_events_history_delete
+AFTER DELETE ON email_redirect_events
+BEGIN
+  INSERT INTO email_redirect_events_history
+    (id, alias, destination, from_address, subject, message_id, size, forwarded, reject_reason, headers, requested_at)
+  VALUES
+    (OLD.id, OLD.alias, OLD.destination, OLD.from_address, OLD.subject, OLD.message_id, OLD.size, OLD.forwarded, OLD.reject_reason, OLD.headers, OLD.requested_at);
 END;
