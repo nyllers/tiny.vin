@@ -825,13 +825,26 @@ async function handleListEmailRedirects(env, session) {
     }
   }
 
-  const redirects = results.map((row) => ({
-    alias: row.alias,
-    address: `${row.alias}@${EMAIL_DOMAIN}`,
-    destination: row.destination,
-    createdAt: row.created_at,
-    verified: verifiedDestinations ? verifiedDestinations.has(row.destination) : null,
+  const groups = new Map();
+  for (const row of results) {
+    if (!groups.has(row.destination)) {
+      groups.set(row.destination, []);
+    }
+    groups.get(row.destination).push({
+      alias: row.alias,
+      address: `${row.alias}@${EMAIL_DOMAIN}`,
+      createdAt: row.created_at,
+      verified: verifiedDestinations ? verifiedDestinations.has(row.destination) : null,
+    });
+  }
+
+  const redirects = Array.from(groups, ([destination, aliases]) => ({
+    destination,
+    createdAt: aliases[aliases.length - 1].createdAt,
+    aliases,
   }));
+
+  redirects.sort((a, b) => b.createdAt - a.createdAt);
 
   return jsonResponse({ redirects });
 }
