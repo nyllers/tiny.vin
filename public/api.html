@@ -14,30 +14,48 @@
   <div class="theme-toggle" role="group" aria-label="Theme"></div>
   <div class="donate-nav"></div>
   <script src="header.js"></script>
-  <h2 class="section-heading" id="api-page-heading">API</h2>
+  <h2 class="section-heading">API</h2>
   <main class="api-page">
     <section class="api-key-section" id="api-key-section"></section>
-    <section class="api-docs">
-      <h3 class="api-docs-heading">Create a generated short URL</h3>
-      <div class="api-example-wrapper">
-        <pre class="api-example" id="example-generated-path"></pre>
-      </div>
-      <p class="api-example-label">Response</p>
-      <pre class="api-example" id="response-generated-path"></pre>
+    <section class="api-docs" id="api-docs-section" hidden>
+      <h2 class="section-heading">EXAMPLES</h2>
+      <div class="api-examples-card">
+        <details class="api-example-details">
+          <summary class="api-docs-heading">Create a generated short URL</summary>
+          <div class="api-example-card">
+            <p class="api-example-label">Request</p>
+            <div class="api-example-wrapper">
+              <pre class="api-example" id="example-generated-path"></pre>
+            </div>
+            <p class="api-example-label">Response</p>
+            <pre class="api-example" id="response-generated-path"></pre>
+          </div>
+        </details>
 
-      <h3 class="api-docs-heading">Create a custom path</h3>
-      <div class="api-example-wrapper">
-        <pre class="api-example" id="example-custom-path"></pre>
-      </div>
-      <p class="api-example-label">Response</p>
-      <pre class="api-example" id="response-custom-path"></pre>
+        <details class="api-example-details">
+          <summary class="api-docs-heading">Create a custom path</summary>
+          <div class="api-example-card">
+            <p class="api-example-label">Request</p>
+            <div class="api-example-wrapper">
+              <pre class="api-example" id="example-custom-path"></pre>
+            </div>
+            <p class="api-example-label">Response</p>
+            <pre class="api-example" id="response-custom-path"></pre>
+          </div>
+        </details>
 
-      <h3 class="api-docs-heading">Create a subdomain</h3>
-      <div class="api-example-wrapper">
-        <pre class="api-example" id="example-subdomain"></pre>
+        <details class="api-example-details">
+          <summary class="api-docs-heading">Create a subdomain</summary>
+          <div class="api-example-card">
+            <p class="api-example-label">Request</p>
+            <div class="api-example-wrapper">
+              <pre class="api-example" id="example-subdomain"></pre>
+            </div>
+            <p class="api-example-label">Response</p>
+            <pre class="api-example" id="response-subdomain"></pre>
+          </div>
+        </details>
       </div>
-      <p class="api-example-label">Response</p>
-      <pre class="api-example" id="response-subdomain"></pre>
     </section>
   </main>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>

@@ -68,6 +68,7 @@ function renderApiKeySection(key) {
     section.append(intro, row);
   }
 
+  document.getElementById("api-docs-section").hidden = !key;
   updateExamples(key);
 }
 
