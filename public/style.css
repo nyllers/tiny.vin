@@ -626,42 +626,17 @@ footer {
 }
 
 .wordmark {
-  isolation: isolate;
+  display: flex;
+  flex-direction: column;
   color: var(--text);
   font-size: 25px;
   font-weight: 700;
+  line-height: 1.05;
   text-decoration: none;
 }
 
 .accent-dot {
-  position: relative;
-  z-index: -1;
-  color: var(--bg);
-}
-
-.accent-dot::before {
-  content: '';
-  position: absolute;
-  top: calc(50% + 8.5px);
-  left: calc(50% - 0.4px);
-  width: 42px;
-  height: 42px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: var(--heading);
-  opacity: 0.75;
-  z-index: -1;
-}
-
-.accent-dot::after {
-  content: '\FE36';
-  position: absolute;
-  top: calc(50% + 20px);
-  left: calc(50% - 0.4px);
-  transform: translate(-50%, -50%);
-  font-size: 18px;
-  line-height: 1;
-  color: var(--bg);
+  color: var(--heading);
 }
 
 .site-nav {

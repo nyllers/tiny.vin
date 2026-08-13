@@ -65,7 +65,10 @@ function renderSiteNav() {
     <button type="button" class="nav-toggle" aria-label="Menu" aria-haspopup="true" aria-expanded="false">
       <span></span><span></span><span></span>
     </button>
-    <a class="wordmark" href="/">tin<span class="accent-dot">y.v</span>in</a>
+    <a class="wordmark" href="/">
+      <span>tiny</span>
+      <span><span class="accent-dot">.</span>vin</span>
+    </a>
     <nav class="nav-dropdown" hidden>
       ${NAV_LINKS.map((link) => navLinkHtml(link)).join("")}
       ${navLinkHtml(SIGN_OUT_LINK, "nav-link--signout")}
