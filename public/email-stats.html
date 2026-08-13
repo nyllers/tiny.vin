@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>tiny.vin — API</title>
-  <meta name="description" content="Generate an API key and create tiny URLs from the command line with curl.">
+  <title>tiny.vin — E-Mail Statistics</title>
+  <meta name="description" content="View e-mail redirect statistics for the aliases you've created on tiny.vin.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <script src="theme-init.js"></script>
@@ -70,46 +70,25 @@
   <div class="donate-nav">
     <div id="donate-button-container"></div>
   </div>
-  <h2 class="section-heading" id="api-page-heading">API</h2>
-  <main class="api-page">
-    <section class="api-key-section" id="api-key-section"></section>
-    <section class="api-docs">
-      <h3 class="api-docs-heading">Create a generated short URL</h3>
-      <div class="api-example-wrapper">
-        <pre class="api-example" id="example-generated-path"></pre>
-      </div>
-      <p class="api-example-label">Response</p>
-      <pre class="api-example" id="response-generated-path"></pre>
-
-      <h3 class="api-docs-heading">Create a custom path</h3>
-      <div class="api-example-wrapper">
-        <pre class="api-example" id="example-custom-path"></pre>
-      </div>
-      <p class="api-example-label">Response</p>
-      <pre class="api-example" id="response-custom-path"></pre>
-
-      <h3 class="api-docs-heading">Create a subdomain</h3>
-      <div class="api-example-wrapper">
-        <pre class="api-example" id="example-subdomain"></pre>
-      </div>
-      <p class="api-example-label">Response</p>
-      <pre class="api-example" id="response-subdomain"></pre>
-    </section>
-  </main>
+  <h2 class="section-heading">E-MAIL STATISTICS</h2>
+  <section class="stats-summary" id="email-stats-summary"></section>
+  <section class="history-panel" id="email-stats-panel">
+    <div id="email-stats-list"></div>
+  </section>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
   <footer>Simple project by Anders &amp; Claude</footer>
-  <div class="modal-overlay" id="confirm-modal-overlay" hidden>
-    <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-message">
-      <p class="modal-title" id="confirm-modal-title">Are you sure?</p>
-      <p class="modal-message" id="confirm-modal-message"></p>
+  <div class="modal-overlay" id="chart-modal-overlay" hidden>
+    <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="chart-modal-title">
+      <p class="modal-title" id="chart-modal-title"></p>
+      <div class="chart-modal-body" id="chart-modal-body"></div>
       <div class="modal-actions">
-        <button type="button" class="modal-btn modal-btn--cancel" id="confirm-modal-cancel">Cancel</button>
-        <button type="button" class="modal-btn" id="confirm-modal-confirm">Confirm</button>
+        <button type="button" class="modal-btn modal-btn--cancel" id="chart-modal-close">Close</button>
       </div>
     </div>
   </div>
   <script src="cards.js"></script>
-  <script src="api.js"></script>
+  <script src="charts.js"></script>
+  <script src="email-stats.js"></script>
   <script src="theme.js"></script>
   <script src="nav.js"></script>
   <script src="https://www.paypalobjects.com/donate/sdk/donate-sdk.js" charset="UTF-8"></script>

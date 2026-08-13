@@ -10,8 +10,18 @@ const SUBDOMAIN_REDIRECT_PATTERN = /^\/subdomain\/([a-z0-9-]{1,63})$/;
 const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
 const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9-]+)$/;
 const DELETE_EMAIL_PATTERN = /^\/api\/emails\/([a-z0-9-]+)$/;
-const RESERVED_CODES = new Set(["login", "subdomain", "stats", "privacy", "terms", "api", "emails"]);
-const PROTECTED_PAGES = new Set(["/", "/stats", "/stats.html", "/api", "/api.html", "/emails", "/emails.html"]);
+const RESERVED_CODES = new Set(["login", "subdomain", "stats", "privacy", "terms", "api", "emails", "email-stats"]);
+const PROTECTED_PAGES = new Set([
+  "/",
+  "/stats",
+  "/stats.html",
+  "/api",
+  "/api.html",
+  "/emails",
+  "/emails.html",
+  "/email-stats",
+  "/email-stats.html",
+]);
 const API_KEY_PATTERN = /^tvk_[0-9a-f]{48}$/;
 const VALID_KINDS = new Set(["generated-path", "custom-path", "subdomain"]);
 const MIN_CUSTOM_PATH_LENGTH = 4;
@@ -733,6 +743,115 @@ async function handleStats(env, session) {
   });
 }
 
+async function handleEmailStats(env, session) {
+  const identityId = await getIdentityId(env, session.email);
+  const cutoff = Date.now() - STATS_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+  // Lifetime per-alias message counts/last-message, for the "Total Messages
+  // by Destination" cards - deliberately not windowed, unlike every chart
+  // below.
+  const { results } = await env.DB.prepare(
+    `SELECT er.alias, er.destination, er.created_at,
+            COUNT(ee.id) AS messages,
+            SUM(CASE WHEN ee.forwarded = 1 THEN 1 ELSE 0 END) AS forwarded,
+            MAX(ee.requested_at) AS last_message
+     FROM email_redirects er
+     LEFT JOIN email_redirect_events ee ON ee.alias = er.alias
+     WHERE er.created_by = ?
+     GROUP BY er.alias
+     ORDER BY er.created_at DESC`
+  )
+    .bind(identityId)
+    .all();
+
+  // Same shape, windowed to the last 14 days, feeding only the "Messages
+  // per Alias" chart.
+  const { results: recentResults } = await env.DB.prepare(
+    `SELECT er.alias, er.destination,
+            COUNT(ee.id) AS messages
+     FROM email_redirects er
+     LEFT JOIN email_redirect_events ee
+       ON ee.alias = er.alias AND ee.requested_at >= ?
+     WHERE er.created_by = ?
+     GROUP BY er.alias`
+  )
+    .bind(cutoff, identityId)
+    .all();
+
+  const { results: dailyRows } = await env.DB.prepare(
+    `SELECT strftime('%Y-%m-%d', ee.requested_at / 1000, 'unixepoch') AS day,
+            COUNT(*) AS cnt
+     FROM email_redirect_events ee
+     JOIN email_redirects er ON er.alias = ee.alias
+     WHERE er.created_by = ? AND ee.requested_at >= ?
+     GROUP BY day`
+  )
+    .bind(identityId, cutoff)
+    .all();
+
+  const { results: eventRows } = await env.DB.prepare(
+    `SELECT ee.from_address AS from_address
+     FROM email_redirect_events ee
+     JOIN email_redirects er ON er.alias = ee.alias
+     WHERE er.created_by = ? AND ee.requested_at >= ?`
+  )
+    .bind(identityId, cutoff)
+    .all();
+
+  const senderDomainCounts = new Map();
+  for (const row of eventRows) {
+    const domain = row.from_address && row.from_address.includes("@") ? row.from_address.split("@")[1].toLowerCase() : "Unknown";
+    senderDomainCounts.set(domain, (senderDomainCounts.get(domain) || 0) + 1);
+  }
+
+  const dailyByDate = new Map(dailyRows.map((row) => [row.day, row.cnt]));
+  const dailyMessages = [];
+  for (let i = STATS_WINDOW_DAYS - 1; i >= 0; i--) {
+    const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    dailyMessages.push({ date, count: dailyByDate.get(date) || 0 });
+  }
+
+  const groups = new Map();
+  let totalMessagesLifetime = 0;
+  let totalForwardedLifetime = 0;
+  for (const row of results) {
+    totalMessagesLifetime += row.messages;
+    totalForwardedLifetime += row.forwarded;
+    if (!groups.has(row.destination)) {
+      groups.set(row.destination, []);
+    }
+    groups.get(row.destination).push({
+      alias: row.alias,
+      address: `${row.alias}@${EMAIL_DOMAIN}`,
+      messages: row.messages,
+      lastMessageAt: row.last_message,
+    });
+  }
+
+  const redirects = Array.from(groups, ([destination, aliases]) => ({
+    destination,
+    totalMessages: aliases.reduce((sum, a) => sum + a.messages, 0),
+    aliases,
+  })).sort((a, b) => b.totalMessages - a.totalMessages);
+
+  const aliasBreakdown14d = recentResults.map((row) => ({
+    alias: row.alias,
+    address: `${row.alias}@${EMAIL_DOMAIN}`,
+    destination: row.destination,
+    messages: row.messages,
+  }));
+
+  return jsonResponse({
+    totalAliases: results.length,
+    totalMessages: totalMessagesLifetime,
+    totalFailedForwards: totalMessagesLifetime - totalForwardedLifetime,
+    senderDomains: topCounts(senderDomainCounts, 10),
+    dailyMessages,
+    aliasBreakdown14d,
+    redirects,
+  });
+}
+
 async function handleDeleteUrl(code, kind, env, session) {
   const identityId = await getIdentityId(env, session.email);
 
@@ -1066,6 +1185,10 @@ export default {
 
     if (request.method === "GET" && url.pathname === "/api/stats") {
       return withAuth(request, env, (session) => handleStats(env, session));
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/email-stats") {
+      return withAuth(request, env, (session) => handleEmailStats(env, session));
     }
 
     const deleteMatch = url.pathname.match(DELETE_URL_PATTERN);
