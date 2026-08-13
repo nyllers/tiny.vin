@@ -899,6 +899,12 @@ footer {
   color: var(--muted);
 }
 
+.api-example-label:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
 .api-example-wrapper {
   position: relative;
 }
