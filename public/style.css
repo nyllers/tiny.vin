@@ -346,10 +346,6 @@ footer {
   margin-top: 1.5rem;
 }
 
-#api-page-heading {
-  margin-top: 20px;
-}
-
 .url-cards {
   display: grid;
   grid-template-columns: repeat(2, minmax(14rem, 22rem));
