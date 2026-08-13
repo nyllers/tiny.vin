@@ -860,12 +860,20 @@ footer {
   opacity: 0.75;
 }
 
-.api-example-details {
-  margin-top: 1.5rem;
+.api-examples-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  padding: 0 1rem;
 }
 
-.api-example-details:first-child {
-  margin-top: 0;
+.api-example-details {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.api-example-details:last-child {
+  border-bottom: none;
 }
 
 .api-docs-heading {
@@ -876,10 +884,7 @@ footer {
 }
 
 .api-example-card {
-  padding: 0.75rem 1rem;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 .api-example {
