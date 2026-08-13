@@ -860,14 +860,19 @@ footer {
   opacity: 0.75;
 }
 
-.api-docs-heading {
-  margin: 1.5rem 0 0.5rem;
-  font-size: 0.9rem;
-  color: var(--text);
+.api-example-details {
+  margin-top: 1.5rem;
 }
 
-.api-docs-heading:first-child {
+.api-example-details:first-child {
   margin-top: 0;
+}
+
+.api-docs-heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  cursor: pointer;
 }
 
 .api-example-card {
