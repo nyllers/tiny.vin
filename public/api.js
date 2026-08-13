@@ -4,10 +4,12 @@ const SHORTEN_EXAMPLES = [
   { id: "subdomain", body: { url: "https://example.com", subdomain: "my-name" }, shortUrl: "my-name.tiny.vin" },
 ];
 
-function curlExample(key, body) {
+const EMAIL_EXAMPLE = { id: "email", body: { alias: "newsletter", destination: "you@example.com" } };
+
+function curlExample(key, path, body) {
   const keyPlaceholder = key || "YOUR_API_KEY";
   return [
-    "curl -X POST https://tiny.vin/api/urls \\",
+    `curl -X POST https://tiny.vin${path} \\`,
     `  -H "Authorization: Bearer ${keyPlaceholder}" \\`,
     '  -H "Content-Type: application/json" \\',
     `  -d '${JSON.stringify(body)}'`,
@@ -18,15 +20,21 @@ function responseExample(shortUrl) {
   return ["HTTP/1.1 201 Created", `Location: https://${shortUrl}`].join("\n");
 }
 
+function emailResponseExample(body) {
+  return ["HTTP/1.1 201 Created", "", JSON.stringify({ ...body, verified: true }, null, 2)].join("\n");
+}
+
 function updateExamples(key) {
   for (const example of SHORTEN_EXAMPLES) {
-    document.getElementById(`example-${example.id}`).textContent = curlExample(key, example.body);
+    document.getElementById(`example-${example.id}`).textContent = curlExample(key, "/api/urls", example.body);
     document.getElementById(`response-${example.id}`).textContent = responseExample(example.shortUrl);
   }
+  document.getElementById(`example-${EMAIL_EXAMPLE.id}`).textContent = curlExample(key, "/api/emails", EMAIL_EXAMPLE.body);
+  document.getElementById(`response-${EMAIL_EXAMPLE.id}`).textContent = emailResponseExample(EMAIL_EXAMPLE.body);
 }
 
 function setupExampleCopyButtons() {
-  for (const example of SHORTEN_EXAMPLES) {
+  for (const example of [...SHORTEN_EXAMPLES, EMAIL_EXAMPLE]) {
     const pre = document.getElementById(`example-${example.id}`);
     const copyBtn = createCopyIconButton();
     copyBtn.classList.add("api-example-copy");

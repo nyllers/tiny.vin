@@ -62,6 +62,17 @@ Add `"path": "my-page"` to the body for a custom path, or `"subdomain": "my-name
 
 If the database was created before this existed, apply `migrations/0009_add_api_keys.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0009_add_api_keys.sql --remote`) in addition to `schema.sql`.
 
+The same key also works on `POST /api/emails`, for creating e-mail redirects from the command line:
+
+```bash
+curl -X POST https://tiny.vin/api/emails \
+  -H "Authorization: Bearer tvk_..." \
+  -H "Content-Type: application/json" \
+  -d '{"alias": "newsletter", "destination": "you@example.com"}'
+```
+
+On success the response is `201 Created` with a JSON body (`{"alias", "destination", "verified"}` — see "E-mail redirects" above for what `verified` means and why Cloudflare credentials are required for this to work at all). `GET /api/emails` (list) and `DELETE /api/emails/<alias>` stay session-only, same as the equivalent URL endpoints - only creation is exposed to API keys.
+
 ## Subdomains
 
 In addition to path-based short URLs (`tiny.vin/<code>`), a URL can also get a subdomain-based one (`<name>.tiny.vin`) via the "Add subdomain" button on each card. `urls.kind` (`'generated-path'`, `'custom-path'`, or `'subdomain'` — the first two distinguish an auto-generated code from a user-chosen pathname) distinguishes them, and `(code, kind)` is the primary key, so the same string can be used as a path and a subdomain independently.
