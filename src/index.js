@@ -105,13 +105,9 @@ function loginPage(errorCode) {
   <div class="site-nav">
     <a class="wordmark" href="/">tin<span class="accent-dot">y.v</span>in</a>
   </div>
-  <div class="theme-toggle" role="group" aria-label="Theme">
-    <button type="button" class="theme-btn" data-theme-value="light">Light</button>
-    <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
-  </div>
-  <div class="donate-nav">
-    <div id="donate-button-container"></div>
-  </div>
+  <div class="theme-toggle" role="group" aria-label="Theme"></div>
+  <div class="donate-nav"></div>
+  <script src="/header.js"></script>
   <main class="panel">
     <p class="heading-large">tiny<span class="heading-large-accent-dot">.</span>vin</p>
     <p class="login-instruction">Sign in and paste or enter a URL to shorten it. Then share it &ndash; it's available to everyone!</p>
@@ -134,9 +130,7 @@ function loginPage(errorCode) {
   </main>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
   <footer>Simple project by Anders &amp; Claude</footer>
-  <script src="/theme.js"></script>
-  <script src="https://www.paypalobjects.com/donate/sdk/donate-sdk.js" charset="UTF-8"></script>
-  <script src="/donate-button.js"></script>
+  <script src="https://www.paypalobjects.com/donate/sdk/donate-sdk.js" charset="UTF-8" onload="renderDonateButton()"></script>
 </body>
 </html>`;
 }

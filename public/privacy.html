@@ -31,13 +31,9 @@
   <div class="site-nav">
     <a class="wordmark" href="/">tin<span class="accent-dot">y.v</span>in</a>
   </div>
-  <div class="theme-toggle" role="group" aria-label="Theme">
-    <button type="button" class="theme-btn" data-theme-value="light">Light</button>
-    <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
-  </div>
-  <div class="donate-nav">
-    <div id="donate-button-container"></div>
-  </div>
+  <div class="theme-toggle" role="group" aria-label="Theme"></div>
+  <div class="donate-nav"></div>
+  <script src="header.js"></script>
   <div class="policy">
     <h1>Privacy Policy</h1>
     <p>tiny.vin is a small, personal URL-shortening tool. This page explains what data it collects and why.</p>
@@ -60,8 +56,6 @@
     <h2>Contact</h2>
     <p>Questions or requests to delete your data can be sent to <a href="mailto:anders.nyllet.nylund@gmail.com">anders.nyllet.nylund@gmail.com</a>.</p>
   </div>
-  <script src="theme.js"></script>
-  <script src="https://www.paypalobjects.com/donate/sdk/donate-sdk.js" charset="UTF-8"></script>
-  <script src="donate-button.js"></script>
+  <script src="https://www.paypalobjects.com/donate/sdk/donate-sdk.js" charset="UTF-8" onload="renderDonateButton()"></script>
 </body>
 </html>

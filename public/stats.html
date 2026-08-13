@@ -11,14 +11,9 @@
 </head>
 <body>
   <div class="site-nav"></div>
-  <script src="nav.js"></script>
-  <div class="theme-toggle" role="group" aria-label="Theme">
-    <button type="button" class="theme-btn" data-theme-value="light">Light</button>
-    <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
-  </div>
-  <div class="donate-nav">
-    <div id="donate-button-container"></div>
-  </div>
+  <div class="theme-toggle" role="group" aria-label="Theme"></div>
+  <div class="donate-nav"></div>
+  <script src="header.js"></script>
   <h2 class="section-heading">URL STATISTICS</h2>
   <section class="stats-summary" id="stats-summary"></section>
   <section class="history-panel" id="stats-panel">
@@ -39,8 +34,6 @@
   <script src="charts.js"></script>
   <script src="world-map-path.js"></script>
   <script src="stats.js"></script>
-  <script src="theme.js"></script>
-  <script src="https://www.paypalobjects.com/donate/sdk/donate-sdk.js" charset="UTF-8"></script>
-  <script src="donate-button.js"></script>
+  <script src="https://www.paypalobjects.com/donate/sdk/donate-sdk.js" charset="UTF-8" onload="renderDonateButton()"></script>
 </body>
 </html>
