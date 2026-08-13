@@ -103,7 +103,10 @@ function loginPage(errorCode) {
 </head>
 <body>
   <div class="site-nav">
-    <a class="wordmark" href="/">tin<span class="accent-dot">y.v</span>in</a>
+    <a class="wordmark" href="/">
+      <span>tiny</span>
+      <span><span class="accent-dot">.</span>vin</span>
+    </a>
   </div>
   <div class="theme-toggle" role="group" aria-label="Theme"></div>
   <div class="donate-nav"></div>
