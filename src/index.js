@@ -1196,7 +1196,7 @@ export default {
     }
 
     if (request.method === "POST" && url.pathname === "/api/emails") {
-      return withAuth(request, env, (session) => handleCreateEmailRedirect(request, env, session));
+      return withAuthOrApiKey(request, env, (session) => handleCreateEmailRedirect(request, env, session));
     }
 
     if (request.method === "GET" && url.pathname === "/api/emails") {
