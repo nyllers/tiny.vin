@@ -80,12 +80,12 @@ async function generateUrl() {
 
   function setError(message) {
     result.textContent = message;
-    result.classList.add("url-result-error");
+    result.classList.add("result-error");
   }
 
   function setStatus(message) {
     result.textContent = message;
-    result.classList.remove("url-result-error");
+    result.classList.remove("result-error");
   }
 
   if (!url) {

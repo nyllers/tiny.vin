@@ -128,7 +128,7 @@ h1 {
   display: none;
 }
 
-#result.url-result-error {
+#result.result-error {
   color: var(--error-text);
 }
 
