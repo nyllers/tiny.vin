@@ -75,7 +75,7 @@ function codeFromLocation(location) {
 
 async function generateUrl() {
   const input = document.getElementById("url-input");
-  const result = document.getElementById("url-result");
+  const result = document.getElementById("result");
   const url = input.value.trim();
 
   function setError(message) {
