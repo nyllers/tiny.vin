@@ -98,25 +98,25 @@ async function loadEmailRedirects(justCreatedAlias) {
 function updateEmailButtonState() {
   const aliasInput = document.getElementById("email-alias-input");
   const destinationInput = document.getElementById("email-destination-input");
-  const submitBtn = document.getElementById("email-generate-btn");
+  const submitBtn = document.getElementById("generate-btn");
   submitBtn.disabled = aliasInput.value.trim() === "" || destinationInput.value.trim() === "";
 }
 
 async function createEmailRedirect() {
   const aliasInput = document.getElementById("email-alias-input");
   const destinationInput = document.getElementById("email-destination-input");
-  const result = document.getElementById("email-result");
+  const result = document.getElementById("result");
   const alias = aliasInput.value.trim();
   const destination = destinationInput.value.trim();
 
   function setError(message) {
     result.textContent = message;
-    result.classList.add("url-result-error");
+    result.classList.add("result-error");
   }
 
   function setStatus(message) {
     result.textContent = message;
-    result.classList.remove("url-result-error");
+    result.classList.remove("result-error");
   }
 
   if (!alias || !destination) {
@@ -158,11 +158,11 @@ async function createEmailRedirect() {
   }
 }
 
-document.getElementById("email-generate-btn").addEventListener("click", createEmailRedirect);
+document.getElementById("generate-btn").addEventListener("click", createEmailRedirect);
 document.getElementById("email-alias-input").addEventListener("input", updateEmailButtonState);
 document.getElementById("email-destination-input").addEventListener("input", updateEmailButtonState);
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !document.getElementById("email-generate-btn").disabled) createEmailRedirect();
+  if (event.key === "Enter" && !document.getElementById("generate-btn").disabled) createEmailRedirect();
 });
 
 updateEmailButtonState();

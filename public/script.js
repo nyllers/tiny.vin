@@ -75,17 +75,17 @@ function codeFromLocation(location) {
 
 async function generateUrl() {
   const input = document.getElementById("url-input");
-  const result = document.getElementById("url-result");
+  const result = document.getElementById("result");
   const url = input.value.trim();
 
   function setError(message) {
     result.textContent = message;
-    result.classList.add("url-result-error");
+    result.classList.add("result-error");
   }
 
   function setStatus(message) {
     result.textContent = message;
-    result.classList.remove("url-result-error");
+    result.classList.remove("result-error");
   }
 
   if (!url) {
