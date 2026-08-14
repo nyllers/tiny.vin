@@ -230,36 +230,32 @@ async function validateUrl(input) {
   return { url: input };
 }
 
-function validateSuffix(input, minLength) {
-  const validChars = /^[A-Za-z0-9-]+$/.test(input);
+// Shared by custom paths (letters+digits+hyphen) and subdomains
+// (lowercase-only) - they differ only in allowed case, max length, and the
+// noun used in the error message, so the exact wording stays per-caller.
+function validateHandle(input, { minLength, maxLength, allowUppercase, noun }) {
+  const validChars = (allowUppercase ? /^[A-Za-z0-9-]+$/ : /^[a-z0-9-]+$/).test(input);
   const noEdgeHyphen = input[0] !== "-" && input[input.length - 1] !== "-";
-  if (!validChars || !noEdgeHyphen || input.length < minLength || input.length > 32) {
+  if (!validChars || !noEdgeHyphen || input.length < minLength || input.length > maxLength) {
+    const caseWord = allowUppercase ? "letters" : "lowercase letters";
     return {
-      error: `Custom short URLs can only contain letters, numbers, and hyphens (not at the start or end), ${minLength}-32 characters.`,
+      error: `${noun} can only contain ${caseWord}, numbers, and hyphens (not at the start or end), ${minLength}-${maxLength} characters.`,
     };
   }
 
-  if (RESERVED_CODES.has(input.toLowerCase())) {
+  if (RESERVED_CODES.has(allowUppercase ? input.toLowerCase() : input)) {
     return { error: `"${input}" is reserved, try another.` };
   }
 
   return { code: input };
 }
 
+function validateSuffix(input, minLength) {
+  return validateHandle(input, { minLength, maxLength: 32, allowUppercase: true, noun: "Custom short URLs" });
+}
+
 function validateSubdomain(input, minLength) {
-  const validChars = /^[a-z0-9-]+$/.test(input);
-  const noEdgeHyphen = input[0] !== "-" && input[input.length - 1] !== "-";
-  if (!validChars || !noEdgeHyphen || input.length < minLength || input.length > 63) {
-    return {
-      error: `Subdomains can only contain lowercase letters, numbers, and hyphens (not at the start or end), ${minLength}-63 characters.`,
-    };
-  }
-
-  if (RESERVED_CODES.has(input)) {
-    return { error: `"${input}" is reserved, try another.` };
-  }
-
-  return { code: input };
+  return validateHandle(input, { minLength, maxLength: 63, allowUppercase: false, noun: "Subdomains" });
 }
 
 function validateEmailAlias(input) {
@@ -526,13 +522,14 @@ async function handleCreateApiKey(env, session) {
   return jsonResponse({ key });
 }
 
-function groupByOriginalUrl(rows, buildEntry) {
+function groupBy(rows, keyFn, buildEntry) {
   const groups = new Map();
   for (const row of rows) {
-    if (!groups.has(row.original_url)) {
-      groups.set(row.original_url, []);
+    const key = keyFn(row);
+    if (!groups.has(key)) {
+      groups.set(key, []);
     }
-    groups.get(row.original_url).push(buildEntry(row));
+    groups.get(key).push(buildEntry(row));
   }
   return groups;
 }
@@ -546,7 +543,7 @@ async function handleHistory(env, session) {
     .bind(identityId)
     .all();
 
-  const groups = groupByOriginalUrl(results, (row) => ({
+  const groups = groupBy(results, (row) => row.original_url, (row) => ({
     code: row.code,
     kind: row.kind,
     shortUrl: formatShortUrl(row.code, row.kind),
@@ -557,9 +554,7 @@ async function handleHistory(env, session) {
     originalUrl,
     createdAt: shortUrls[shortUrls.length - 1].createdAt,
     shortUrls,
-  }));
-
-  urls.sort((a, b) => b.createdAt - a.createdAt);
+  })).sort((a, b) => b.createdAt - a.createdAt);
 
   return jsonResponse({ urls });
 }
@@ -599,6 +594,18 @@ function topCounts(counts, limit) {
 }
 
 const STATS_WINDOW_DAYS = 14;
+
+// Zero-fills a per-day count series for the last STATS_WINDOW_DAYS, from
+// sparse {day, cnt} rows (days with no activity simply don't have a row).
+function buildDailySeries(dailyRows) {
+  const byDate = new Map(dailyRows.map((row) => [row.day, row.cnt]));
+  const series = [];
+  for (let i = STATS_WINDOW_DAYS - 1; i >= 0; i--) {
+    const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    series.push({ date, count: byDate.get(date) || 0 });
+  }
+  return series;
+}
 
 async function handleStats(env, session) {
   const identityId = await getIdentityId(env, session.email);
@@ -691,14 +698,9 @@ async function handleStats(env, session) {
     deviceCounts.set(device, (deviceCounts.get(device) || 0) + 1);
   }
 
-  const dailyByDate = new Map(dailyRows.map((row) => [row.day, row.cnt]));
-  const dailyRedirects = [];
-  for (let i = STATS_WINDOW_DAYS - 1; i >= 0; i--) {
-    const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    dailyRedirects.push({ date, count: dailyByDate.get(date) || 0 });
-  }
+  const dailyRedirects = buildDailySeries(dailyRows);
 
-  const groups = groupByOriginalUrl(results, (row) => ({
+  const groups = groupBy(results, (row) => row.original_url, (row) => ({
     code: row.code,
     kind: row.kind,
     shortUrl: formatShortUrl(row.code, row.kind),
@@ -714,7 +716,7 @@ async function handleStats(env, session) {
     return { originalUrl, totalClicks: groupTotal, shortUrls };
   }).sort((a, b) => b.totalClicks - a.totalClicks);
 
-  const recentGroups = groupByOriginalUrl(recentResults, (row) => ({
+  const recentGroups = groupBy(recentResults, (row) => row.original_url, (row) => ({
     code: row.code,
     kind: row.kind,
     shortUrl: formatShortUrl(row.code, row.kind),
@@ -801,29 +803,17 @@ async function handleEmailStats(env, session) {
     senderDomainCounts.set(domain, (senderDomainCounts.get(domain) || 0) + 1);
   }
 
-  const dailyByDate = new Map(dailyRows.map((row) => [row.day, row.cnt]));
-  const dailyMessages = [];
-  for (let i = STATS_WINDOW_DAYS - 1; i >= 0; i--) {
-    const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    dailyMessages.push({ date, count: dailyByDate.get(date) || 0 });
-  }
+  const dailyMessages = buildDailySeries(dailyRows);
 
-  const groups = new Map();
-  let totalMessagesLifetime = 0;
-  let totalForwardedLifetime = 0;
-  for (const row of results) {
-    totalMessagesLifetime += row.messages;
-    totalForwardedLifetime += row.forwarded;
-    if (!groups.has(row.destination)) {
-      groups.set(row.destination, []);
-    }
-    groups.get(row.destination).push({
-      alias: row.alias,
-      address: `${row.alias}@${EMAIL_DOMAIN}`,
-      messages: row.messages,
-      lastMessageAt: row.last_message,
-    });
-  }
+  const totalMessagesLifetime = results.reduce((sum, row) => sum + row.messages, 0);
+  const totalForwardedLifetime = results.reduce((sum, row) => sum + row.forwarded, 0);
+
+  const groups = groupBy(results, (row) => row.destination, (row) => ({
+    alias: row.alias,
+    address: `${row.alias}@${EMAIL_DOMAIN}`,
+    messages: row.messages,
+    lastMessageAt: row.last_message,
+  }));
 
   const redirects = Array.from(groups, ([destination, aliases]) => ({
     destination,
@@ -941,26 +931,18 @@ async function handleListEmailRedirects(env, session) {
     }
   }
 
-  const groups = new Map();
-  for (const row of results) {
-    if (!groups.has(row.destination)) {
-      groups.set(row.destination, []);
-    }
-    groups.get(row.destination).push({
-      alias: row.alias,
-      address: `${row.alias}@${EMAIL_DOMAIN}`,
-      createdAt: row.created_at,
-      verified: verifiedDestinations ? verifiedDestinations.has(row.destination) : null,
-    });
-  }
+  const groups = groupBy(results, (row) => row.destination, (row) => ({
+    alias: row.alias,
+    address: `${row.alias}@${EMAIL_DOMAIN}`,
+    createdAt: row.created_at,
+    verified: verifiedDestinations ? verifiedDestinations.has(row.destination) : null,
+  }));
 
   const redirects = Array.from(groups, ([destination, aliases]) => ({
     destination,
     createdAt: aliases[aliases.length - 1].createdAt,
     aliases,
-  }));
-
-  redirects.sort((a, b) => b.createdAt - a.createdAt);
+  })).sort((a, b) => b.createdAt - a.createdAt);
 
   return jsonResponse({ redirects });
 }
@@ -1132,6 +1114,24 @@ async function handleAuthCallback(url, request, env) {
   }
 }
 
+// Routes that are just "exact method+path, run this handler under this auth
+// wrapper" - each handler ignores the args it doesn't need, so they can all
+// share one shape. Pattern-based routes (redirects, deletes with a query
+// param) stay as explicit checks below since they need extra logic.
+const SIMPLE_ROUTES = new Map([
+  ["POST /api/urls", { auth: withAuthOrApiKey, run: (request, env, session) => handleShorten(request, env, session) }],
+  ["GET /api/keys", { auth: withAuth, run: (request, env, session) => handleGetApiKey(env, session) }],
+  ["POST /api/keys", { auth: withAuth, run: (request, env, session) => handleCreateApiKey(env, session) }],
+  ["GET /api/history", { auth: withAuth, run: (request, env, session) => handleHistory(env, session) }],
+  ["GET /api/stats", { auth: withAuth, run: (request, env, session) => handleStats(env, session) }],
+  ["GET /api/email-stats", { auth: withAuth, run: (request, env, session) => handleEmailStats(env, session) }],
+  [
+    "POST /api/emails",
+    { auth: withAuthOrApiKey, run: (request, env, session) => handleCreateEmailRedirect(request, env, session) },
+  ],
+  ["GET /api/emails", { auth: withAuth, run: (request, env, session) => handleListEmailRedirects(env, session) }],
+]);
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -1164,28 +1164,9 @@ export default {
       return handleRedirect(codeMatch[1], ["generated-path", "custom-path"], env, ctx, request);
     }
 
-    if (request.method === "POST" && url.pathname === "/api/urls") {
-      return withAuthOrApiKey(request, env, (session) => handleShorten(request, env, session));
-    }
-
-    if (request.method === "GET" && url.pathname === "/api/keys") {
-      return withAuth(request, env, (session) => handleGetApiKey(env, session));
-    }
-
-    if (request.method === "POST" && url.pathname === "/api/keys") {
-      return withAuth(request, env, (session) => handleCreateApiKey(env, session));
-    }
-
-    if (request.method === "GET" && url.pathname === "/api/history") {
-      return withAuth(request, env, (session) => handleHistory(env, session));
-    }
-
-    if (request.method === "GET" && url.pathname === "/api/stats") {
-      return withAuth(request, env, (session) => handleStats(env, session));
-    }
-
-    if (request.method === "GET" && url.pathname === "/api/email-stats") {
-      return withAuth(request, env, (session) => handleEmailStats(env, session));
+    const route = SIMPLE_ROUTES.get(`${request.method} ${url.pathname}`);
+    if (route) {
+      return route.auth(request, env, (session) => route.run(request, env, session));
     }
 
     const deleteMatch = url.pathname.match(DELETE_URL_PATTERN);
@@ -1193,14 +1174,6 @@ export default {
       const kindParam = url.searchParams.get("kind");
       const kind = VALID_KINDS.has(kindParam) ? kindParam : "generated-path";
       return withAuth(request, env, (session) => handleDeleteUrl(deleteMatch[1], kind, env, session));
-    }
-
-    if (request.method === "POST" && url.pathname === "/api/emails") {
-      return withAuthOrApiKey(request, env, (session) => handleCreateEmailRedirect(request, env, session));
-    }
-
-    if (request.method === "GET" && url.pathname === "/api/emails") {
-      return withAuth(request, env, (session) => handleListEmailRedirects(env, session));
     }
 
     const deleteEmailMatch = url.pathname.match(DELETE_EMAIL_PATTERN);
