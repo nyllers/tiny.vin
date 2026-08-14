@@ -124,11 +124,8 @@ h1 {
 #url-result,
 #email-result {
   margin: 1rem 0 0;
-  word-break: break-all;
-}
-
-#url-result {
   font-size: 1.1rem;
+  word-break: break-all;
 }
 
 #url-result:empty,
@@ -193,11 +190,6 @@ h1 {
 .email-arrow {
   color: var(--muted);
   font-size: 1.2rem;
-}
-
-#email-result {
-  font-size: 1rem;
-  text-align: center;
 }
 
 .email-status-badge {
