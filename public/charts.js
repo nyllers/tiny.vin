@@ -155,33 +155,12 @@ function openChartModal(title, buildContent) {
   const titleEl = document.getElementById("chart-modal-title");
   const body = document.getElementById("chart-modal-body");
   const closeBtn = document.getElementById("chart-modal-close");
-  const previouslyFocused = document.activeElement;
 
   titleEl.textContent = title;
   body.textContent = "";
   body.appendChild(buildContent());
-  overlay.hidden = false;
-  closeBtn.focus();
 
-  function close() {
-    overlay.hidden = true;
-    closeBtn.removeEventListener("click", close);
-    overlay.removeEventListener("click", onOverlayClick);
-    document.removeEventListener("keydown", onKeydown);
-    if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
-  }
-
-  function onOverlayClick(event) {
-    if (event.target === overlay) close();
-  }
-
-  function onKeydown(event) {
-    if (event.key === "Escape") close();
-  }
-
-  closeBtn.addEventListener("click", close);
-  overlay.addEventListener("click", onOverlayClick);
-  document.addEventListener("keydown", onKeydown);
+  openModal(overlay, closeBtn);
 }
 
 function formatDayLabel(dateStr) {

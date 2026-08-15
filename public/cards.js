@@ -99,30 +99,69 @@ function createCopyableTextGroup(text) {
   return group;
 }
 
+// Wires "click outside" and "Escape" to call onDismiss, and returns a
+// cleanup() that unwires those and restores focus to whatever had it
+// before the modal opened. Shared plumbing for every modal on the site -
+// each one still owns its own open/close semantics on top of this.
+function bindModalDismissal(overlay, onDismiss) {
+  const previouslyFocused = document.activeElement;
+
+  function onOverlayClick(event) {
+    if (event.target === overlay) onDismiss();
+  }
+
+  function onKeydown(event) {
+    if (event.key === "Escape") onDismiss();
+  }
+
+  overlay.addEventListener("click", onOverlayClick);
+  document.addEventListener("keydown", onKeydown);
+
+  return function cleanup() {
+    overlay.removeEventListener("click", onOverlayClick);
+    document.removeEventListener("keydown", onKeydown);
+    if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
+  };
+}
+
+// Single-button modal: opens overlay, focuses closeBtn, and closes (hiding
+// + cleaning up) on close-button click, outside click, or Escape. For
+// modals with more than one exit path (e.g. confirm/cancel with different
+// results), build directly on bindModalDismissal instead.
+function openModal(overlay, closeBtn) {
+  function close() {
+    overlay.hidden = true;
+    closeBtn.removeEventListener("click", close);
+    cleanup();
+  }
+
+  const cleanup = bindModalDismissal(overlay, close);
+  closeBtn.addEventListener("click", close);
+  overlay.hidden = false;
+  closeBtn.focus();
+}
+
 function confirmAction(message, { confirmLabel = "Confirm", danger = false } = {}) {
   return new Promise((resolve) => {
     const overlay = document.getElementById("confirm-modal-overlay");
     const messageEl = document.getElementById("confirm-modal-message");
     const confirmBtn = document.getElementById("confirm-modal-confirm");
     const cancelBtn = document.getElementById("confirm-modal-cancel");
-    const previouslyFocused = document.activeElement;
 
     messageEl.textContent = message;
     confirmBtn.textContent = confirmLabel;
     confirmBtn.classList.toggle("modal-btn--confirm", danger);
     confirmBtn.classList.toggle("modal-btn--primary", !danger);
-    overlay.hidden = false;
-    cancelBtn.focus();
 
     function close(result) {
       overlay.hidden = true;
       confirmBtn.removeEventListener("click", onConfirm);
       cancelBtn.removeEventListener("click", onCancel);
-      overlay.removeEventListener("click", onOverlayClick);
-      document.removeEventListener("keydown", onKeydown);
-      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
+      cleanup();
       resolve(result);
     }
+
+    const cleanup = bindModalDismissal(overlay, () => close(false));
 
     function onConfirm() {
       close(true);
@@ -132,18 +171,10 @@ function confirmAction(message, { confirmLabel = "Confirm", danger = false } = {
       close(false);
     }
 
-    function onOverlayClick(event) {
-      if (event.target === overlay) close(false);
-    }
-
-    function onKeydown(event) {
-      if (event.key === "Escape") close(false);
-    }
-
     confirmBtn.addEventListener("click", onConfirm);
     cancelBtn.addEventListener("click", onCancel);
-    overlay.addEventListener("click", onOverlayClick);
-    document.addEventListener("keydown", onKeydown);
+    overlay.hidden = false;
+    cancelBtn.focus();
   });
 }
 
