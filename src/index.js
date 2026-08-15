@@ -28,7 +28,6 @@ const MIN_CUSTOM_PATH_LENGTH = 4;
 const MIN_CUSTOM_PATH_LENGTH_ADMIN = 1;
 const MAX_RESOURCES = 10;
 const MAX_RESOURCES_ADMIN = 100;
-const EMAIL_ALIAS_PATTERN = /^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$/;
 const EMAIL_ADDRESS_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_DOMAIN = "tiny.vin";
 const EMAIL_ALIAS_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -269,17 +268,8 @@ function validateSubdomain(input, minLength) {
 }
 
 function validateEmailAlias(input) {
-  if (!EMAIL_ALIAS_PATTERN.test(input) || input.length > 64) {
-    return {
-      error: "Aliases can only contain lowercase letters, numbers, and hyphens (not at the start or end), 1-64 characters.",
-    };
-  }
-
-  if (RESERVED_CODES.has(input)) {
-    return { error: `"${input}" is reserved, try another.` };
-  }
-
-  return { alias: input };
+  const validation = validateHandle(input, { minLength: 1, maxLength: 64, allowUppercase: false, noun: "Aliases" });
+  return validation.error ? validation : { alias: validation.code };
 }
 
 function validateDestinationEmail(input) {
@@ -550,6 +540,17 @@ function groupBy(rows, keyFn, buildEntry) {
   return groups;
 }
 
+// Shared by handleHistory/handleListEmailRedirects: group rows, tag each
+// group with its most recent item's createdAt, and sort groups newest-first.
+function groupedByCreatedAtDesc(rows, keyFn, buildEntry, keyName, itemsName) {
+  const groups = groupBy(rows, keyFn, buildEntry);
+  return Array.from(groups, ([key, items]) => ({
+    [keyName]: key,
+    createdAt: items[items.length - 1].createdAt,
+    [itemsName]: items,
+  })).sort((a, b) => b.createdAt - a.createdAt);
+}
+
 async function handleHistory(env, session) {
   const identityId = await getIdentityId(env, session.email);
 
@@ -559,18 +560,13 @@ async function handleHistory(env, session) {
     .bind(identityId)
     .all();
 
-  const groups = groupBy(results, (row) => row.original_url, (row) => ({
-    code: row.code,
-    kind: row.kind,
-    shortUrl: formatShortUrl(row.code, row.kind),
-    createdAt: row.created_at,
-  }));
-
-  const urls = Array.from(groups, ([originalUrl, shortUrls]) => ({
-    originalUrl,
-    createdAt: shortUrls[shortUrls.length - 1].createdAt,
-    shortUrls,
-  })).sort((a, b) => b.createdAt - a.createdAt);
+  const urls = groupedByCreatedAtDesc(
+    results,
+    (row) => row.original_url,
+    (row) => ({ code: row.code, kind: row.kind, shortUrl: formatShortUrl(row.code, row.kind), createdAt: row.created_at }),
+    "originalUrl",
+    "shortUrls"
+  );
 
   return jsonResponse({ urls });
 }
@@ -995,18 +991,18 @@ async function handleListEmailRedirects(env, session) {
     }
   }
 
-  const groups = groupBy(results, (row) => row.destination, (row) => ({
-    alias: row.alias,
-    address: `${row.alias}@${EMAIL_DOMAIN}`,
-    createdAt: row.created_at,
-    verified: verifiedDestinations ? verifiedDestinations.has(row.destination) : null,
-  }));
-
-  const redirects = Array.from(groups, ([destination, aliases]) => ({
-    destination,
-    createdAt: aliases[aliases.length - 1].createdAt,
-    aliases,
-  })).sort((a, b) => b.createdAt - a.createdAt);
+  const redirects = groupedByCreatedAtDesc(
+    results,
+    (row) => row.destination,
+    (row) => ({
+      alias: row.alias,
+      address: `${row.alias}@${EMAIL_DOMAIN}`,
+      createdAt: row.created_at,
+      verified: verifiedDestinations ? verifiedDestinations.has(row.destination) : null,
+    }),
+    "destination",
+    "aliases"
+  );
 
   return jsonResponse({ redirects });
 }
