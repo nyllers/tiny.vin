@@ -139,22 +139,6 @@ function createQrIconButton() {
   return button;
 }
 
-function createAddButton(label) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "theme-btn active";
-  button.innerHTML = `<span>${label}</span>`;
-  return button;
-}
-
-function createSaveSuffixButton() {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "icon-btn cancel-btn";
-  button.innerHTML = `<span>Save</span>`;
-  return button;
-}
-
 function createDeleteIconButton() {
   const button = document.createElement("button");
   button.type = "button";
@@ -197,108 +181,26 @@ function createShortUrlRow(shortUrlItem) {
   return shortCopyRow;
 }
 
-function createInlineCodeInputRow({ group, bodyKey, prefixText, suffixText, placeholder, onCancel }) {
-  const wrapper = document.createElement("div");
-  wrapper.className = "url-card-suffix-wrapper";
-
-  const row = document.createElement("div");
-  row.className = "url-card-copy-row";
-
-  if (prefixText) {
-    const prefix = document.createElement("span");
-    prefix.className = "url-card-suffix-prefix";
-    prefix.textContent = prefixText;
-    row.append(prefix);
-  }
-
-  const input = document.createElement("input");
-  input.type = "text";
-  input.className = "url-card-suffix-input";
-  input.placeholder = placeholder;
-  row.append(input);
-
-  if (suffixText) {
-    const suffix = document.createElement("span");
-    suffix.className = "url-card-suffix-prefix";
-    suffix.textContent = suffixText;
-    row.append(suffix);
-  }
-
-  const saveBtn = createSaveSuffixButton();
-  const saveBtnLabel = saveBtn.querySelector("span");
-  row.append(saveBtn);
-
-  const error = document.createElement("p");
-  error.className = "url-card-suffix-error";
-
-  function updateSaveButtonLabel() {
-    const hasValue = Boolean(input.value.trim());
-    saveBtnLabel.textContent = hasValue ? "Save" : "Cancel";
-    saveBtn.classList.toggle("save-btn", hasValue);
-    saveBtn.classList.toggle("cancel-btn", !hasValue);
-  }
-
-  async function submitValue() {
-    const value = input.value.trim();
-    if (!value) {
-      onCancel();
-      return;
-    }
-
-    saveBtn.disabled = true;
-    error.textContent = "";
-
-    try {
-      const response = await fetch("/api/urls", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: group.originalUrl, [bodyKey]: value }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        error.textContent = data.error || "Something went wrong.";
-        saveBtn.disabled = false;
-        return;
-      }
-
-      loadHistory(codeFromLocation(response.headers.get("Location")));
-    } catch {
-      error.textContent = "Network error, try again.";
-      saveBtn.disabled = false;
-    }
-  }
-
-  saveBtn.addEventListener("click", submitValue);
-  input.addEventListener("input", updateSaveButtonLabel);
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") submitValue();
-    if (event.key === "Escape") onCancel();
-  });
-  updateSaveButtonLabel();
-
-  wrapper.append(row, error);
-  return wrapper;
-}
-
 function createSuffixInputRow(group, onCancel) {
   return createInlineCodeInputRow({
-    group,
-    bodyKey: "path",
+    endpoint: "/api/urls",
+    buildBody: (value) => ({ url: group.originalUrl, path: value }),
     prefixText: "tiny.vin/",
     suffixText: null,
     placeholder: "Enter pathname",
+    onSuccess: (response) => loadHistory(codeFromLocation(response.headers.get("Location"))),
     onCancel,
   });
 }
 
 function createSubdomainInputRow(group, onCancel) {
   return createInlineCodeInputRow({
-    group,
-    bodyKey: "subdomain",
+    endpoint: "/api/urls",
+    buildBody: (value) => ({ url: group.originalUrl, subdomain: value }),
     prefixText: null,
     suffixText: ".tiny.vin",
     placeholder: "Enter subdomain name",
+    onSuccess: (response) => loadHistory(codeFromLocation(response.headers.get("Location"))),
     onCancel,
   });
 }

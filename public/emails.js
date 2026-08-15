@@ -54,6 +54,21 @@ function createEmailAliasRow(item) {
   return copyRow;
 }
 
+function createAliasInputRow(group, onCancel) {
+  return createInlineCodeInputRow({
+    endpoint: "/api/emails",
+    buildBody: (value) => ({ destination: group.destination, alias: value }),
+    prefixText: null,
+    suffixText: "@tiny.vin",
+    placeholder: "Enter alias",
+    onSuccess: async (response) => {
+      const data = await response.json();
+      loadEmailRedirects(data.alias);
+    },
+    onCancel,
+  });
+}
+
 function createEmailCard(group, justCreatedAlias) {
   const shouldFlash = group.aliases.some((item) => item.alias === justCreatedAlias);
 
@@ -71,7 +86,25 @@ function createEmailCard(group, justCreatedAlias) {
     row.append(createEmailAliasRow(item));
   }
 
-  card.append(destinationRow, row);
+  const actionsContainer = document.createElement("div");
+  actionsContainer.className = "url-card-actions";
+  const addAliasBtn = createAddButton("Add alias");
+
+  function showActionButton() {
+    actionsContainer.textContent = "";
+    actionsContainer.append(addAliasBtn);
+  }
+
+  addAliasBtn.addEventListener("click", () => {
+    actionsContainer.textContent = "";
+    const inputRow = createAliasInputRow(group, showActionButton);
+    actionsContainer.appendChild(inputRow);
+    inputRow.querySelector("input").focus();
+  });
+
+  showActionButton();
+
+  card.append(destinationRow, row, actionsContainer);
   return card;
 }
 
@@ -96,18 +129,15 @@ async function loadEmailRedirects(justCreatedAlias) {
 }
 
 function updateEmailButtonState() {
-  const aliasInput = document.getElementById("email-alias-input");
-  const destinationInput = document.getElementById("email-destination-input");
-  const submitBtn = document.getElementById("generate-btn");
-  submitBtn.disabled = aliasInput.value.trim() === "" || destinationInput.value.trim() === "";
+  const input = document.getElementById("email-destination-input");
+  const generateBtn = document.getElementById("generate-btn");
+  generateBtn.disabled = input.value.trim() === "";
 }
 
 async function createEmailRedirect() {
-  const aliasInput = document.getElementById("email-alias-input");
-  const destinationInput = document.getElementById("email-destination-input");
+  const input = document.getElementById("email-destination-input");
   const result = document.getElementById("result");
-  const alias = aliasInput.value.trim();
-  const destination = destinationInput.value.trim();
+  const destination = input.value.trim();
 
   function setError(message) {
     result.textContent = message;
@@ -119,8 +149,8 @@ async function createEmailRedirect() {
     result.classList.remove("result-error");
   }
 
-  if (!alias || !destination) {
-    setError("Enter an alias and a destination address.");
+  if (!destination) {
+    setError("Enter a destination address first.");
     return;
   }
 
@@ -130,7 +160,7 @@ async function createEmailRedirect() {
     const response = await fetch("/api/emails", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ alias, destination }),
+      body: JSON.stringify({ destination }),
     });
 
     const data = await response.json();
@@ -140,16 +170,14 @@ async function createEmailRedirect() {
       return;
     }
 
-    aliasInput.value = "";
-    destinationInput.value = "";
+    input.value = "";
+    setStatus("");
     updateEmailButtonState();
 
     if (data.verified === false) {
       setStatus(
         `Created. Cloudflare needs to verify ${destination} before mail will actually forward there - check that inbox for a confirmation link.`
       );
-    } else {
-      setStatus("");
     }
 
     loadEmailRedirects(data.alias);
@@ -159,7 +187,6 @@ async function createEmailRedirect() {
 }
 
 document.getElementById("generate-btn").addEventListener("click", createEmailRedirect);
-document.getElementById("email-alias-input").addEventListener("input", updateEmailButtonState);
 document.getElementById("email-destination-input").addEventListener("input", updateEmailButtonState);
 document.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !document.getElementById("generate-btn").disabled) createEmailRedirect();
