@@ -4,7 +4,10 @@ const SHORTEN_EXAMPLES = [
   { id: "subdomain", body: { url: "https://example.com", subdomain: "my-name" }, shortUrl: "my-name.tiny.vin" },
 ];
 
-const EMAIL_EXAMPLE = { id: "email", body: { alias: "newsletter", destination: "you@example.com" } };
+const EMAIL_EXAMPLES = [
+  { id: "random-alias", body: { destination: "you@example.com" }, alias: "a1b2c3d4" },
+  { id: "custom-alias", body: { alias: "newsletter", destination: "you@example.com" }, alias: "newsletter" },
+];
 
 function curlExample(key, path, body) {
   const keyPlaceholder = key || "YOUR_API_KEY";
@@ -20,8 +23,9 @@ function responseExample(shortUrl) {
   return ["HTTP/1.1 201 Created", `Location: https://${shortUrl}`].join("\n");
 }
 
-function emailResponseExample(body) {
-  return ["HTTP/1.1 201 Created", "", JSON.stringify({ ...body, verified: true }, null, 2)].join("\n");
+function emailResponseExample(example) {
+  const responseBody = { alias: example.alias, destination: example.body.destination, verified: true };
+  return ["HTTP/1.1 201 Created", "", JSON.stringify(responseBody, null, 2)].join("\n");
 }
 
 function updateExamples(key) {
@@ -29,12 +33,14 @@ function updateExamples(key) {
     document.getElementById(`example-${example.id}`).textContent = curlExample(key, "/api/urls", example.body);
     document.getElementById(`response-${example.id}`).textContent = responseExample(example.shortUrl);
   }
-  document.getElementById(`example-${EMAIL_EXAMPLE.id}`).textContent = curlExample(key, "/api/emails", EMAIL_EXAMPLE.body);
-  document.getElementById(`response-${EMAIL_EXAMPLE.id}`).textContent = emailResponseExample(EMAIL_EXAMPLE.body);
+  for (const example of EMAIL_EXAMPLES) {
+    document.getElementById(`example-${example.id}`).textContent = curlExample(key, "/api/emails", example.body);
+    document.getElementById(`response-${example.id}`).textContent = emailResponseExample(example);
+  }
 }
 
 function setupExampleCopyButtons() {
-  for (const example of [...SHORTEN_EXAMPLES, EMAIL_EXAMPLE]) {
+  for (const example of [...SHORTEN_EXAMPLES, ...EMAIL_EXAMPLES]) {
     const pre = document.getElementById(`example-${example.id}`);
     const copyBtn = createCopyIconButton();
     copyBtn.classList.add("api-example-copy");
