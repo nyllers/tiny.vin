@@ -26,11 +26,13 @@ const API_KEY_PATTERN = /^tvk_[0-9a-f]{48}$/;
 const VALID_KINDS = new Set(["generated-path", "custom-path", "subdomain"]);
 const MIN_CUSTOM_PATH_LENGTH = 4;
 const MIN_CUSTOM_PATH_LENGTH_ADMIN = 1;
-const MAX_URLS = 10;
-const MAX_URLS_ADMIN = 100;
+const MAX_RESOURCES = 10;
+const MAX_RESOURCES_ADMIN = 100;
 const EMAIL_ALIAS_PATTERN = /^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$/;
 const EMAIL_ADDRESS_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_DOMAIN = "tiny.vin";
+const EMAIL_ALIAS_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
+const EMAIL_ALIAS_LENGTH = 8;
 
 const LOGIN_ERRORS = {
   oauth_failed: "Something went wrong signing in. Please try again.",
@@ -75,6 +77,14 @@ function generateCode() {
     }
   }
   return code;
+}
+
+function generateEmailAlias() {
+  let alias = "";
+  for (let i = 0; i < EMAIL_ALIAS_LENGTH; i++) {
+    alias += EMAIL_ALIAS_CHARS[Math.floor(Math.random() * EMAIL_ALIAS_CHARS.length)];
+  }
+  return alias;
 }
 
 function generateApiKey() {
@@ -322,11 +332,13 @@ async function handleShorten(request, env, session) {
   const createdBy = await getOrCreateIdentityId(env, session.email);
   const admin = await isAdmin(env, session.email);
 
-  const maxUrls = admin ? MAX_URLS_ADMIN : MAX_URLS;
-  const urlCount = await countUrls(env, createdBy);
-  if (urlCount >= maxUrls) {
+  const maxResources = admin ? MAX_RESOURCES_ADMIN : MAX_RESOURCES;
+  const resourceCount = await countUrlsAndEmails(env, createdBy);
+  if (resourceCount >= maxResources) {
     return jsonResponse(
-      { error: `You've reached the maximum of ${maxUrls} URLs. Delete one before creating another.` },
+      {
+        error: `You've reached the maximum of ${maxResources} URLs and/or e-mail aliases. Delete one before creating another.`,
+      },
       403
     );
   }
@@ -400,9 +412,13 @@ async function isAdmin(env, email) {
   return identity?.role === "admin";
 }
 
-async function countUrls(env, identityId) {
-  const row = await env.DB.prepare("SELECT COUNT(*) AS cnt FROM urls WHERE created_by = ?")
-    .bind(identityId)
+async function countUrlsAndEmails(env, identityId) {
+  const row = await env.DB.prepare(
+    `SELECT
+       (SELECT COUNT(*) FROM urls WHERE created_by = ?) +
+       (SELECT COUNT(*) FROM email_redirects WHERE created_by = ?) AS cnt`
+  )
+    .bind(identityId, identityId)
     .first();
 
   return row.cnt;
@@ -855,6 +871,34 @@ async function handleDeleteUrl(code, kind, env, session) {
   return jsonResponse({ ok: true });
 }
 
+// Creates the Cloudflare routing rule and the email_redirects row for one
+// alias. Returns { ok: true } on success; on failure returns { error:
+// "cloudflare" } (rule creation itself failed) or { error: "conflict" }
+// (alias already taken - the just-created rule is cleaned up) so the two
+// callers below can tell a real Cloudflare-side failure apart from a
+// generated-alias collision worth retrying.
+async function createEmailRedirectRow(env, { alias, destination, createdBy }) {
+  let ruleId;
+  try {
+    ruleId = await createWorkerEmailRule(env, alias);
+  } catch {
+    return { error: "cloudflare" };
+  }
+
+  try {
+    await env.DB.prepare(
+      "INSERT INTO email_redirects (alias, destination, cloudflare_rule_id, created_at, created_by) VALUES (?, ?, ?, ?, ?)"
+    )
+      .bind(alias, destination, ruleId, Date.now(), createdBy)
+      .run();
+  } catch {
+    await deleteWorkerEmailRule(env, ruleId).catch(() => {});
+    return { error: "conflict" };
+  }
+
+  return { ok: true };
+}
+
 async function handleCreateEmailRedirect(request, env, session) {
   let body;
   try {
@@ -866,9 +910,13 @@ async function handleCreateEmailRedirect(request, env, session) {
   const aliasInput = typeof body.alias === "string" ? body.alias.trim().toLowerCase() : "";
   const destinationInput = typeof body.destination === "string" ? body.destination.trim() : "";
 
-  const aliasValidation = validateEmailAlias(aliasInput);
-  if (aliasValidation.error) {
-    return jsonResponse({ error: aliasValidation.error }, 400);
+  let alias = null;
+  if (aliasInput) {
+    const aliasValidation = validateEmailAlias(aliasInput);
+    if (aliasValidation.error) {
+      return jsonResponse({ error: aliasValidation.error }, 400);
+    }
+    alias = aliasValidation.alias;
   }
 
   const destinationValidation = validateDestinationEmail(destinationInput);
@@ -880,9 +928,20 @@ async function handleCreateEmailRedirect(request, env, session) {
     return jsonResponse({ error: "E-mail redirects aren't set up on this server yet." }, 503);
   }
 
-  const { alias } = aliasValidation;
   const { email: destination } = destinationValidation;
   const createdBy = await getOrCreateIdentityId(env, session.email);
+  const admin = await isAdmin(env, session.email);
+
+  const maxResources = admin ? MAX_RESOURCES_ADMIN : MAX_RESOURCES;
+  const resourceCount = await countUrlsAndEmails(env, createdBy);
+  if (resourceCount >= maxResources) {
+    return jsonResponse(
+      {
+        error: `You've reached the maximum of ${maxResources} URLs and/or e-mail aliases. Delete one before creating another.`,
+      },
+      403
+    );
+  }
 
   let verified = null;
   try {
@@ -892,25 +951,30 @@ async function handleCreateEmailRedirect(request, env, session) {
     // fails; verification status just won't be known yet.
   }
 
-  let ruleId;
-  try {
-    ruleId = await createWorkerEmailRule(env, alias);
-  } catch {
-    return jsonResponse({ error: "Could not set up the redirect with Cloudflare, try again." }, 502);
+  if (alias) {
+    const result = await createEmailRedirectRow(env, { alias, destination, createdBy });
+    if (result.error === "cloudflare") {
+      return jsonResponse({ error: "Could not set up the redirect with Cloudflare, try again." }, 502);
+    }
+    if (result.error === "conflict") {
+      return jsonResponse({ error: `"${alias}@${EMAIL_DOMAIN}" is already taken, try another.` }, 409);
+    }
+    return jsonResponse({ alias, destination, verified }, 201);
   }
 
-  try {
-    await env.DB.prepare(
-      "INSERT INTO email_redirects (alias, destination, cloudflare_rule_id, created_at, created_by) VALUES (?, ?, ?, ?, ?)"
-    )
-      .bind(alias, destination, ruleId, Date.now(), createdBy)
-      .run();
-  } catch {
-    await deleteWorkerEmailRule(env, ruleId).catch(() => {});
-    return jsonResponse({ error: `"${alias}@${EMAIL_DOMAIN}" is already taken, try another.` }, 409);
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const candidate = generateEmailAlias();
+    const result = await createEmailRedirectRow(env, { alias: candidate, destination, createdBy });
+    if (result.error === "cloudflare") {
+      return jsonResponse({ error: "Could not set up the redirect with Cloudflare, try again." }, 502);
+    }
+    if (!result.error) {
+      return jsonResponse({ alias: candidate, destination, verified }, 201);
+    }
+    // alias collision, retry with a new random alias
   }
 
-  return jsonResponse({ alias, destination, verified }, 201);
+  return jsonResponse({ error: "Could not generate a unique alias, try again" }, 500);
 }
 
 async function handleListEmailRedirects(env, session) {

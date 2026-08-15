@@ -43,7 +43,7 @@ wrangler d1 execute tiny-vin-db --remote --command "UPDATE login_identities SET 
 
 If the database was created before this existed, apply `migrations/0012_add_login_identities_role.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0012_add_login_identities_role.sql --remote`) in addition to `schema.sql`. This migration also promotes every account that already existed at the time it runs to `'admin'`, since there was no user/admin distinction before it — review who that affects before running it against production.
 
-An account can hold at most 10 URLs total (`generated-path` + `custom-path` + `subdomain` combined), or 100 for `admin` accounts. `POST /api/urls` checks the account's current row count in `urls` before creating (or adding a path/subdomain to an existing one) and returns `403` once at the limit — deleting a URL frees up a slot.
+An account can hold at most 10 URLs and/or e-mail aliases combined total (`urls` rows + `email_redirects` rows, added together), or 100 for `admin` accounts. Both `POST /api/urls` and `POST /api/emails` check that combined count before creating (or adding a path/subdomain/alias to an existing one) and return `403` once at the limit — deleting a URL or an alias frees up a slot.
 
 ## API access
 
@@ -71,7 +71,7 @@ curl -X POST https://tiny.vin/api/emails \
   -d '{"alias": "newsletter", "destination": "you@example.com"}'
 ```
 
-On success the response is `201 Created` with a JSON body (`{"alias", "destination", "verified"}` — see "E-mail redirects" above for what `verified` means and why Cloudflare credentials are required for this to work at all). `GET /api/emails` (list) and `DELETE /api/emails/<alias>` stay session-only, same as the equivalent URL endpoints - only creation is exposed to API keys.
+`alias` is optional — omit it for a random 8-character one, the same idea as leaving off `path`/`subdomain` for URLs. On success the response is `201 Created` with a JSON body (`{"alias", "destination", "verified"}` — see "E-mail redirects" above for what `verified` means and why Cloudflare credentials are required for this to work at all). `GET /api/emails` (list) and `DELETE /api/emails/<alias>` stay session-only, same as the equivalent URL endpoints - only creation is exposed to API keys.
 
 ## Subdomains
 
@@ -86,6 +86,8 @@ The `generated-path`/`custom-path` split is separate and newer: if the database 
 ## E-mail redirects
 
 The `/emails` page (linked from the nav) lets a signed-in account redirect `<alias>@tiny.vin` to any other e-mail address — `email_redirects` holds one row per alias (`alias` is the primary key, same relationship `urls.code` has to the domain), with `alias@tiny.vin` reserved words checked against the same `RESERVED_CODES` set used for paths. If the database was created before this existed, apply `migrations/0013_add_email_redirects.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0013_add_email_redirects.sql --remote`) in addition to `schema.sql`.
+
+Mirroring the URL page: the top form only asks for a destination address and generates a random 8-character lowercase alphanumeric alias (`generateEmailAlias` in `src/index.js`), retrying on collision the same way `generateCode` does for URLs. Multiple aliases can point at the same destination — cards group by destination the same way URL cards group by original URL, and each card's "Add alias" button reveals an inline input (mirroring "Add Path"/"Add Subdomain" on the URL page) for attaching another chosen alias to that destination without re-entering it.
 
 **This needs Cloudflare Email Routing enabled on the zone**, which isn't part of this repo: enable it with `wrangler email routing enable tiny.vin`, or Dashboard → **Email Service** → **Email Routing** → **Enable**. This adds the required MX/TXT records. (On tiny.vin this has already been done.)
 
