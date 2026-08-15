@@ -22,7 +22,6 @@ function openQrModal(url) {
   const titleEl = document.getElementById("qr-modal-title");
   const urlEl = document.getElementById("qr-modal-url");
   const closeBtn = document.getElementById("qr-modal-close");
-  const previouslyFocused = document.activeElement;
 
   const qr = qrcode(0, "M");
   qr.addData(url);
@@ -44,28 +43,8 @@ function openQrModal(url) {
 
   urlEl.textContent = "";
   urlEl.appendChild(createCopyableTextGroup(url));
-  overlay.hidden = false;
-  closeBtn.focus();
 
-  function close() {
-    overlay.hidden = true;
-    closeBtn.removeEventListener("click", close);
-    overlay.removeEventListener("click", onOverlayClick);
-    document.removeEventListener("keydown", onKeydown);
-    if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
-  }
-
-  function onOverlayClick(event) {
-    if (event.target === overlay) close();
-  }
-
-  function onKeydown(event) {
-    if (event.key === "Escape") close();
-  }
-
-  closeBtn.addEventListener("click", close);
-  overlay.addEventListener("click", onOverlayClick);
-  document.addEventListener("keydown", onKeydown);
+  openModal(overlay, closeBtn);
 }
 
 function codeFromLocation(location) {
