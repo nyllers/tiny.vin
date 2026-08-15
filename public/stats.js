@@ -1,64 +1,22 @@
-function createStatRow(shortUrlItem, maxClicks) {
-  const row = document.createElement("div");
-  row.className = "url-card-copy-row";
-
-  const info = document.createElement("div");
-  info.className = "stat-row-info";
-  const value = document.createElement("span");
-  value.className = "url-card-value";
-  value.textContent = shortUrlItem.shortUrl;
-  const meta = document.createElement("span");
-  meta.className = "stat-row-meta";
-  meta.textContent = shortUrlItem.lastClickAt ? `Last redirect: ${formatDate(shortUrlItem.lastClickAt)}` : "No redirects yet";
-  info.append(value, meta);
-
-  const countWrap = document.createElement("div");
-  countWrap.className = "stat-row-count-wrap";
-  const count = document.createElement("span");
-  count.className = "stat-row-count";
-  count.textContent = `${shortUrlItem.clicks} redirect${shortUrlItem.clicks === 1 ? "" : "s"}`;
-  const bar = document.createElement("div");
-  bar.className = "stat-bar";
-  const barFill = document.createElement("div");
-  barFill.className = "stat-bar-fill";
-  barFill.style.width = maxClicks > 0 ? `${Math.round((shortUrlItem.clicks / maxClicks) * 100)}%` : "0%";
-  bar.appendChild(barFill);
-  countWrap.append(count, bar);
-
-  row.append(info, countWrap);
-  return row;
-}
+const URL_STAT_KIND = {
+  unitLabel: "redirect",
+  itemLabel: (s) => s.shortUrl,
+  itemCount: (s) => s.clicks,
+  itemLastAt: (s) => s.lastClickAt,
+  groupRow: (g) => createOriginalUrlRow(g.originalUrl),
+  groupItems: (g) => g.shortUrls,
+  groupTotal: (g) => g.totalClicks,
+};
 
 function createStatCard(group) {
-  const card = document.createElement("div");
-  card.className = "url-card";
-
-  const originalRow = createOriginalUrlRow(group.originalUrl);
-
-  const shortRow = document.createElement("div");
-  shortRow.className = "url-card-row url-card-row--tiny";
-  const maxClicks = Math.max(...group.shortUrls.map((s) => s.clicks), 0);
-  for (const shortUrlItem of group.shortUrls) {
-    shortRow.append(createStatRow(shortUrlItem, maxClicks));
-  }
-
-  const metaRow = document.createElement("div");
-  metaRow.className = "url-card-meta-row";
-  const totalBadge = document.createElement("span");
-  totalBadge.className = "stat-total-badge";
-  totalBadge.textContent = `${group.totalClicks} total redirect${group.totalClicks === 1 ? "" : "s"}`;
-  metaRow.appendChild(totalBadge);
-
-  card.append(originalRow, shortRow, metaRow);
-  return card;
+  return createGroupStatCard(group, URL_STAT_KIND);
 }
 
 function flattenShortUrls(urls) {
-  return urls
-    .flatMap((group) => group.shortUrls.map((shortUrlItem) => ({ ...shortUrlItem, originalUrl: group.originalUrl })))
-    .filter((entry) => entry.clicks > 0)
-    .sort((a, b) => b.clicks - a.clicks)
-    .slice(0, BAR_CHART_LIMIT);
+  return topByCount(
+    urls.flatMap((group) => group.shortUrls.map((shortUrlItem) => ({ ...shortUrlItem, originalUrl: group.originalUrl }))),
+    "clicks"
+  );
 }
 
 function createUrlBreakdownChartCard(entries) {
@@ -66,24 +24,6 @@ function createUrlBreakdownChartCard(entries) {
     chartAriaLabel: "Redirects per URL",
     labelFor: (e) => e.code,
     describeEntry: (e) => `${e.shortUrl} (${e.originalUrl}): ${e.count} redirect${e.count === 1 ? "" : "s"}`,
-  });
-}
-
-function createBrowserChartCard(browsers) {
-  const entries = browsers.map((b) => ({ label: b.name, count: b.count }));
-  return createBreakdownChartCard("Redirects by Browser", entries, {
-    chartAriaLabel: "Redirects by browser",
-    labelFor: (e) => e.label,
-    describeEntry: (e) => `${e.label}: ${e.count} redirect${e.count === 1 ? "" : "s"}`,
-  });
-}
-
-function createRefererChartCard(referrers) {
-  const entries = referrers.map((r) => ({ label: r.name, count: r.count }));
-  return createBreakdownChartCard("Redirects by Referer", entries, {
-    chartAriaLabel: "Redirects by referer",
-    labelFor: (e) => e.label,
-    describeEntry: (e) => `${e.label}: ${e.count} redirect${e.count === 1 ? "" : "s"}`,
   });
 }
 
@@ -223,10 +163,14 @@ async function loadStats() {
     breakdownCards.push(createUrlBreakdownChartCard(urlChartEntries));
   }
   if (data.browsers && data.browsers.length > 0) {
-    breakdownCards.push(createBrowserChartCard(data.browsers.slice(0, BAR_CHART_LIMIT)));
+    breakdownCards.push(
+      createNameCountChartCard("Redirects by Browser", "Redirects by browser", data.browsers.slice(0, BAR_CHART_LIMIT), "redirect")
+    );
   }
   if (data.topReferrers && data.topReferrers.length > 0) {
-    breakdownCards.push(createRefererChartCard(data.topReferrers.slice(0, BAR_CHART_LIMIT)));
+    breakdownCards.push(
+      createNameCountChartCard("Redirects by Referer", "Redirects by referer", data.topReferrers.slice(0, BAR_CHART_LIMIT), "redirect")
+    );
   }
   if (data.mapPoints && data.mapPoints.length > 0) {
     breakdownCards.push(createWorldMapCard(data.mapPoints));

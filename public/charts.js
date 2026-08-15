@@ -268,3 +268,88 @@ function createSummaryTile(label, value) {
   tile.append(valueEl, labelEl);
   return tile;
 }
+
+// Shared "N per category, last 14 days" breakdown card for the common case
+// of plotting a flat {name, count} list (browsers, referers, sender
+// domains, ...) - only the title/aria-label wording and unit noun differ.
+function createNameCountChartCard(titleText, ariaLabel, items, unitLabel) {
+  const entries = items.map((item) => ({ label: item.name, count: item.count }));
+  return createBreakdownChartCard(titleText, entries, {
+    chartAriaLabel: ariaLabel,
+    labelFor: (e) => e.label,
+    describeEntry: (e) => `${e.label}: ${e.count} ${unitLabel}${e.count === 1 ? "" : "s"}`,
+  });
+}
+
+// Keeps only the top BAR_CHART_LIMIT entries with nonzero activity, busiest
+// first - shared by the URL/e-mail stats pages' 14-day breakdown charts.
+function topByCount(entries, countKey) {
+  return entries
+    .filter((entry) => entry[countKey] > 0)
+    .sort((a, b) => b[countKey] - a[countKey])
+    .slice(0, BAR_CHART_LIMIT);
+}
+
+// A "group card" pairs one parent row (an original URL, an e-mail
+// destination) with a list of child items (its short URLs, its aliases),
+// each shown as a labeled row with a proportional bar, plus a total badge.
+// Shared by /stats and /email-stats - `kind` supplies the field accessors
+// and unit noun that differ between the two.
+function createStatRow(item, max, kind) {
+  const row = document.createElement("div");
+  row.className = "url-card-copy-row";
+
+  const info = document.createElement("div");
+  info.className = "stat-row-info";
+  const value = document.createElement("span");
+  value.className = "url-card-value";
+  value.textContent = kind.itemLabel(item);
+  const meta = document.createElement("span");
+  meta.className = "stat-row-meta";
+  const lastAt = kind.itemLastAt(item);
+  meta.textContent = lastAt ? `Last ${kind.unitLabel}: ${formatDate(lastAt)}` : `No ${kind.unitLabel}s yet`;
+  info.append(value, meta);
+
+  const countWrap = document.createElement("div");
+  countWrap.className = "stat-row-count-wrap";
+  const countEl = document.createElement("span");
+  countEl.className = "stat-row-count";
+  const count = kind.itemCount(item);
+  countEl.textContent = `${count} ${kind.unitLabel}${count === 1 ? "" : "s"}`;
+  const bar = document.createElement("div");
+  bar.className = "stat-bar";
+  const barFill = document.createElement("div");
+  barFill.className = "stat-bar-fill";
+  barFill.style.width = max > 0 ? `${Math.round((count / max) * 100)}%` : "0%";
+  bar.appendChild(barFill);
+  countWrap.append(countEl, bar);
+
+  row.append(info, countWrap);
+  return row;
+}
+
+function createGroupStatCard(group, kind) {
+  const card = document.createElement("div");
+  card.className = "url-card";
+
+  const topRow = kind.groupRow(group);
+
+  const itemsRow = document.createElement("div");
+  itemsRow.className = "url-card-row url-card-row--tiny";
+  const items = kind.groupItems(group);
+  const max = Math.max(...items.map(kind.itemCount), 0);
+  for (const item of items) {
+    itemsRow.append(createStatRow(item, max, kind));
+  }
+
+  const metaRow = document.createElement("div");
+  metaRow.className = "url-card-meta-row";
+  const totalBadge = document.createElement("span");
+  totalBadge.className = "stat-total-badge";
+  const total = kind.groupTotal(group);
+  totalBadge.textContent = `${total} total ${kind.unitLabel}${total === 1 ? "" : "s"}`;
+  metaRow.appendChild(totalBadge);
+
+  card.append(topRow, itemsRow, metaRow);
+  return card;
+}
