@@ -1,5 +1,13 @@
 import { buildAuthorizeUrl, exchangeCodeForToken, fetchUserInfo } from "./providers.js";
-import { parseCookies, createSessionCookie, clearSessionCookie, getSession, randomState } from "./session.js";
+import {
+  parseCookies,
+  createSessionCookie,
+  clearSessionCookie,
+  getSession,
+  randomState,
+  createAppAuthToken,
+  verifyAppAuthToken,
+} from "./session.js";
 
 const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 const UPPERCASE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -10,7 +18,17 @@ const SUBDOMAIN_REDIRECT_PATTERN = /^\/subdomain\/([a-z0-9-]{1,63})$/;
 const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
 const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9-]+)$/;
 const DELETE_EMAIL_PATTERN = /^\/api\/emails\/([a-z0-9-]+)$/;
-const RESERVED_CODES = new Set(["login", "subdomain", "stats", "privacy", "terms", "api", "emails", "email-stats"]);
+const RESERVED_CODES = new Set([
+  "login",
+  "subdomain",
+  "stats",
+  "privacy",
+  "terms",
+  "api",
+  "emails",
+  "email-stats",
+  "app",
+]);
 const PROTECTED_PAGES = new Set([
   "/",
   "/stats",
@@ -514,10 +532,17 @@ async function handleGetApiKey(env, session) {
   return jsonResponse({ key: row ? row.key : null });
 }
 
-async function handleCreateApiKey(env, session) {
-  const identityId = await getOrCreateIdentityId(env, session.email);
-  const key = generateApiKey();
+// Shared by the "regenerate" button on /api (always mints a fresh key) and
+// the Android app's post-sign-in exchange (reuses one if it already exists).
+async function getOrCreateApiKey(env, email, { forceRegenerate = false } = {}) {
+  const identityId = await getOrCreateIdentityId(env, email);
 
+  if (!forceRegenerate) {
+    const existing = await env.DB.prepare("SELECT key FROM api_keys WHERE identity_id = ?").bind(identityId).first();
+    if (existing) return existing.key;
+  }
+
+  const key = generateApiKey();
   await env.DB.prepare(
     `INSERT INTO api_keys (identity_id, key, created_at) VALUES (?, ?, ?)
      ON CONFLICT (identity_id) DO UPDATE SET key = excluded.key, created_at = excluded.created_at`
@@ -525,7 +550,53 @@ async function handleCreateApiKey(env, session) {
     .bind(identityId, key, Date.now())
     .run();
 
+  return key;
+}
+
+async function handleCreateApiKey(env, session) {
+  const key = await getOrCreateApiKey(env, session.email, { forceRegenerate: true });
   return jsonResponse({ key });
+}
+
+async function handleAppAuthExchange(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid request body" }, 400);
+  }
+
+  const payload = await verifyAppAuthToken(body.token, env.SESSION_SECRET);
+  if (!payload) return jsonResponse({ error: "Invalid or expired token" }, 401);
+
+  const key = await getOrCreateApiKey(env, payload.email);
+  return jsonResponse({ key });
+}
+
+function appAuthCallbackPage(url) {
+  const error = url.searchParams.get("error");
+  const message = error
+    ? LOGIN_ERRORS[error] || "Something went wrong signing in. Please try again in the app."
+    : url.searchParams.get("token")
+      ? "Signed in — return to the tiny.vin app to finish."
+      : "Nothing to do here — open the tiny.vin app to sign in.";
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tiny.vin</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <h1>tiny.vin</h1>
+    <p>${message}</p>
+  </main>
+</body>
+</html>`;
 }
 
 function groupBy(rows, keyFn, buildEntry) {
@@ -1110,13 +1181,17 @@ function handleAuthStart(url, env) {
   const redirectUri = `${env.SITE_URL}/auth/google/callback`;
   const authorizeUrl = buildAuthorizeUrl(env, redirectUri, state);
 
-  return new Response(null, {
-    status: 302,
-    headers: {
-      location: authorizeUrl,
-      "set-cookie": `oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`,
-    },
-  });
+  // ?client=app marks a sign-in started by the Android app (via a Custom Tab)
+  // rather than a normal browser visit, via a cookie so it survives the round
+  // trip to Google and back. handleAuthCallback reads it to decide whether to
+  // hand the result back to the app instead of the browser.
+  const headers = new Headers({ location: authorizeUrl });
+  headers.append("set-cookie", `oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);
+  if (url.searchParams.get("client") === "app") {
+    headers.append("set-cookie", `oauth_client=app; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);
+  }
+
+  return new Response(null, { status: 302, headers });
 }
 
 async function getOrCreateIdentityId(env, email) {
@@ -1145,9 +1220,11 @@ async function handleAuthCallback(url, request, env) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const cookies = parseCookies(request);
+  const isApp = cookies.oauth_client === "app";
+  const failureTarget = isApp ? `${url.origin}/app/auth-callback` : `${url.origin}/login`;
 
   if (!code || !state || !cookies.oauth_state || cookies.oauth_state !== state) {
-    return Response.redirect(`${url.origin}/login?error=state_mismatch`, 302);
+    return Response.redirect(`${failureTarget}?error=state_mismatch`, 302);
   }
 
   try {
@@ -1162,15 +1239,23 @@ async function handleAuthCallback(url, request, env) {
 
     const sessionCookie = await createSessionCookie(user, env.SESSION_SECRET);
 
+    // The app can't read this HttpOnly session cookie, so it also gets a
+    // short-lived signed token in the redirect URL, which it exchanges for
+    // an API key at /app/auth-exchange. The browser-facing session cookie is
+    // still set here too, in case this callback is ever hit outside the app.
+    const location = isApp
+      ? `${url.origin}/app/auth-callback?token=${await createAppAuthToken(user.email, env.SESSION_SECRET)}`
+      : `${url.origin}/`;
+
     return new Response(null, {
       status: 302,
       headers: {
-        location: `${url.origin}/`,
+        location,
         "set-cookie": sessionCookie,
       },
     });
   } catch {
-    return Response.redirect(`${url.origin}/login?error=oauth_failed`, 302);
+    return Response.redirect(`${failureTarget}?error=oauth_failed`, 302);
   }
 }
 
@@ -1212,6 +1297,14 @@ export default {
       const [, step] = authMatch;
       if (step === "start") return handleAuthStart(url, env);
       return handleAuthCallback(url, request, env);
+    }
+
+    if (url.pathname === "/app/auth-callback" && request.method === "GET") {
+      return htmlResponse(appAuthCallbackPage(url));
+    }
+
+    if (url.pathname === "/app/auth-exchange" && request.method === "POST") {
+      return handleAppAuthExchange(request, env);
     }
 
     const subdomainMatch = url.pathname.match(SUBDOMAIN_REDIRECT_PATTERN);

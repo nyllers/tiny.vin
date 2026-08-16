@@ -1,5 +1,6 @@
 const SESSION_COOKIE = "session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+const APP_AUTH_TOKEN_MAX_AGE = 120; // 2 minutes - just long enough to reach the app via redirect
 
 function base64UrlEncode(bytes) {
   let binary = "";
@@ -69,9 +70,9 @@ function clearSessionCookie() {
   return `${SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
 }
 
-async function getSession(request, secret) {
-  const cookies = parseCookies(request);
-  const value = cookies[SESSION_COOKIE];
+// Shared by the session cookie and the app-auth token below: both are just a
+// base64url JSON payload plus an HMAC signature, verified the same way.
+async function verifySignedValue(value, secret) {
   if (!value) return null;
 
   const [payloadB64, signature] = value.split(".");
@@ -92,8 +93,36 @@ async function getSession(request, secret) {
   return payload;
 }
 
+async function getSession(request, secret) {
+  const cookies = parseCookies(request);
+  return verifySignedValue(cookies[SESSION_COOKIE], secret);
+}
+
 function randomState() {
   return base64UrlEncode(crypto.getRandomValues(new Uint8Array(18)));
 }
 
-export { parseCookies, createSessionCookie, clearSessionCookie, getSession, randomState };
+// Short-lived, single-purpose token handed to the Android app via a redirect
+// after it completes Google sign-in in a Custom Tab (see /auth/google/callback
+// and /app/auth-exchange). Deliberately separate from the session cookie: it's
+// URL-borne rather than HttpOnly, so it stays valid for minutes, not weeks.
+async function createAppAuthToken(email, secret) {
+  const payload = { email, exp: Math.floor(Date.now() / 1000) + APP_AUTH_TOKEN_MAX_AGE };
+  const payloadB64 = base64UrlEncode(new TextEncoder().encode(JSON.stringify(payload)));
+  const signature = await signPayload(payloadB64, secret);
+  return `${payloadB64}.${signature}`;
+}
+
+async function verifyAppAuthToken(token, secret) {
+  return verifySignedValue(token, secret);
+}
+
+export {
+  parseCookies,
+  createSessionCookie,
+  clearSessionCookie,
+  getSession,
+  randomState,
+  createAppAuthToken,
+  verifyAppAuthToken,
+};
