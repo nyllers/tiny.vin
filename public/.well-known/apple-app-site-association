@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "L6DT3GH23M.vin.tiny.clipshort",
+        "paths": ["/app/auth-callback*"]
+      }
+    ]
+  }
+}
