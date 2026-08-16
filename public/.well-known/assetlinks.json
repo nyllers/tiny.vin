@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "vin.tiny.clipshort",
       "sha256_cert_fingerprints": [
-        "70:FB:06:E8:31:32:DA:0C:31:0B:1A:8C:A7:A4:62:EE:65:F8:AE:FC:EE:B9:9A:5B:6B:66:4F:BC:C7:41:B1:E9"
+        "70:FB:06:E8:31:32:DA:0C:31:0B:1A:8C:A7:A4:62:EE:65:F8:AE:FC:EE:B9:9A:5B:6B:66:4F:BC:C7:41:B1:E9",
+        "F6:E5:47:BE:88:0E:5A:33:95:61:E1:DC:71:15:7F:14:F0:B8:D8:1A:F8:A4:C2:1F:67:06:92:7A:5A:12:47:8F"
       ]
     }
   }
