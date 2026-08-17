@@ -1171,7 +1171,12 @@ async function handleRedirect(code, kinds, env, ctx, request) {
     return new Response("Not found", { status: 404 });
   }
 
-  ctx.waitUntil(recordRedirectEvent(env, { code, kind: row.kind, request }));
+  // HEAD requests answer identically to GET (same redirect, no body) so
+  // scanners/link-preview tools can check a short link's destination without
+  // it counting as a real visit - only GET click-throughs go into analytics.
+  if (request.method === "GET") {
+    ctx.waitUntil(recordRedirectEvent(env, { code, kind: row.kind, request }));
+  }
 
   return Response.redirect(row.original_url, 302);
 }
@@ -1277,69 +1282,90 @@ const SIMPLE_ROUTES = new Map([
   ["GET /api/emails", { auth: withAuth, run: (request, env, session) => handleListEmailRedirects(env, session) }],
 ]);
 
+// Applied to every response so header hygiene is uniform across pages, the
+// API, static assets, and redirects alike - inconsistent headers across an
+// origin is itself one of the things automated site-categorization scanners
+// weigh. Content-Security-Policy is deliberately not included here: the
+// PayPal donate SDK's inline `onload` handler and other third-party
+// resources would need a careful per-page audit first.
+function withSecurityHeaders(response) {
+  const headers = new Headers(response.headers);
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains");
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+async function handleFetch(request, env, ctx) {
+  const url = new URL(request.url);
+
+  if (url.pathname === "/login") {
+    return htmlResponse(loginPage(url.searchParams.get("error")));
+  }
+
+  if (url.pathname === "/auth/logout") {
+    return new Response(null, {
+      status: 302,
+      headers: { location: "/login", "set-cookie": clearSessionCookie() },
+    });
+  }
+
+  const authMatch = url.pathname.match(AUTH_PATTERN);
+  if (authMatch && request.method === "GET") {
+    const [, step] = authMatch;
+    if (step === "start") return handleAuthStart(url, env);
+    return handleAuthCallback(url, request, env);
+  }
+
+  if (url.pathname === "/app/auth-callback" && request.method === "GET") {
+    return htmlResponse(appAuthCallbackPage(url));
+  }
+
+  if (url.pathname === "/app/auth-exchange" && request.method === "POST") {
+    return handleAppAuthExchange(request, env);
+  }
+
+  const isGetOrHead = request.method === "GET" || request.method === "HEAD";
+
+  const subdomainMatch = url.pathname.match(SUBDOMAIN_REDIRECT_PATTERN);
+  if (isGetOrHead && subdomainMatch) {
+    return handleRedirect(subdomainMatch[1], ["subdomain"], env, ctx, request);
+  }
+
+  const codeMatch = url.pathname.match(CODE_PATTERN);
+  if (isGetOrHead && codeMatch && !RESERVED_CODES.has(codeMatch[1].toLowerCase())) {
+    return handleRedirect(codeMatch[1], ["generated-path", "custom-path"], env, ctx, request);
+  }
+
+  const route = SIMPLE_ROUTES.get(`${request.method} ${url.pathname}`);
+  if (route) {
+    return route.auth(request, env, (session) => route.run(request, env, session));
+  }
+
+  const deleteMatch = url.pathname.match(DELETE_URL_PATTERN);
+  if (request.method === "DELETE" && deleteMatch) {
+    const kindParam = url.searchParams.get("kind");
+    const kind = VALID_KINDS.has(kindParam) ? kindParam : "generated-path";
+    return withAuth(request, env, (session) => handleDeleteUrl(deleteMatch[1], kind, env, session));
+  }
+
+  const deleteEmailMatch = url.pathname.match(DELETE_EMAIL_PATTERN);
+  if (request.method === "DELETE" && deleteEmailMatch) {
+    return withAuth(request, env, (session) => handleDeleteEmailRedirect(deleteEmailMatch[1], env, session));
+  }
+
+  if (PROTECTED_PAGES.has(url.pathname)) {
+    const session = await getSession(request, env.SESSION_SECRET);
+    if (!session) return htmlResponse(loginPage());
+  }
+
+  return env.ASSETS.fetch(request);
+}
+
 export default {
   async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-
-    if (url.pathname === "/login") {
-      return htmlResponse(loginPage(url.searchParams.get("error")));
-    }
-
-    if (url.pathname === "/auth/logout") {
-      return new Response(null, {
-        status: 302,
-        headers: { location: "/login", "set-cookie": clearSessionCookie() },
-      });
-    }
-
-    const authMatch = url.pathname.match(AUTH_PATTERN);
-    if (authMatch && request.method === "GET") {
-      const [, step] = authMatch;
-      if (step === "start") return handleAuthStart(url, env);
-      return handleAuthCallback(url, request, env);
-    }
-
-    if (url.pathname === "/app/auth-callback" && request.method === "GET") {
-      return htmlResponse(appAuthCallbackPage(url));
-    }
-
-    if (url.pathname === "/app/auth-exchange" && request.method === "POST") {
-      return handleAppAuthExchange(request, env);
-    }
-
-    const subdomainMatch = url.pathname.match(SUBDOMAIN_REDIRECT_PATTERN);
-    if (request.method === "GET" && subdomainMatch) {
-      return handleRedirect(subdomainMatch[1], ["subdomain"], env, ctx, request);
-    }
-
-    const codeMatch = url.pathname.match(CODE_PATTERN);
-    if (request.method === "GET" && codeMatch && !RESERVED_CODES.has(codeMatch[1].toLowerCase())) {
-      return handleRedirect(codeMatch[1], ["generated-path", "custom-path"], env, ctx, request);
-    }
-
-    const route = SIMPLE_ROUTES.get(`${request.method} ${url.pathname}`);
-    if (route) {
-      return route.auth(request, env, (session) => route.run(request, env, session));
-    }
-
-    const deleteMatch = url.pathname.match(DELETE_URL_PATTERN);
-    if (request.method === "DELETE" && deleteMatch) {
-      const kindParam = url.searchParams.get("kind");
-      const kind = VALID_KINDS.has(kindParam) ? kindParam : "generated-path";
-      return withAuth(request, env, (session) => handleDeleteUrl(deleteMatch[1], kind, env, session));
-    }
-
-    const deleteEmailMatch = url.pathname.match(DELETE_EMAIL_PATTERN);
-    if (request.method === "DELETE" && deleteEmailMatch) {
-      return withAuth(request, env, (session) => handleDeleteEmailRedirect(deleteEmailMatch[1], env, session));
-    }
-
-    if (PROTECTED_PAGES.has(url.pathname)) {
-      const session = await getSession(request, env.SESSION_SECRET);
-      if (!session) return htmlResponse(loginPage());
-    }
-
-    return env.ASSETS.fetch(request);
+    return withSecurityHeaders(await handleFetch(request, env, ctx));
   },
 
   async email(message, env, ctx) {
