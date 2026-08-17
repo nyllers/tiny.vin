@@ -159,7 +159,7 @@ function renderDonateNav() {
 
 function donateButtonImageSrc() {
   const theme = document.documentElement.getAttribute("data-theme");
-  return theme === "dark" ? "/donate-button-dark.svg" : "/donate-button-light.svg";
+  return theme === "dark" ? "/donate-button-dark.svg" : "/top-middle-button.svg";
 }
 
 // Called by the PayPal SDK script tag's onload attribute, since that script
