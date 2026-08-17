@@ -128,4 +128,12 @@ If the database was created before this existed, apply `migrations/0007_add_hist
 
 Each short URL in the "Created URLs" list has a QR-code icon next to its copy-link icon. Clicking it opens a modal with a large QR code encoding `https://<shortUrl>` (the scheme is added since the stored/displayed short URL never includes one). QR generation is entirely client-side and offline — `public/qrcode-lib.js` vendors [kazuhikoarase/qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT license, unmodified) rather than calling a third-party image API, so the destination URL never leaves the browser.
 
+## Response hardening
+
+`withSecurityHeaders` in `src/index.js` wraps every response (pages, the API, static assets, and redirects alike) with `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Strict-Transport-Security` — uniform header hygiene across the whole origin, which some automated site-categorization/reputation scanners factor into how they score a domain. `Content-Security-Policy` is deliberately not included: the PayPal donate SDK's inline `onload` handler and other third-party resources would need a careful per-page audit first, and adding it in without one would break the donate button.
+
+Short-code and subdomain redirects (`handleRedirect`) also answer `HEAD` requests identically to `GET` — same redirect, no body — instead of falling through to a `404`. Redirect services conventionally support `HEAD` so link-preview tools and security scanners can check a destination without it counting as a real visit; `HEAD` requests are excluded from `redirect_events` for the same reason (only `GET` click-throughs count as analytics).
+
+`public/robots.txt` and `public/.well-known/security.txt` (RFC 9116) are both static files, no server logic involved.
+
 Clicking the QR code itself copies it to the clipboard as a PNG (rendered via the library's `renderTo2dContext` onto an offscreen canvas, then `canvas.toBlob` + the Clipboard API — no server round-trip). The URL underneath the QR code reuses the same copy-group styling and copy-link icon as the short URL in its card, so both look and behave identically.
