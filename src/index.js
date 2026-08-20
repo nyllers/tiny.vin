@@ -1190,10 +1190,17 @@ function handleAuthStart(url, env) {
   // rather than a normal browser visit, via a cookie so it survives the round
   // trip to Google and back. handleAuthCallback reads it to decide whether to
   // hand the result back to the app instead of the browser.
+  //
+  // ?return=share marks a sign-in started from the app's share dialog rather
+  // than its main screen - the app has two activities that can each receive
+  // the redirect (see APP_CALLBACK_PATHS below), so the result needs to land
+  // back on whichever one the user was actually looking at.
   const headers = new Headers({ location: authorizeUrl });
   headers.append("set-cookie", `oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);
   if (url.searchParams.get("client") === "app") {
     headers.append("set-cookie", `oauth_client=app; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);
+    const returnTarget = url.searchParams.get("return") === "share" ? "share" : "main";
+    headers.append("set-cookie", `oauth_target=${returnTarget}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);
   }
 
   return new Response(null, { status: 302, headers });
@@ -1226,7 +1233,8 @@ async function handleAuthCallback(url, request, env) {
   const state = url.searchParams.get("state");
   const cookies = parseCookies(request);
   const isApp = cookies.oauth_client === "app";
-  const failureTarget = isApp ? `${url.origin}/app/auth-callback` : `${url.origin}/login`;
+  const appCallbackPath = cookies.oauth_target === "share" ? "/app/share-callback" : "/app/auth-callback";
+  const failureTarget = isApp ? `${url.origin}${appCallbackPath}` : `${url.origin}/login`;
 
   if (!code || !state || !cookies.oauth_state || cookies.oauth_state !== state) {
     return Response.redirect(`${failureTarget}?error=state_mismatch`, 302);
@@ -1249,7 +1257,7 @@ async function handleAuthCallback(url, request, env) {
     // an API key at /app/auth-exchange. The browser-facing session cookie is
     // still set here too, in case this callback is ever hit outside the app.
     const location = isApp
-      ? `${url.origin}/app/auth-callback?token=${await createAppAuthToken(user.email, env.SESSION_SECRET)}`
+      ? `${url.origin}${appCallbackPath}?token=${await createAppAuthToken(user.email, env.SESSION_SECRET)}`
       : `${url.origin}/`;
 
     return new Response(null, {
@@ -1318,7 +1326,7 @@ async function handleFetch(request, env, ctx) {
     return handleAuthCallback(url, request, env);
   }
 
-  if (url.pathname === "/app/auth-callback" && request.method === "GET") {
+  if ((url.pathname === "/app/auth-callback" || url.pathname === "/app/share-callback") && request.method === "GET") {
     return htmlResponse(appAuthCallbackPage(url));
   }
 
