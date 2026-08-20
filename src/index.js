@@ -24,6 +24,7 @@ const RESERVED_CODES = new Set([
   "stats",
   "privacy",
   "terms",
+  "support",
   "api",
   "emails",
   "email-stats",
