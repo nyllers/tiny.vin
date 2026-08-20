@@ -4,7 +4,7 @@
     "details": [
       {
         "appID": "NRPT4V4ZVR.vin.tiny.clipshort",
-        "paths": ["/app/auth-callback*"]
+        "paths": ["/app/auth-callback*", "/app/share-callback*"]
       }
     ]
   }
