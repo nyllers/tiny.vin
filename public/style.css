@@ -30,6 +30,21 @@
   --delete: #991b1b;
 }
 
+:root[data-theme="crisp"] {
+  --bg: #f1f5f9;
+  --text: #0f172a;
+  --heading: #0891b2;
+  --panel-bg: #ffffff;
+  --panel-shadow: rgba(15, 23, 42, 0.14);
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+  --input-border: #cbd5e1;
+  --input-bg: #ffffff;
+  --delete: #dc2626;
+  --muted: #64748b;
+  --error-text: #dc2626;
+}
+
 body {
   font-family: system-ui, sans-serif;
   min-height: 100vh;

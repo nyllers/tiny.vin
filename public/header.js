@@ -122,6 +122,7 @@ function renderThemeToggle() {
   root.innerHTML = `
     <button type="button" class="theme-btn" data-theme-value="light">Light</button>
     <button type="button" class="theme-btn" data-theme-value="dark">Dark</button>
+    <button type="button" class="theme-btn" data-theme-value="crisp">Crisp</button>
   `;
 }
 
@@ -159,7 +160,9 @@ function renderDonateNav() {
 
 function donateButtonImageSrc() {
   const theme = document.documentElement.getAttribute("data-theme");
-  return theme === "dark" ? "/top-middle-button-dark.svg" : "/top-middle-button.svg";
+  if (theme === "dark") return "/top-middle-button-dark.svg";
+  if (theme === "crisp") return "/top-middle-button-crisp.svg";
+  return "/top-middle-button.svg";
 }
 
 // Called by the PayPal SDK script tag's onload attribute, since that script
