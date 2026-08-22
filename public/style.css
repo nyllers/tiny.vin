@@ -17,13 +17,14 @@
 
 :root[data-theme="dark"] {
   --bg: #111827;
-  --text: #e5e7eb;
+  --text: #f3f4f6;
   --heading: #fb923c;
   --surface-bg: #1f2937;
   --panel-shadow: rgba(0, 0, 0, 0.6);
   --card-border: #374151;
   --input-border: #4b5563;
   --delete: #991b1b;
+  --muted: #9ca3af;
 }
 
 body {
