@@ -100,14 +100,12 @@ async function maybeShowAdminLink(dropdown) {
   signOutLink.insertAdjacentHTML("beforebegin", navLinkHtml(ADMIN_LINK));
 }
 
-async function initNavMenu() {
+function initNavMenu() {
   renderSiteNav();
 
   const toggle = document.querySelector(".nav-toggle");
   const dropdown = document.querySelector(".nav-dropdown");
   if (!toggle || !dropdown) return;
-
-  await maybeShowAdminLink(dropdown);
 
   function closeMenu() {
     dropdown.hidden = true;
@@ -133,12 +131,21 @@ async function initNavMenu() {
     if (event.key === "Escape") closeMenu();
   });
 
-  const currentPath = window.location.pathname;
-  dropdown.querySelectorAll(".nav-link").forEach((link) => {
-    if (new URL(link.href).pathname === currentPath) {
-      link.setAttribute("aria-current", "page");
-    }
-  });
+  function markCurrentPage() {
+    const currentPath = window.location.pathname;
+    dropdown.querySelectorAll(".nav-link").forEach((link) => {
+      if (new URL(link.href).pathname === currentPath) {
+        link.setAttribute("aria-current", "page");
+      }
+    });
+  }
+
+  // Menu interactivity and the current-page marker don't depend on admin
+  // status, so they're wired up immediately rather than waiting on the
+  // /api/session round trip - re-marked once that resolves in case it
+  // inserted the Admin link and it's the current page.
+  markCurrentPage();
+  maybeShowAdminLink(dropdown).then(markCurrentPage);
 }
 
 function renderThemeToggle() {
