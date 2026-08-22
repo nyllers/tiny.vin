@@ -86,12 +86,16 @@ async function withAuthOrApiKey(request, env, handler) {
   return withAuth(request, env, handler);
 }
 
+async function isAdmin(env, email) {
+  const identity = await env.DB.prepare("SELECT role FROM login_identities WHERE email = ?")
+    .bind(email)
+    .first();
+  return identity?.role === "admin";
+}
+
 async function withAdminAuth(request, env, handler) {
   return withAuth(request, env, async (session) => {
-    const identity = await env.DB.prepare("SELECT role FROM login_identities WHERE email = ?")
-      .bind(session.email)
-      .first();
-    if (identity?.role !== "admin") return jsonResponse({ error: "Forbidden" }, 403);
+    if (!(await isAdmin(env, session.email))) return jsonResponse({ error: "Forbidden" }, 403);
     return handler(session);
   });
 }
@@ -563,11 +567,7 @@ async function handleCreateApiKey(env, session) {
 }
 
 async function handleGetSession(env, session) {
-  const identity = await env.DB.prepare("SELECT role FROM login_identities WHERE email = ?")
-    .bind(session.email)
-    .first();
-
-  return jsonResponse({ email: session.email, admin: identity?.role === "admin" });
+  return jsonResponse({ email: session.email, admin: await isAdmin(env, session.email) });
 }
 
 async function handleListAdminIdentities(env) {
@@ -1462,11 +1462,8 @@ async function handleFetch(request, env, ctx) {
     const session = await getSession(request, env.SESSION_SECRET);
     if (!session) return htmlResponse(loginPage());
 
-    if (ADMIN_PAGES.has(url.pathname)) {
-      const identity = await env.DB.prepare("SELECT role FROM login_identities WHERE email = ?")
-        .bind(session.email)
-        .first();
-      if (identity?.role !== "admin") return Response.redirect(`${url.origin}/`, 302);
+    if (ADMIN_PAGES.has(url.pathname) && !(await isAdmin(env, session.email))) {
+      return Response.redirect(`${url.origin}/`, 302);
     }
   }
 
