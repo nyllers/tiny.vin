@@ -62,16 +62,6 @@ async function loadEmailStats() {
   if (aliasChartEntries.length > 0) {
     breakdownCards.push(createAliasBreakdownChartCard(aliasChartEntries));
   }
-  if (data.senderDomains && data.senderDomains.length > 0) {
-    breakdownCards.push(
-      createNameCountChartCard(
-        "Messages by Sender Domain",
-        "Messages by sender domain",
-        data.senderDomains.slice(0, BAR_CHART_LIMIT),
-        "message"
-      )
-    );
-  }
   if (breakdownCards.length > 0) {
     list.append(createCardsSectionFromElements("BREAKDOWN LAST 14 DAYS", breakdownCards));
   }
