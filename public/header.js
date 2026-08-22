@@ -42,6 +42,12 @@ const NAV_LINKS = [
   },
 ];
 
+const ADMIN_LINK = {
+  href: "/admin",
+  label: "Admin",
+  icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path>',
+};
+
 const SIGN_OUT_LINK = {
   href: "/auth/logout",
   label: "Sign out",
@@ -76,12 +82,32 @@ function renderSiteNav() {
   `;
 }
 
-function initNavMenu() {
+// Only admins get the Admin nav link - the session cookie is HttpOnly, so
+// the only way to know from here is to ask the server.
+async function maybeShowAdminLink(dropdown) {
+  let data;
+  try {
+    const response = await fetch("/api/session");
+    if (!response.ok) return;
+    data = await response.json();
+  } catch {
+    return;
+  }
+
+  if (!data.admin) return;
+
+  const signOutLink = dropdown.querySelector(".nav-link--signout");
+  signOutLink.insertAdjacentHTML("beforebegin", navLinkHtml(ADMIN_LINK));
+}
+
+async function initNavMenu() {
   renderSiteNav();
 
   const toggle = document.querySelector(".nav-toggle");
   const dropdown = document.querySelector(".nav-dropdown");
   if (!toggle || !dropdown) return;
+
+  await maybeShowAdminLink(dropdown);
 
   function closeMenu() {
     dropdown.hidden = true;

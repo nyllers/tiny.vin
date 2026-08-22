@@ -51,6 +51,14 @@ If the database was created before this existed, apply `migrations/0015_add_logi
 
 If the database was created before this existed, apply `migrations/0016_add_login_identities_min_custom_path_length.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0016_add_login_identities_min_custom_path_length.sql --remote`) in addition to `schema.sql`. This migration backfills every existing `admin` account to 1, preserving the effective minimum the old hardcoded constants gave them.
 
+## Admin page
+
+`/admin` (linked from the nav, but only for admins - it's absent from the dropdown entirely for regular accounts) lists every account: current link/e-mail-alias counts (read-only) alongside editable `role`, `max_resources`, and `min_custom_path_length`, saved per row via `PATCH /api/admin/identities/<id>`. This is what makes the by-hand `UPDATE login_identities SET ...` commands earlier in this README optional rather than the only option.
+
+Both the page and its API are gated by role, checked fresh from the database on every request (`withAdminAuth` for the API, an inline check alongside the existing `PROTECTED_PAGES` login gate for the page itself) - the session cookie only proves who's signed in, not their role. The one guard rail: an admin can't demote their own account away from `'admin'` through this page, since there'd be no way back in through the UI once that saves - use the manual SQL command for that instead, from another admin account or directly against the database.
+
+`GET /api/session` (`{email, admin}`) backs the nav's decision to show the Admin link at all - it's the only thing client-side JS can check, since the session cookie itself is `HttpOnly`.
+
 ## API access
 
 Signed-in accounts can create tiny URLs from the command line instead of the browser, via an API key. The `/api` page (linked from the nav) generates one while signed in — one key per account; regenerating immediately invalidates the previous one.
