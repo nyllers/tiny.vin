@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tiny.vin — Admin</title>
+  <meta name="description" content="Manage tiny.vin accounts: role, max links, and minimum alias length.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="theme-init.js"></script>
+</head>
+<body>
+  <div class="site-nav"></div>
+  <div class="theme-toggle" role="group" aria-label="Theme"></div>
+  <div class="donate-nav"></div>
+  <script src="header.js"></script>
+  <h2 class="section-heading">ADMIN</h2>
+  <main class="admin-page">
+    <p class="admin-intro">Min. alias length applies to custom paths and subdomains on URLs.</p>
+    <div class="admin-table-wrapper">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Links</th>
+            <th>E-Mail aliases</th>
+            <th>Max links</th>
+            <th>Min. alias length</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="admin-table-body"></tbody>
+      </table>
+    </div>
+  </main>
+  <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
+  <footer>Simple project by Anders &amp; Claude</footer>
+  <script src="cards.js"></script>
+  <script src="admin.js"></script>
+  <script src="https://www.paypalobjects.com/donate/sdk/donate-sdk.js" charset="UTF-8" onload="renderDonateButton()"></script>
+</body>
+</html>

@@ -18,6 +18,7 @@ const SUBDOMAIN_REDIRECT_PATTERN = /^\/subdomain\/([a-z0-9-]{1,63})$/;
 const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
 const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9-]+)$/;
 const DELETE_EMAIL_PATTERN = /^\/api\/emails\/([a-z0-9-]+)$/;
+const ADMIN_IDENTITY_PATTERN = /^\/api\/admin\/identities\/(\d+)$/;
 const RESERVED_CODES = new Set([
   "login",
   "subdomain",
@@ -29,6 +30,7 @@ const RESERVED_CODES = new Set([
   "emails",
   "email-stats",
   "app",
+  "admin",
 ]);
 const PROTECTED_PAGES = new Set([
   "/",
@@ -40,7 +42,11 @@ const PROTECTED_PAGES = new Set([
   "/emails.html",
   "/email-stats",
   "/email-stats.html",
+  "/admin",
+  "/admin.html",
 ]);
+// Pages that require session auth (PROTECTED_PAGES) AND admin role.
+const ADMIN_PAGES = new Set(["/admin", "/admin.html"]);
 const API_KEY_PATTERN = /^tvk_[0-9a-f]{48}$/;
 const VALID_KINDS = new Set(["generated-path", "custom-path", "subdomain"]);
 const EMAIL_ADDRESS_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -78,6 +84,16 @@ async function withAuthOrApiKey(request, env, handler) {
     return handler(identity);
   }
   return withAuth(request, env, handler);
+}
+
+async function withAdminAuth(request, env, handler) {
+  return withAuth(request, env, async (session) => {
+    const identity = await env.DB.prepare("SELECT role FROM login_identities WHERE email = ?")
+      .bind(session.email)
+      .first();
+    if (identity?.role !== "admin") return jsonResponse({ error: "Forbidden" }, 403);
+    return handler(session);
+  });
 }
 
 function generateCode() {
@@ -544,6 +560,76 @@ async function getOrCreateApiKey(env, email, { forceRegenerate = false } = {}) {
 async function handleCreateApiKey(env, session) {
   const key = await getOrCreateApiKey(env, session.email, { forceRegenerate: true });
   return jsonResponse({ key });
+}
+
+async function handleGetSession(env, session) {
+  const identity = await env.DB.prepare("SELECT role FROM login_identities WHERE email = ?")
+    .bind(session.email)
+    .first();
+
+  return jsonResponse({ email: session.email, admin: identity?.role === "admin" });
+}
+
+async function handleListAdminIdentities(env) {
+  const { results } = await env.DB.prepare(
+    `SELECT
+       li.id, li.email, li.role, li.max_resources, li.min_custom_path_length,
+       (SELECT COUNT(*) FROM urls u WHERE u.created_by = li.id) AS url_count,
+       (SELECT COUNT(*) FROM email_redirects er WHERE er.created_by = li.id) AS email_count
+     FROM login_identities li
+     ORDER BY li.email`
+  ).all();
+
+  return jsonResponse({ identities: results });
+}
+
+function validateAdminIdentityUpdate(body) {
+  if (body.role !== "user" && body.role !== "admin") {
+    return { error: 'Role must be "user" or "admin".' };
+  }
+
+  const maxResources = Number(body.max_resources);
+  if (!Number.isInteger(maxResources) || maxResources < 0) {
+    return { error: "Max links must be a whole number of at least 0." };
+  }
+
+  const minCustomPathLength = Number(body.min_custom_path_length);
+  if (!Number.isInteger(minCustomPathLength) || minCustomPathLength < 1) {
+    return { error: "Minimum alias length must be a whole number of at least 1." };
+  }
+
+  return { role: body.role, maxResources, minCustomPathLength };
+}
+
+async function handleUpdateAdminIdentity(id, request, env, session) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
+  }
+
+  const validation = validateAdminIdentityUpdate(body);
+  if (validation.error) {
+    return jsonResponse({ error: validation.error }, 400);
+  }
+
+  const target = await env.DB.prepare("SELECT email FROM login_identities WHERE id = ?").bind(id).first();
+  if (!target) {
+    return jsonResponse({ error: "Not found" }, 404);
+  }
+
+  // Editing yourself is fine, but the admin page has no way to promote
+  // anyone back if you lock yourself out of it - block that one case.
+  if (target.email === session.email && validation.role !== "admin") {
+    return jsonResponse({ error: "You can't remove your own admin access." }, 400);
+  }
+
+  await env.DB.prepare("UPDATE login_identities SET role = ?, max_resources = ?, min_custom_path_length = ? WHERE id = ?")
+    .bind(validation.role, validation.maxResources, validation.minCustomPathLength, id)
+    .run();
+
+  return jsonResponse({ ok: true });
 }
 
 async function handleAppAuthExchange(request, env) {
@@ -1286,6 +1372,11 @@ const SIMPLE_ROUTES = new Map([
     { auth: withAuthOrApiKey, run: (request, env, session) => handleCreateEmailRedirect(request, env, session) },
   ],
   ["GET /api/emails", { auth: withAuth, run: (request, env, session) => handleListEmailRedirects(env, session) }],
+  ["GET /api/session", { auth: withAuth, run: (request, env, session) => handleGetSession(env, session) }],
+  [
+    "GET /api/admin/identities",
+    { auth: withAdminAuth, run: (request, env, session) => handleListAdminIdentities(env) },
+  ],
 ]);
 
 // Applied to every response so header hygiene is uniform across pages, the
@@ -1361,9 +1452,22 @@ async function handleFetch(request, env, ctx) {
     return withAuth(request, env, (session) => handleDeleteEmailRedirect(deleteEmailMatch[1], env, session));
   }
 
+  const adminIdentityMatch = url.pathname.match(ADMIN_IDENTITY_PATTERN);
+  if (request.method === "PATCH" && adminIdentityMatch) {
+    const id = Number(adminIdentityMatch[1]);
+    return withAdminAuth(request, env, (session) => handleUpdateAdminIdentity(id, request, env, session));
+  }
+
   if (PROTECTED_PAGES.has(url.pathname)) {
     const session = await getSession(request, env.SESSION_SECRET);
     if (!session) return htmlResponse(loginPage());
+
+    if (ADMIN_PAGES.has(url.pathname)) {
+      const identity = await env.DB.prepare("SELECT role FROM login_identities WHERE email = ?")
+        .bind(session.email)
+        .first();
+      if (identity?.role !== "admin") return Response.redirect(`${url.origin}/`, 302);
+    }
   }
 
   return env.ASSETS.fetch(request);

@@ -1081,3 +1081,78 @@ footer {
   flex: none;
   min-width: 0;
 }
+
+.admin-page {
+  width: 100%;
+  max-width: 900px;
+}
+
+.admin-intro {
+  margin: 0 0 1rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.admin-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  background: var(--card-bg);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.admin-table thead th {
+  border-bottom: 1px solid var(--card-border);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.admin-table tbody tr:not(:last-child) td {
+  border-bottom: 1px solid var(--card-border);
+}
+
+.admin-input {
+  padding: 0.3rem 0.4rem;
+  font-size: 0.85rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text);
+}
+
+.admin-table select.admin-input {
+  min-width: 5.5rem;
+}
+
+.admin-table input.admin-input {
+  width: 5rem;
+}
+
+.admin-row-status {
+  margin-bottom: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.admin-row-status:empty {
+  display: none;
+}
+
+.admin-row-status--error {
+  color: var(--error-text);
+}
