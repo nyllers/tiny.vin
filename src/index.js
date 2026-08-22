@@ -45,8 +45,6 @@ const API_KEY_PATTERN = /^tvk_[0-9a-f]{48}$/;
 const VALID_KINDS = new Set(["generated-path", "custom-path", "subdomain"]);
 const MIN_CUSTOM_PATH_LENGTH = 4;
 const MIN_CUSTOM_PATH_LENGTH_ADMIN = 1;
-const MAX_RESOURCES = 10;
-const MAX_RESOURCES_ADMIN = 100;
 const EMAIL_ADDRESS_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_DOMAIN = "tiny.vin";
 const EMAIL_ALIAS_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -338,15 +336,15 @@ async function handleShorten(request, env, session) {
     return jsonResponse({ error: validation.error }, 400);
   }
 
-  const createdBy = await getOrCreateIdentityId(env, session.email);
-  const admin = await isAdmin(env, session.email);
+  const identity = await getOrCreateIdentity(env, session.email);
+  const createdBy = identity.id;
+  const admin = identity.role === "admin";
 
-  const maxResources = admin ? MAX_RESOURCES_ADMIN : MAX_RESOURCES;
   const resourceCount = await countUrlsAndEmails(env, createdBy);
-  if (resourceCount >= maxResources) {
+  if (resourceCount >= identity.max_resources) {
     return jsonResponse(
       {
-        error: `You've reached the maximum of ${maxResources} URLs and/or e-mail aliases. Delete one before creating another.`,
+        error: `You've reached the maximum of ${identity.max_resources} URLs and/or e-mail aliases. Delete one before creating another.`,
       },
       403
     );
@@ -411,14 +409,6 @@ async function getIdentityId(env, email) {
     .first();
 
   return identity ? identity.id : null;
-}
-
-async function isAdmin(env, email) {
-  const identity = await env.DB.prepare("SELECT role FROM login_identities WHERE email = ?")
-    .bind(email)
-    .first();
-
-  return identity?.role === "admin";
 }
 
 async function countUrlsAndEmails(env, identityId) {
@@ -997,15 +987,14 @@ async function handleCreateEmailRedirect(request, env, session) {
   }
 
   const { email: destination } = destinationValidation;
-  const createdBy = await getOrCreateIdentityId(env, session.email);
-  const admin = await isAdmin(env, session.email);
+  const identity = await getOrCreateIdentity(env, session.email);
+  const createdBy = identity.id;
 
-  const maxResources = admin ? MAX_RESOURCES_ADMIN : MAX_RESOURCES;
   const resourceCount = await countUrlsAndEmails(env, createdBy);
-  if (resourceCount >= maxResources) {
+  if (resourceCount >= identity.max_resources) {
     return jsonResponse(
       {
-        error: `You've reached the maximum of ${maxResources} URLs and/or e-mail aliases. Delete one before creating another.`,
+        error: `You've reached the maximum of ${identity.max_resources} URLs and/or e-mail aliases. Delete one before creating another.`,
       },
       403
     );
@@ -1207,12 +1196,21 @@ function handleAuthStart(url, env) {
   return new Response(null, { status: 302, headers });
 }
 
-async function getOrCreateIdentityId(env, email) {
+// Returns { id, role, max_resources }, creating the row (with column
+// defaults) first if this is the account's first-ever action.
+async function getOrCreateIdentity(env, email) {
   await env.DB.prepare("INSERT INTO login_identities (email) VALUES (?) ON CONFLICT (email) DO NOTHING")
     .bind(email)
     .run();
 
-  return getIdentityId(env, email);
+  return env.DB.prepare("SELECT id, role, max_resources FROM login_identities WHERE email = ?")
+    .bind(email)
+    .first();
+}
+
+async function getOrCreateIdentityId(env, email) {
+  const identity = await getOrCreateIdentity(env, email);
+  return identity.id;
 }
 
 async function recordLogin(env, email, ipAddress) {
