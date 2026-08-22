@@ -2,7 +2,8 @@ CREATE TABLE IF NOT EXISTS login_identities (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT NOT NULL UNIQUE,
   role TEXT NOT NULL DEFAULT 'user',
-  max_resources INTEGER NOT NULL DEFAULT 10
+  max_resources INTEGER NOT NULL DEFAULT 10,
+  min_custom_path_length INTEGER NOT NULL DEFAULT 5
 );
 
 CREATE TABLE IF NOT EXISTS urls (
@@ -87,21 +88,22 @@ CREATE TABLE IF NOT EXISTS login_identities_history (
   email TEXT,
   role TEXT,
   max_resources INTEGER,
+  min_custom_path_length INTEGER,
   history_created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TRIGGER IF NOT EXISTS login_identities_history_update
 AFTER UPDATE ON login_identities
 BEGIN
-  INSERT INTO login_identities_history (id, email, role, max_resources)
-  VALUES (OLD.id, OLD.email, OLD.role, OLD.max_resources);
+  INSERT INTO login_identities_history (id, email, role, max_resources, min_custom_path_length)
+  VALUES (OLD.id, OLD.email, OLD.role, OLD.max_resources, OLD.min_custom_path_length);
 END;
 
 CREATE TRIGGER IF NOT EXISTS login_identities_history_delete
 AFTER DELETE ON login_identities
 BEGIN
-  INSERT INTO login_identities_history (id, email, role, max_resources)
-  VALUES (OLD.id, OLD.email, OLD.role, OLD.max_resources);
+  INSERT INTO login_identities_history (id, email, role, max_resources, min_custom_path_length)
+  VALUES (OLD.id, OLD.email, OLD.role, OLD.max_resources, OLD.min_custom_path_length);
 END;
 
 CREATE TABLE IF NOT EXISTS urls_history (

@@ -43,8 +43,6 @@ const PROTECTED_PAGES = new Set([
 ]);
 const API_KEY_PATTERN = /^tvk_[0-9a-f]{48}$/;
 const VALID_KINDS = new Set(["generated-path", "custom-path", "subdomain"]);
-const MIN_CUSTOM_PATH_LENGTH = 4;
-const MIN_CUSTOM_PATH_LENGTH_ADMIN = 1;
 const EMAIL_ADDRESS_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_DOMAIN = "tiny.vin";
 const EMAIL_ALIAS_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -338,7 +336,6 @@ async function handleShorten(request, env, session) {
 
   const identity = await getOrCreateIdentity(env, session.email);
   const createdBy = identity.id;
-  const admin = identity.role === "admin";
 
   const resourceCount = await countUrlsAndEmails(env, createdBy);
   if (resourceCount >= identity.max_resources) {
@@ -352,7 +349,7 @@ async function handleShorten(request, env, session) {
 
   const customSuffix = typeof body.path === "string" ? body.path.trim() : "";
   const customSubdomain = typeof body.subdomain === "string" ? body.subdomain.trim() : "";
-  const minCustomPathLength = admin ? MIN_CUSTOM_PATH_LENGTH_ADMIN : MIN_CUSTOM_PATH_LENGTH;
+  const minCustomPathLength = identity.min_custom_path_length;
 
   let customCode = null;
   if (customSuffix) {
@@ -1196,14 +1193,16 @@ function handleAuthStart(url, env) {
   return new Response(null, { status: 302, headers });
 }
 
-// Returns { id, role, max_resources }, creating the row (with column
-// defaults) first if this is the account's first-ever action.
+// Returns { id, max_resources, min_custom_path_length }, creating the row
+// (with column defaults) first if this is the account's first-ever action.
+// role isn't selected here since nothing currently reads it off this
+// object - every permission it used to gate now has its own column.
 async function getOrCreateIdentity(env, email) {
   await env.DB.prepare("INSERT INTO login_identities (email) VALUES (?) ON CONFLICT (email) DO NOTHING")
     .bind(email)
     .run();
 
-  return env.DB.prepare("SELECT id, role, max_resources FROM login_identities WHERE email = ?")
+  return env.DB.prepare("SELECT id, max_resources, min_custom_path_length FROM login_identities WHERE email = ?")
     .bind(email)
     .first();
 }

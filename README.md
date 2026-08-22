@@ -35,10 +35,10 @@ Every successful login is recorded in D1: `login_identities` holds one row per e
 
 `login_identities` originally also had a `provider` column (this project has only ever supported Google sign-in, so it never carried real information) and its email column was originally named `username`. If the database predates this cleanup, apply `migrations/0010_login_identities_email.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0010_login_identities_email.sql --remote`) in addition to `schema.sql`. This migration rebuilds `login_identities` and `login_identities_history` (SQLite can't drop a column that's part of a UNIQUE constraint or referenced by a trigger), so back up first if the data matters.
 
-`login_identities.role` distinguishes regular users (`'user'`, the default for every new signup) from administrators (`'admin'`) — the only thing this currently unlocks is a shorter minimum custom-path length (see "Subdomains" below); it no longer affects the resource cap, which lives in its own column (see below). There's no UI for either yet — promote an account (and typically raise its cap alongside it) by hand:
+`login_identities.role` distinguishes regular users (`'user'`, the default for every new signup) from administrators (`'admin'`). It's purely a label now — every permission it used to gate (the resource cap, the minimum custom-path length) has its own column instead, both independently tunable per account regardless of role. There's no UI for any of this yet — promote an account (and typically raise its limits alongside it) by hand:
 
 ```bash
-wrangler d1 execute tiny-vin-db --remote --command "UPDATE login_identities SET role = 'admin', max_resources = 100 WHERE email = 'you@example.com'"
+wrangler d1 execute tiny-vin-db --remote --command "UPDATE login_identities SET role = 'admin', max_resources = 100, min_custom_path_length = 1 WHERE email = 'you@example.com'"
 ```
 
 If the database was created before this existed, apply `migrations/0012_add_login_identities_role.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0012_add_login_identities_role.sql --remote`) in addition to `schema.sql`. This migration also promotes every account that already existed at the time it runs to `'admin'`, since there was no user/admin distinction before it — review who that affects before running it against production.
@@ -46,6 +46,10 @@ If the database was created before this existed, apply `migrations/0012_add_logi
 `login_identities.max_resources` caps how many URLs and/or e-mail aliases (`urls` rows + `email_redirects` rows, added together) an account can hold at once — 10 by default for every new signup, the same as every regular account had before this was a column. Tune it per account by hand the same way as `role` above (they're independent — bumping `role` to `'admin'` alone no longer raises this). Both `POST /api/urls` and `POST /api/emails` check the combined count against this column before creating (or adding a path/subdomain/alias to an existing one) and return `403` once at the limit — deleting a URL or an alias frees up a slot.
 
 If the database was created before this existed, apply `migrations/0015_add_login_identities_max_resources.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0015_add_login_identities_max_resources.sql --remote`) in addition to `schema.sql`. This migration backfills every existing `admin` account to 100, preserving the effective limit the old hardcoded constants gave them.
+
+`login_identities.min_custom_path_length` sets the minimum length `POST /api/urls` accepts for a custom `path` or `subdomain` — 5 by default for every new signup. Tune it per account the same way as `max_resources` above.
+
+If the database was created before this existed, apply `migrations/0016_add_login_identities_min_custom_path_length.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0016_add_login_identities_min_custom_path_length.sql --remote`) in addition to `schema.sql`. This migration backfills every existing `admin` account to 1, preserving the effective minimum the old hardcoded constants gave them.
 
 ## API access
 
