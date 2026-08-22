@@ -945,21 +945,6 @@ async function handleEmailStats(env, session) {
     .bind(identityId, cutoff)
     .all();
 
-  const { results: eventRows } = await env.DB.prepare(
-    `SELECT ee.from_address AS from_address
-     FROM email_redirect_events ee
-     JOIN email_redirects er ON er.alias = ee.alias
-     WHERE er.created_by = ? AND ee.requested_at >= ?`
-  )
-    .bind(identityId, cutoff)
-    .all();
-
-  const senderDomainCounts = new Map();
-  for (const row of eventRows) {
-    const domain = row.from_address && row.from_address.includes("@") ? row.from_address.split("@")[1].toLowerCase() : "Unknown";
-    senderDomainCounts.set(domain, (senderDomainCounts.get(domain) || 0) + 1);
-  }
-
   const dailyMessages = buildDailySeries(dailyRows);
 
   const totalMessagesLifetime = results.reduce((sum, row) => sum + row.messages, 0);
@@ -989,7 +974,6 @@ async function handleEmailStats(env, session) {
     totalAliases: results.length,
     totalMessages: totalMessagesLifetime,
     totalFailedForwards: totalMessagesLifetime - totalForwardedLifetime,
-    senderDomains: topCounts(senderDomainCounts, 10),
     dailyMessages,
     aliasBreakdown14d,
     redirects,
