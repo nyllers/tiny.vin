@@ -298,8 +298,8 @@ function validateSubdomain(input, minLength) {
   return validateHandle(input, { minLength, maxLength: 63, allowUppercase: false, noun: "Subdomains" });
 }
 
-function validateEmailAlias(input) {
-  const validation = validateHandle(input, { minLength: 1, maxLength: 64, allowUppercase: false, noun: "Aliases" });
+function validateEmailAlias(input, minLength) {
+  const validation = validateHandle(input, { minLength, maxLength: 64, allowUppercase: false, noun: "Aliases" });
   return validation.error ? validation : { alias: validation.code };
 }
 
@@ -1051,15 +1051,6 @@ async function handleCreateEmailRedirect(request, env, session) {
   const aliasInput = typeof body.alias === "string" ? body.alias.trim().toLowerCase() : "";
   const destinationInput = typeof body.destination === "string" ? body.destination.trim() : "";
 
-  let alias = null;
-  if (aliasInput) {
-    const aliasValidation = validateEmailAlias(aliasInput);
-    if (aliasValidation.error) {
-      return jsonResponse({ error: aliasValidation.error }, 400);
-    }
-    alias = aliasValidation.alias;
-  }
-
   const destinationValidation = validateDestinationEmail(destinationInput);
   if (destinationValidation.error) {
     return jsonResponse({ error: destinationValidation.error }, 400);
@@ -1081,6 +1072,15 @@ async function handleCreateEmailRedirect(request, env, session) {
       },
       403
     );
+  }
+
+  let alias = null;
+  if (aliasInput) {
+    const aliasValidation = validateEmailAlias(aliasInput, identity.min_custom_path_length);
+    if (aliasValidation.error) {
+      return jsonResponse({ error: aliasValidation.error }, 400);
+    }
+    alias = aliasValidation.alias;
   }
 
   let verified = null;

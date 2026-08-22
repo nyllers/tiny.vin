@@ -47,7 +47,7 @@ If the database was created before this existed, apply `migrations/0012_add_logi
 
 If the database was created before this existed, apply `migrations/0015_add_login_identities_max_resources.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0015_add_login_identities_max_resources.sql --remote`) in addition to `schema.sql`. This migration backfills every existing `admin` account to 100, preserving the effective limit the old hardcoded constants gave them.
 
-`login_identities.min_custom_path_length` sets the minimum length `POST /api/urls` accepts for a custom `path` or `subdomain` — 5 by default for every new signup. Tune it per account the same way as `max_resources` above.
+`login_identities.min_custom_path_length` sets the minimum length accepted for a custom `path` or `subdomain` on `POST /api/urls`, and for an explicit `alias` on `POST /api/emails` — 5 by default for every new signup. Tune it per account the same way as `max_resources` above. It doesn't apply to auto-generated codes/aliases (always a fixed 8 characters, same as before this was configurable) — only to a value the caller chooses themselves.
 
 If the database was created before this existed, apply `migrations/0016_add_login_identities_min_custom_path_length.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0016_add_login_identities_min_custom_path_length.sql --remote`) in addition to `schema.sql`. This migration backfills every existing `admin` account to 1, preserving the effective minimum the old hardcoded constants gave them.
 
