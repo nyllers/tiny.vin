@@ -590,7 +590,7 @@ function validateAdminIdentityUpdate(body) {
 
   const maxResources = Number(body.max_resources);
   if (!Number.isInteger(maxResources) || maxResources < 0) {
-    return { error: "Max links must be a whole number of at least 0." };
+    return { error: "Max redirects must be a whole number of at least 0." };
   }
 
   const minCustomPathLength = Number(body.min_custom_path_length);
