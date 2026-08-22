@@ -6,12 +6,10 @@
   --bg: #f9fafb;
   --text: #1f2937;
   --heading: #4338ca;
-  --panel-bg: #fff;
+  --surface-bg: #fff;
   --panel-shadow: rgba(0, 0, 0, 0.25);
-  --card-bg: #fff;
   --card-border: #e5e7eb;
   --input-border: #d1d5db;
-  --input-bg: #fff;
   --delete: #cc0000;
   --muted: #6b7280;
   --error-text: #dc2626;
@@ -21,12 +19,10 @@
   --bg: #111827;
   --text: #e5e7eb;
   --heading: #fb923c;
-  --panel-bg: #1f2937;
+  --surface-bg: #1f2937;
   --panel-shadow: rgba(0, 0, 0, 0.6);
-  --card-bg: #1f2937;
   --card-border: #374151;
   --input-border: #4b5563;
-  --input-bg: #1f2937;
   --delete: #991b1b;
 }
 
@@ -46,7 +42,7 @@ body {
 .panel {
   width: 100%;
   max-width: 380px;
-  background: var(--panel-bg);
+  background: var(--surface-bg);
   border-radius: 1rem;
   padding: 2rem;
   box-shadow: 0 1rem 3rem var(--panel-shadow);
@@ -96,7 +92,7 @@ h1 {
   font-size: 1rem;
   border-radius: 0.375rem;
   border: 1px solid var(--input-border);
-  background: var(--input-bg);
+  background: var(--surface-bg);
   color: var(--text);
 }
 
@@ -236,7 +232,7 @@ footer {
   border-radius: 0.375rem;
   border: 1px solid var(--input-border);
   color: var(--text);
-  background: var(--panel-bg);
+  background: var(--surface-bg);
 }
 
 .provider-btn:hover {
@@ -283,7 +279,7 @@ footer {
 .stat-tile,
 .api-key-section,
 .api-examples-card {
-  background: var(--card-bg);
+  background: var(--surface-bg);
   border: 1px solid var(--card-border);
   border-radius: 0.5rem;
 }
@@ -450,7 +446,7 @@ footer {
   font-size: 0.75rem;
   border: 1px solid var(--input-border);
   border-radius: 0.25rem;
-  background: var(--input-bg);
+  background: var(--surface-bg);
   color: var(--text);
 }
 
@@ -471,7 +467,7 @@ footer {
   display: flex;
   gap: 0.25rem;
   padding: 0.25rem;
-  background: var(--panel-bg);
+  background: var(--surface-bg);
   border: 1px solid var(--card-border);
   border-radius: 999px;
 }
@@ -560,7 +556,7 @@ footer {
   width: 2rem;
   height: 2rem;
   padding: 0.4rem;
-  background: var(--panel-bg);
+  background: var(--surface-bg);
   border: 1px solid var(--card-border);
   border-radius: 0.375rem;
   cursor: pointer;
@@ -584,7 +580,7 @@ footer {
   display: flex;
   flex-direction: column;
   min-width: 10rem;
-  background: var(--panel-bg);
+  background: var(--surface-bg);
   border: 1px solid var(--card-border);
   border-radius: 0.5rem;
   box-shadow: 0 0.5rem 1.5rem var(--panel-shadow);
@@ -946,7 +942,7 @@ footer {
 .world-map-dot {
   fill: var(--heading);
   fill-opacity: 0.8;
-  stroke: var(--panel-bg);
+  stroke: var(--surface-bg);
   stroke-width: 0.5;
 }
 
@@ -968,7 +964,7 @@ footer {
 .modal {
   width: 100%;
   max-width: 24rem;
-  background: var(--panel-bg);
+  background: var(--surface-bg);
   border-radius: 0.75rem;
   padding: 1.5rem;
   box-shadow: 0 1rem 3rem var(--panel-shadow);
@@ -1098,7 +1094,7 @@ footer {
   overflow-x: auto;
   border: 1px solid var(--card-border);
   border-radius: 0.5rem;
-  background: var(--card-bg);
+  background: var(--surface-bg);
 }
 
 .admin-table {
@@ -1131,7 +1127,7 @@ footer {
   font-size: 0.85rem;
   border-radius: 0.25rem;
   border: 1px solid var(--input-border);
-  background: var(--input-bg);
+  background: var(--surface-bg);
   color: var(--text);
 }
 
