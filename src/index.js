@@ -323,12 +323,67 @@ function formatShortUrl(code, kind) {
   return kind === "subdomain" ? `${code}.tiny.vin` : `tiny.vin/${code}`;
 }
 
-async function insertUrl(env, { code, kind, originalUrl, createdBy }) {
+async function insertAlias(env, { code, kind, destinationId, createdBy, cloudflareRuleId = null }) {
   await env.DB.prepare(
-    "INSERT INTO urls (code, kind, original_url, created_at, created_by) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO aliases (code, kind, destination_id, cloudflare_rule_id, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?)"
   )
-    .bind(code, kind, originalUrl, Date.now(), createdBy)
+    .bind(code, kind, destinationId, cloudflareRuleId, Date.now(), createdBy)
     .run();
+}
+
+// Finds the existing destination row for this (owner, target) pair, or
+// creates one. The UNIQUE(created_by, original_url) constraint can lose a
+// race to a concurrent request for the same pair (double-clicked "Generate
+// Path", two open tabs) - on that failure, re-select and return the
+// winner's row instead of surfacing the raw constraint violation.
+async function findOrCreateDestination(env, { originalUrl, createdBy }) {
+  const existing = await env.DB.prepare("SELECT id FROM destinations WHERE original_url = ? AND created_by = ?")
+    .bind(originalUrl, createdBy)
+    .first();
+  if (existing) return existing.id;
+
+  try {
+    const result = await env.DB.prepare(
+      "INSERT INTO destinations (original_url, created_at, created_by) VALUES (?, ?, ?)"
+    )
+      .bind(originalUrl, Date.now(), createdBy)
+      .run();
+    return result.meta.last_row_id;
+  } catch (err) {
+    const winner = await env.DB.prepare("SELECT id FROM destinations WHERE original_url = ? AND created_by = ?")
+      .bind(originalUrl, createdBy)
+      .first();
+    if (winner) return winner.id;
+    throw err;
+  }
+}
+
+// Deletes one alias row (already verified as owned by identityId) and, if
+// it was the last alias pointing at its destination, deletes the now-
+// orphaned destination too. Returns the deleted row (so callers can act on
+// kind-specific fields like cloudflare_rule_id), or null if not found/owned.
+async function deleteAliasAndMaybeDestination(env, { code, kind, identityId }) {
+  const row = await env.DB.prepare(
+    "SELECT destination_id, cloudflare_rule_id FROM aliases WHERE code = ? AND kind = ? AND created_by = ?"
+  )
+    .bind(code, kind, identityId)
+    .first();
+
+  if (!row) return null;
+
+  await env.DB.prepare("DELETE FROM aliases WHERE code = ? AND kind = ? AND created_by = ?")
+    .bind(code, kind, identityId)
+    .run();
+
+  const remaining = await env.DB.prepare("SELECT COUNT(*) AS cnt FROM aliases WHERE destination_id = ?")
+    .bind(row.destination_id)
+    .first();
+
+  if (remaining.cnt === 0) {
+    await env.DB.prepare("DELETE FROM destinations WHERE id = ?").bind(row.destination_id).run();
+  }
+
+  return row;
 }
 
 function shortUrlResponse(code, kind) {
@@ -389,9 +444,11 @@ async function handleShorten(request, env, session) {
     subdomainCode = subdomainValidation.code;
   }
 
+  const destinationId = await findOrCreateDestination(env, { originalUrl: validation.url, createdBy });
+
   if (subdomainCode) {
     try {
-      await insertUrl(env, { code: subdomainCode, kind: "subdomain", originalUrl: validation.url, createdBy });
+      await insertAlias(env, { code: subdomainCode, kind: "subdomain", destinationId, createdBy });
       return shortUrlResponse(subdomainCode, "subdomain");
     } catch {
       return jsonResponse({ error: `"${subdomainCode}.tiny.vin" is already taken, try another.` }, 409);
@@ -400,7 +457,7 @@ async function handleShorten(request, env, session) {
 
   if (customCode) {
     try {
-      await insertUrl(env, { code: customCode, kind: "custom-path", originalUrl: validation.url, createdBy });
+      await insertAlias(env, { code: customCode, kind: "custom-path", destinationId, createdBy });
       return shortUrlResponse(customCode, "custom-path");
     } catch {
       return jsonResponse({ error: `"${customCode}" is already taken, try another.` }, 409);
@@ -410,7 +467,7 @@ async function handleShorten(request, env, session) {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const code = generateCode();
     try {
-      await insertUrl(env, { code, kind: "generated-path", originalUrl: validation.url, createdBy });
+      await insertAlias(env, { code, kind: "generated-path", destinationId, createdBy });
       return shortUrlResponse(code, "generated-path");
     } catch {
       // code collision, retry with a new random code
@@ -429,12 +486,8 @@ async function getIdentityId(env, email) {
 }
 
 async function countUrlsAndEmails(env, identityId) {
-  const row = await env.DB.prepare(
-    `SELECT
-       (SELECT COUNT(*) FROM urls WHERE created_by = ?) +
-       (SELECT COUNT(*) FROM email_redirects WHERE created_by = ?) AS cnt`
-  )
-    .bind(identityId, identityId)
+  const row = await env.DB.prepare("SELECT COUNT(*) AS cnt FROM aliases WHERE created_by = ?")
+    .bind(identityId)
     .first();
 
   return row.cnt;
@@ -574,8 +627,8 @@ async function handleListAdminIdentities(env) {
   const { results } = await env.DB.prepare(
     `SELECT
        li.id, li.email, li.role, li.max_resources, li.min_custom_path_length,
-       (SELECT COUNT(*) FROM urls u WHERE u.created_by = li.id) AS url_count,
-       (SELECT COUNT(*) FROM email_redirects er WHERE er.created_by = li.id) AS email_count
+       (SELECT COUNT(*) FROM aliases a WHERE a.created_by = li.id AND a.kind != 'email') AS url_count,
+       (SELECT COUNT(*) FROM aliases a WHERE a.created_by = li.id AND a.kind = 'email') AS email_count
      FROM login_identities li
      ORDER BY li.email`
   ).all();
@@ -700,7 +753,11 @@ async function handleHistory(env, session) {
   const identityId = await getIdentityId(env, session.email);
 
   const { results } = await env.DB.prepare(
-    "SELECT code, kind, original_url, created_at FROM urls WHERE created_by = ? ORDER BY created_at DESC"
+    `SELECT a.code, a.kind, d.original_url, a.created_at
+     FROM aliases a
+     JOIN destinations d ON d.id = a.destination_id
+     WHERE a.created_by = ? AND a.kind != 'email'
+     ORDER BY a.created_at DESC`
   )
     .bind(identityId)
     .all();
@@ -771,14 +828,15 @@ async function handleStats(env, session) {
   // Lifetime per-URL click counts/last-click, for the "Total Redirects by
   // URL" cards - deliberately not windowed, unlike every chart below.
   const { results } = await env.DB.prepare(
-    `SELECT u.code, u.kind, u.original_url, u.created_at,
+    `SELECT a.code, a.kind, d.original_url, a.created_at,
             COUNT(re.id) AS clicks,
             MAX(re.requested_at) AS last_click
-     FROM urls u
-     LEFT JOIN redirect_events re ON re.code = u.code AND re.kind = u.kind
-     WHERE u.created_by = ?
-     GROUP BY u.code, u.kind
-     ORDER BY u.created_at DESC`
+     FROM aliases a
+     JOIN destinations d ON d.id = a.destination_id
+     LEFT JOIN redirect_events re ON re.alias_id = a.id
+     WHERE a.created_by = ? AND a.kind != 'email'
+     GROUP BY a.id
+     ORDER BY a.created_at DESC`
   )
     .bind(identityId)
     .all();
@@ -786,13 +844,14 @@ async function handleStats(env, session) {
   // Same shape, windowed to the last 14 days, feeding only the "Redirects
   // per URL" chart (a bar chart, so it follows the same window as the rest).
   const { results: recentResults } = await env.DB.prepare(
-    `SELECT u.code, u.kind, u.original_url,
+    `SELECT a.code, a.kind, d.original_url,
             COUNT(re.id) AS clicks
-     FROM urls u
+     FROM aliases a
+     JOIN destinations d ON d.id = a.destination_id
      LEFT JOIN redirect_events re
-       ON re.code = u.code AND re.kind = u.kind AND re.requested_at >= ?
-     WHERE u.created_by = ?
-     GROUP BY u.code, u.kind`
+       ON re.alias_id = a.id AND re.requested_at >= ?
+     WHERE a.created_by = ? AND a.kind != 'email'
+     GROUP BY a.id`
   )
     .bind(cutoff, identityId)
     .all();
@@ -800,8 +859,8 @@ async function handleStats(env, session) {
   const { results: topCountryRows } = await env.DB.prepare(
     `SELECT re.country AS country, COUNT(*) AS cnt
      FROM redirect_events re
-     JOIN urls u ON u.code = re.code AND u.kind = re.kind
-     WHERE u.created_by = ? AND re.country IS NOT NULL AND re.requested_at >= ?
+     JOIN aliases a ON a.id = re.alias_id
+     WHERE a.created_by = ? AND a.kind != 'email' AND re.country IS NOT NULL AND re.requested_at >= ?
      GROUP BY re.country
      ORDER BY cnt DESC
      LIMIT 5`
@@ -813,8 +872,8 @@ async function handleStats(env, session) {
     `SELECT strftime('%Y-%m-%d', re.requested_at / 1000, 'unixepoch') AS day,
             COUNT(*) AS cnt
      FROM redirect_events re
-     JOIN urls u ON u.code = re.code AND u.kind = re.kind
-     WHERE u.created_by = ? AND re.requested_at >= ?
+     JOIN aliases a ON a.id = re.alias_id
+     WHERE a.created_by = ? AND a.kind != 'email' AND re.requested_at >= ?
      GROUP BY day`
   )
     .bind(identityId, cutoff)
@@ -823,8 +882,8 @@ async function handleStats(env, session) {
   const { results: eventRows } = await env.DB.prepare(
     `SELECT re.referer AS referer, re.user_agent AS user_agent
      FROM redirect_events re
-     JOIN urls u ON u.code = re.code AND u.kind = re.kind
-     WHERE u.created_by = ? AND re.requested_at >= ?`
+     JOIN aliases a ON a.id = re.alias_id
+     WHERE a.created_by = ? AND a.kind != 'email' AND re.requested_at >= ?`
   )
     .bind(identityId, cutoff)
     .all();
@@ -832,8 +891,8 @@ async function handleStats(env, session) {
   const { results: mapPointRows } = await env.DB.prepare(
     `SELECT re.latitude AS lat, re.longitude AS lng, COUNT(*) AS cnt
      FROM redirect_events re
-     JOIN urls u ON u.code = re.code AND u.kind = re.kind
-     WHERE u.created_by = ? AND re.requested_at >= ?
+     JOIN aliases a ON a.id = re.alias_id
+     WHERE a.created_by = ? AND a.kind != 'email' AND re.requested_at >= ?
        AND re.latitude IS NOT NULL AND re.longitude IS NOT NULL
      GROUP BY re.latitude, re.longitude`
   )
@@ -907,15 +966,16 @@ async function handleEmailStats(env, session) {
   // by Destination" cards - deliberately not windowed, unlike every chart
   // below.
   const { results } = await env.DB.prepare(
-    `SELECT er.alias, er.destination, er.created_at,
+    `SELECT a.code AS alias, d.original_url AS destination, a.created_at,
             COUNT(ee.id) AS messages,
             SUM(CASE WHEN ee.forwarded = 1 THEN 1 ELSE 0 END) AS forwarded,
             MAX(ee.requested_at) AS last_message
-     FROM email_redirects er
-     LEFT JOIN email_redirect_events ee ON ee.alias = er.alias
-     WHERE er.created_by = ?
-     GROUP BY er.alias
-     ORDER BY er.created_at DESC`
+     FROM aliases a
+     JOIN destinations d ON d.id = a.destination_id
+     LEFT JOIN email_redirect_events ee ON ee.alias_id = a.id
+     WHERE a.created_by = ? AND a.kind = 'email'
+     GROUP BY a.id
+     ORDER BY a.created_at DESC`
   )
     .bind(identityId)
     .all();
@@ -923,13 +983,14 @@ async function handleEmailStats(env, session) {
   // Same shape, windowed to the last 14 days, feeding only the "Messages
   // per Alias" chart.
   const { results: recentResults } = await env.DB.prepare(
-    `SELECT er.alias, er.destination,
+    `SELECT a.code AS alias, d.original_url AS destination,
             COUNT(ee.id) AS messages
-     FROM email_redirects er
+     FROM aliases a
+     JOIN destinations d ON d.id = a.destination_id
      LEFT JOIN email_redirect_events ee
-       ON ee.alias = er.alias AND ee.requested_at >= ?
-     WHERE er.created_by = ?
-     GROUP BY er.alias`
+       ON ee.alias_id = a.id AND ee.requested_at >= ?
+     WHERE a.created_by = ? AND a.kind = 'email'
+     GROUP BY a.id`
   )
     .bind(cutoff, identityId)
     .all();
@@ -938,8 +999,8 @@ async function handleEmailStats(env, session) {
     `SELECT strftime('%Y-%m-%d', ee.requested_at / 1000, 'unixepoch') AS day,
             COUNT(*) AS cnt
      FROM email_redirect_events ee
-     JOIN email_redirects er ON er.alias = ee.alias
-     WHERE er.created_by = ? AND ee.requested_at >= ?
+     JOIN aliases a ON a.id = ee.alias_id
+     WHERE a.created_by = ? AND a.kind = 'email' AND ee.requested_at >= ?
      GROUP BY day`
   )
     .bind(identityId, cutoff)
@@ -983,20 +1044,15 @@ async function handleEmailStats(env, session) {
 async function handleDeleteUrl(code, kind, env, session) {
   const identityId = await getIdentityId(env, session.email);
 
-  const result = await env.DB.prepare(
-    "DELETE FROM urls WHERE code = ? AND kind = ? AND created_by = ?"
-  )
-    .bind(code, kind, identityId)
-    .run();
-
-  if (!result.meta.changes) {
+  const row = await deleteAliasAndMaybeDestination(env, { code, kind, identityId });
+  if (!row) {
     return jsonResponse({ error: "Not found" }, 404);
   }
 
   return jsonResponse({ ok: true });
 }
 
-// Creates the Cloudflare routing rule and the email_redirects row for one
+// Creates the Cloudflare routing rule and the aliases row for one e-mail
 // alias. Returns { ok: true } on success; on failure returns { error:
 // "cloudflare" } (rule creation itself failed) or { error: "conflict" }
 // (alias already taken - the just-created rule is cleaned up) so the two
@@ -1011,11 +1067,8 @@ async function createEmailRedirectRow(env, { alias, destination, createdBy }) {
   }
 
   try {
-    await env.DB.prepare(
-      "INSERT INTO email_redirects (alias, destination, cloudflare_rule_id, created_at, created_by) VALUES (?, ?, ?, ?, ?)"
-    )
-      .bind(alias, destination, ruleId, Date.now(), createdBy)
-      .run();
+    const destinationId = await findOrCreateDestination(env, { originalUrl: destination, createdBy });
+    await insertAlias(env, { code: alias, kind: "email", destinationId, createdBy, cloudflareRuleId: ruleId });
   } catch {
     await deleteWorkerEmailRule(env, ruleId).catch(() => {});
     return { error: "conflict" };
@@ -1105,7 +1158,11 @@ async function handleListEmailRedirects(env, session) {
   const identityId = await getIdentityId(env, session.email);
 
   const { results } = await env.DB.prepare(
-    "SELECT alias, destination, created_at FROM email_redirects WHERE created_by = ? ORDER BY created_at DESC"
+    `SELECT a.code AS alias, d.original_url AS destination, a.created_at
+     FROM aliases a
+     JOIN destinations d ON d.id = a.destination_id
+     WHERE a.created_by = ? AND a.kind = 'email'
+     ORDER BY a.created_at DESC`
   )
     .bind(identityId)
     .all();
@@ -1138,19 +1195,10 @@ async function handleListEmailRedirects(env, session) {
 async function handleDeleteEmailRedirect(alias, env, session) {
   const identityId = await getIdentityId(env, session.email);
 
-  const row = await env.DB.prepare(
-    "SELECT cloudflare_rule_id FROM email_redirects WHERE alias = ? AND created_by = ?"
-  )
-    .bind(alias, identityId)
-    .first();
-
+  const row = await deleteAliasAndMaybeDestination(env, { code: alias, kind: "email", identityId });
   if (!row) {
     return jsonResponse({ error: "Not found" }, 404);
   }
-
-  await env.DB.prepare("DELETE FROM email_redirects WHERE alias = ? AND created_by = ?")
-    .bind(alias, identityId)
-    .run();
 
   if (row.cloudflare_rule_id && hasCloudflareApiCredentials(env)) {
     try {
@@ -1164,7 +1212,7 @@ async function handleDeleteEmailRedirect(alias, env, session) {
   return jsonResponse({ ok: true });
 }
 
-async function recordRedirectEvent(env, { code, kind, request }) {
+async function recordRedirectEvent(env, { aliasId, request }) {
   try {
     const headers = JSON.stringify(Object.fromEntries(request.headers.entries()));
     const cfData = JSON.stringify(request.cf || {});
@@ -1177,17 +1225,17 @@ async function recordRedirectEvent(env, { code, kind, request }) {
 
     await env.DB.prepare(
       `INSERT INTO redirect_events
-        (code, kind, requested_at, ip_address, country, user_agent, referer, headers, cf_data, latitude, longitude)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (alias_id, requested_at, ip_address, country, user_agent, referer, headers, cf_data, latitude, longitude)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-      .bind(code, kind, Date.now(), ipAddress, country, userAgent, referer, headers, cfData, latitude, longitude)
+      .bind(aliasId, Date.now(), ipAddress, country, userAgent, referer, headers, cfData, latitude, longitude)
       .run();
   } catch {
     // stats are best-effort; never block a redirect over it
   }
 }
 
-async function recordEmailRedirectEvent(env, { alias, destination, message, forwarded, rejectReason }) {
+async function recordEmailRedirectEvent(env, { aliasId, destination, message, forwarded, rejectReason }) {
   try {
     const headers = JSON.stringify(Object.fromEntries(message.headers.entries()));
     const subject = message.headers.get("subject");
@@ -1195,11 +1243,11 @@ async function recordEmailRedirectEvent(env, { alias, destination, message, forw
 
     await env.DB.prepare(
       `INSERT INTO email_redirect_events
-        (alias, destination, from_address, subject, message_id, size, forwarded, reject_reason, headers, requested_at)
+        (alias_id, destination, from_address, subject, message_id, size, forwarded, reject_reason, headers, requested_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
-        alias,
+        aliasId,
         destination,
         message.from,
         subject,
@@ -1219,7 +1267,10 @@ async function recordEmailRedirectEvent(env, { alias, destination, message, forw
 async function handleRedirect(code, kinds, env, ctx, request) {
   const placeholders = kinds.map(() => "?").join(", ");
   const row = await env.DB.prepare(
-    `SELECT kind, original_url FROM urls WHERE code = ? AND kind IN (${placeholders})`
+    `SELECT a.id, a.kind, d.original_url
+     FROM aliases a
+     JOIN destinations d ON d.id = a.destination_id
+     WHERE a.code = ? AND a.kind IN (${placeholders})`
   )
     .bind(code, ...kinds)
     .first();
@@ -1232,7 +1283,7 @@ async function handleRedirect(code, kinds, env, ctx, request) {
   // scanners/link-preview tools can check a short link's destination without
   // it counting as a real visit - only GET click-throughs go into analytics.
   if (request.method === "GET") {
-    ctx.waitUntil(recordRedirectEvent(env, { code, kind: row.kind, request }));
+    ctx.waitUntil(recordRedirectEvent(env, { aliasId: row.id, request }));
   }
 
   return Response.redirect(row.original_url, 302);
@@ -1462,7 +1513,12 @@ export default {
   async email(message, env, ctx) {
     const alias = message.to.split("@")[0].toLowerCase();
 
-    const row = await env.DB.prepare("SELECT destination FROM email_redirects WHERE alias = ?")
+    const row = await env.DB.prepare(
+      `SELECT a.id, d.original_url AS destination
+       FROM aliases a
+       JOIN destinations d ON d.id = a.destination_id
+       WHERE a.code = ? AND a.kind = 'email'`
+    )
       .bind(alias)
       .first();
 
@@ -1482,7 +1538,7 @@ export default {
     }
 
     ctx.waitUntil(
-      recordEmailRedirectEvent(env, { alias, destination: row.destination, message, forwarded, rejectReason })
+      recordEmailRedirectEvent(env, { aliasId: row.id, destination: row.destination, message, forwarded, rejectReason })
     );
   },
 };

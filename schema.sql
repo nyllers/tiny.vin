@@ -6,13 +6,23 @@ CREATE TABLE IF NOT EXISTS login_identities (
   min_custom_path_length INTEGER NOT NULL DEFAULT 5
 );
 
-CREATE TABLE IF NOT EXISTS urls (
-  code TEXT NOT NULL,
-  kind TEXT NOT NULL DEFAULT 'generated-path',
+CREATE TABLE IF NOT EXISTS destinations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   original_url TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   created_by INTEGER REFERENCES login_identities(id),
-  PRIMARY KEY (code, kind)
+  UNIQUE (created_by, original_url)
+);
+
+CREATE TABLE IF NOT EXISTS aliases (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'generated-path',
+  destination_id INTEGER NOT NULL REFERENCES destinations(id),
+  cloudflare_rule_id TEXT,
+  created_at INTEGER NOT NULL,
+  created_by INTEGER REFERENCES login_identities(id),
+  UNIQUE (code, kind)
 );
 
 CREATE TABLE IF NOT EXISTS login_events (
@@ -26,8 +36,7 @@ CREATE INDEX IF NOT EXISTS idx_login_events_identity ON login_events(identity_id
 
 CREATE TABLE IF NOT EXISTS redirect_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  code TEXT NOT NULL,
-  kind TEXT NOT NULL,
+  alias_id INTEGER NOT NULL REFERENCES aliases(id) ON DELETE CASCADE,
   requested_at INTEGER NOT NULL,
   ip_address TEXT,
   country TEXT,
@@ -36,11 +45,10 @@ CREATE TABLE IF NOT EXISTS redirect_events (
   headers TEXT NOT NULL,
   cf_data TEXT,
   latitude REAL,
-  longitude REAL,
-  FOREIGN KEY (code, kind) REFERENCES urls(code, kind) ON DELETE CASCADE
+  longitude REAL
 );
 
-CREATE INDEX IF NOT EXISTS idx_redirect_events_code ON redirect_events(code, kind);
+CREATE INDEX IF NOT EXISTS idx_redirect_events_alias ON redirect_events(alias_id);
 
 CREATE TABLE IF NOT EXISTS api_keys (
   identity_id INTEGER PRIMARY KEY REFERENCES login_identities(id),
@@ -48,17 +56,9 @@ CREATE TABLE IF NOT EXISTS api_keys (
   created_at INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS email_redirects (
-  alias TEXT PRIMARY KEY,
-  destination TEXT NOT NULL,
-  cloudflare_rule_id TEXT,
-  created_at INTEGER NOT NULL,
-  created_by INTEGER REFERENCES login_identities(id)
-);
-
 CREATE TABLE IF NOT EXISTS email_redirect_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  alias TEXT NOT NULL,
+  alias_id INTEGER NOT NULL REFERENCES aliases(id) ON DELETE CASCADE,
   destination TEXT NOT NULL,
   from_address TEXT,
   subject TEXT,
@@ -67,11 +67,10 @@ CREATE TABLE IF NOT EXISTS email_redirect_events (
   forwarded INTEGER NOT NULL,
   reject_reason TEXT,
   headers TEXT NOT NULL,
-  requested_at INTEGER NOT NULL,
-  FOREIGN KEY (alias) REFERENCES email_redirects(alias) ON DELETE CASCADE
+  requested_at INTEGER NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_email_redirect_events_alias ON email_redirect_events(alias);
+CREATE INDEX IF NOT EXISTS idx_email_redirect_events_alias ON email_redirect_events(alias_id);
 
 -- Audit history: one "<table>_history" per tracked table above, holding a
 -- copy of each row's content immediately before it was updated or deleted.
@@ -106,28 +105,53 @@ BEGIN
   VALUES (OLD.id, OLD.email, OLD.role, OLD.max_resources, OLD.min_custom_path_length);
 END;
 
-CREATE TABLE IF NOT EXISTS urls_history (
+CREATE TABLE IF NOT EXISTS aliases_history (
   history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER,
   code TEXT,
   kind TEXT,
+  destination_id INTEGER,
+  cloudflare_rule_id TEXT,
+  created_at INTEGER,
+  created_by INTEGER,
+  history_created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TRIGGER IF NOT EXISTS aliases_history_update
+AFTER UPDATE ON aliases
+BEGIN
+  INSERT INTO aliases_history (id, code, kind, destination_id, cloudflare_rule_id, created_at, created_by)
+  VALUES (OLD.id, OLD.code, OLD.kind, OLD.destination_id, OLD.cloudflare_rule_id, OLD.created_at, OLD.created_by);
+END;
+
+CREATE TRIGGER IF NOT EXISTS aliases_history_delete
+AFTER DELETE ON aliases
+BEGIN
+  INSERT INTO aliases_history (id, code, kind, destination_id, cloudflare_rule_id, created_at, created_by)
+  VALUES (OLD.id, OLD.code, OLD.kind, OLD.destination_id, OLD.cloudflare_rule_id, OLD.created_at, OLD.created_by);
+END;
+
+CREATE TABLE IF NOT EXISTS destinations_history (
+  history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER,
   original_url TEXT,
   created_at INTEGER,
   created_by INTEGER,
   history_created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TRIGGER IF NOT EXISTS urls_history_update
-AFTER UPDATE ON urls
+CREATE TRIGGER IF NOT EXISTS destinations_history_update
+AFTER UPDATE ON destinations
 BEGIN
-  INSERT INTO urls_history (code, kind, original_url, created_at, created_by)
-  VALUES (OLD.code, OLD.kind, OLD.original_url, OLD.created_at, OLD.created_by);
+  INSERT INTO destinations_history (id, original_url, created_at, created_by)
+  VALUES (OLD.id, OLD.original_url, OLD.created_at, OLD.created_by);
 END;
 
-CREATE TRIGGER IF NOT EXISTS urls_history_delete
-AFTER DELETE ON urls
+CREATE TRIGGER IF NOT EXISTS destinations_history_delete
+AFTER DELETE ON destinations
 BEGIN
-  INSERT INTO urls_history (code, kind, original_url, created_at, created_by)
-  VALUES (OLD.code, OLD.kind, OLD.original_url, OLD.created_at, OLD.created_by);
+  INSERT INTO destinations_history (id, original_url, created_at, created_by)
+  VALUES (OLD.id, OLD.original_url, OLD.created_at, OLD.created_by);
 END;
 
 CREATE TABLE IF NOT EXISTS login_events_history (
@@ -156,8 +180,7 @@ END;
 CREATE TABLE IF NOT EXISTS redirect_events_history (
   history_id INTEGER PRIMARY KEY AUTOINCREMENT,
   id INTEGER,
-  code TEXT,
-  kind TEXT,
+  alias_id INTEGER,
   requested_at INTEGER,
   ip_address TEXT,
   country TEXT,
@@ -174,18 +197,18 @@ CREATE TRIGGER IF NOT EXISTS redirect_events_history_update
 AFTER UPDATE ON redirect_events
 BEGIN
   INSERT INTO redirect_events_history
-    (id, code, kind, requested_at, ip_address, country, user_agent, referer, headers, cf_data, latitude, longitude)
+    (id, alias_id, requested_at, ip_address, country, user_agent, referer, headers, cf_data, latitude, longitude)
   VALUES
-    (OLD.id, OLD.code, OLD.kind, OLD.requested_at, OLD.ip_address, OLD.country, OLD.user_agent, OLD.referer, OLD.headers, OLD.cf_data, OLD.latitude, OLD.longitude);
+    (OLD.id, OLD.alias_id, OLD.requested_at, OLD.ip_address, OLD.country, OLD.user_agent, OLD.referer, OLD.headers, OLD.cf_data, OLD.latitude, OLD.longitude);
 END;
 
 CREATE TRIGGER IF NOT EXISTS redirect_events_history_delete
 AFTER DELETE ON redirect_events
 BEGIN
   INSERT INTO redirect_events_history
-    (id, code, kind, requested_at, ip_address, country, user_agent, referer, headers, cf_data, latitude, longitude)
+    (id, alias_id, requested_at, ip_address, country, user_agent, referer, headers, cf_data, latitude, longitude)
   VALUES
-    (OLD.id, OLD.code, OLD.kind, OLD.requested_at, OLD.ip_address, OLD.country, OLD.user_agent, OLD.referer, OLD.headers, OLD.cf_data, OLD.latitude, OLD.longitude);
+    (OLD.id, OLD.alias_id, OLD.requested_at, OLD.ip_address, OLD.country, OLD.user_agent, OLD.referer, OLD.headers, OLD.cf_data, OLD.latitude, OLD.longitude);
 END;
 
 CREATE TABLE IF NOT EXISTS api_keys_history (
@@ -210,34 +233,10 @@ BEGIN
   VALUES (OLD.identity_id, OLD.key, OLD.created_at);
 END;
 
-CREATE TABLE IF NOT EXISTS email_redirects_history (
-  history_id INTEGER PRIMARY KEY AUTOINCREMENT,
-  alias TEXT,
-  destination TEXT,
-  cloudflare_rule_id TEXT,
-  created_at INTEGER,
-  created_by INTEGER,
-  history_created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TRIGGER IF NOT EXISTS email_redirects_history_update
-AFTER UPDATE ON email_redirects
-BEGIN
-  INSERT INTO email_redirects_history (alias, destination, cloudflare_rule_id, created_at, created_by)
-  VALUES (OLD.alias, OLD.destination, OLD.cloudflare_rule_id, OLD.created_at, OLD.created_by);
-END;
-
-CREATE TRIGGER IF NOT EXISTS email_redirects_history_delete
-AFTER DELETE ON email_redirects
-BEGIN
-  INSERT INTO email_redirects_history (alias, destination, cloudflare_rule_id, created_at, created_by)
-  VALUES (OLD.alias, OLD.destination, OLD.cloudflare_rule_id, OLD.created_at, OLD.created_by);
-END;
-
 CREATE TABLE IF NOT EXISTS email_redirect_events_history (
   history_id INTEGER PRIMARY KEY AUTOINCREMENT,
   id INTEGER,
-  alias TEXT,
+  alias_id INTEGER,
   destination TEXT,
   from_address TEXT,
   subject TEXT,
@@ -254,16 +253,16 @@ CREATE TRIGGER IF NOT EXISTS email_redirect_events_history_update
 AFTER UPDATE ON email_redirect_events
 BEGIN
   INSERT INTO email_redirect_events_history
-    (id, alias, destination, from_address, subject, message_id, size, forwarded, reject_reason, headers, requested_at)
+    (id, alias_id, destination, from_address, subject, message_id, size, forwarded, reject_reason, headers, requested_at)
   VALUES
-    (OLD.id, OLD.alias, OLD.destination, OLD.from_address, OLD.subject, OLD.message_id, OLD.size, OLD.forwarded, OLD.reject_reason, OLD.headers, OLD.requested_at);
+    (OLD.id, OLD.alias_id, OLD.destination, OLD.from_address, OLD.subject, OLD.message_id, OLD.size, OLD.forwarded, OLD.reject_reason, OLD.headers, OLD.requested_at);
 END;
 
 CREATE TRIGGER IF NOT EXISTS email_redirect_events_history_delete
 AFTER DELETE ON email_redirect_events
 BEGIN
   INSERT INTO email_redirect_events_history
-    (id, alias, destination, from_address, subject, message_id, size, forwarded, reject_reason, headers, requested_at)
+    (id, alias_id, destination, from_address, subject, message_id, size, forwarded, reject_reason, headers, requested_at)
   VALUES
-    (OLD.id, OLD.alias, OLD.destination, OLD.from_address, OLD.subject, OLD.message_id, OLD.size, OLD.forwarded, OLD.reject_reason, OLD.headers, OLD.requested_at);
+    (OLD.id, OLD.alias_id, OLD.destination, OLD.from_address, OLD.subject, OLD.message_id, OLD.size, OLD.forwarded, OLD.reject_reason, OLD.headers, OLD.requested_at);
 END;
