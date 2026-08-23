@@ -506,7 +506,7 @@ async function loadResourceUsage() {
   const remaining = Math.max(0, max - used);
   const percent = max > 0 ? Math.min(100, (used / max) * 100) : 0;
 
-  text.innerHTML = `<strong>${used}</strong> of <strong>${max}</strong> redirects used &mdash; <strong>${remaining}</strong> left`;
+  text.textContent = `${used} of ${max} redirects used — ${remaining} left`;
   fill.style.width = `${percent}%`;
   container.hidden = false;
 }

@@ -88,21 +88,10 @@ h1 {
   display: none;
 }
 
-.resource-usage-text {
-  margin: 0 0 0.4rem;
-  font-size: 0.8rem;
-  color: var(--muted);
-  text-align: center;
-}
-
-.resource-usage-text strong {
-  color: var(--text);
-  font-weight: 600;
-}
-
 .resource-usage-bar {
+  position: relative;
   width: 100%;
-  height: 8px;
+  height: 1.6rem;
   background: var(--card-border);
   border-radius: 999px;
   overflow: hidden;
@@ -111,8 +100,22 @@ h1 {
 .resource-usage-bar-fill {
   height: 100%;
   background: var(--heading);
+  opacity: 0.35;
   border-radius: 999px;
   transition: width 0.2s ease;
+}
+
+.resource-usage-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+  pointer-events: none;
 }
 
 .controls {
