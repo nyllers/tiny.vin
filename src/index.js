@@ -384,24 +384,15 @@ async function deleteAliasAndMaybeDestination(env, { code, kind, identityId }) {
   return row;
 }
 
-function shortUrlResponse(code, kind) {
-  const shortUrl = formatShortUrl(code, kind);
-  return new Response(null, { status: 201, headers: { Location: `https://${shortUrl}` } });
+// Unified 201 response shape for POST /api/redirects, for both URL and
+// e-mail kinds - lets callers (the website, the Android app) handle the
+// result with one code path instead of branching on kind.
+function redirectResponse(code, kind, verified = null) {
+  const shortUrl = kind === "email" ? `${code}@${EMAIL_DOMAIN}` : formatShortUrl(code, kind);
+  return jsonResponse({ kind: kind === "email" ? "email" : "url", code, shortUrl, verified }, 201);
 }
 
-async function handleShorten(request, env, session) {
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return jsonResponse({ error: "Invalid JSON body" }, 400);
-  }
-
-  const url = typeof body.url === "string" ? body.url.trim() : "";
-  if (!url) {
-    return jsonResponse({ error: "Missing url" }, 400);
-  }
-
+async function createUrlRedirect(url, body, env, session) {
   const validation = await validateUrl(url);
   if (validation.error) {
     return jsonResponse({ error: validation.error }, 400);
@@ -447,7 +438,7 @@ async function handleShorten(request, env, session) {
   if (subdomainCode) {
     try {
       await insertAlias(env, { code: subdomainCode, kind: "subdomain", destinationId, createdBy });
-      return shortUrlResponse(subdomainCode, "subdomain");
+      return redirectResponse(subdomainCode, "subdomain");
     } catch {
       return jsonResponse({ error: `"${subdomainCode}.tiny.vin" is already taken, try another.` }, 409);
     }
@@ -456,7 +447,7 @@ async function handleShorten(request, env, session) {
   if (customCode) {
     try {
       await insertAlias(env, { code: customCode, kind: "custom-path", destinationId, createdBy });
-      return shortUrlResponse(customCode, "custom-path");
+      return redirectResponse(customCode, "custom-path");
     } catch {
       return jsonResponse({ error: `"${customCode}" is already taken, try another.` }, 409);
     }
@@ -466,7 +457,7 @@ async function handleShorten(request, env, session) {
     const code = generateCode();
     try {
       await insertAlias(env, { code, kind: "generated-path", destinationId, createdBy });
-      return shortUrlResponse(code, "generated-path");
+      return redirectResponse(code, "generated-path");
     } catch {
       // code collision, retry with a new random code
     }
@@ -498,7 +489,7 @@ async function countUrlsAndEmails(env, identityId) {
 // verification (Cloudflare forwards fail silently to unverified addresses),
 // this means CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_ZONE_ID
 // are required for this feature to do anything at all - without them,
-// handleCreateEmailRedirect refuses to create redirects (see README).
+// createEmailRedirect refuses to create redirects (see README).
 const CLOUDFLARE_WORKER_NAME = "tiny-vin";
 
 function hasCloudflareApiCredentials(env) {
@@ -744,7 +735,7 @@ function groupBy(rows, keyFn, buildEntry) {
   return groups;
 }
 
-// Shared by handleHistory/handleListEmailRedirects: group rows, tag each
+// Shared by handleListRedirects: group rows, tag each
 // group with its most recent item's createdAt, and sort groups newest-first.
 function groupedByCreatedAtDesc(rows, keyFn, buildEntry, keyName, itemsName) {
   const groups = groupBy(rows, keyFn, buildEntry);
@@ -753,30 +744,6 @@ function groupedByCreatedAtDesc(rows, keyFn, buildEntry, keyName, itemsName) {
     createdAt: items[items.length - 1].createdAt,
     [itemsName]: items,
   })).sort((a, b) => b.createdAt - a.createdAt);
-}
-
-async function handleHistory(env, session) {
-  const identityId = await getIdentityId(env, session.email);
-
-  const { results } = await env.DB.prepare(
-    `SELECT a.code, a.kind, d.original_url, a.created_at
-     FROM aliases a
-     JOIN destinations d ON d.id = a.destination_id
-     WHERE a.created_by = ? AND a.kind != 'email'
-     ORDER BY a.created_at DESC`
-  )
-    .bind(identityId)
-    .all();
-
-  const urls = groupedByCreatedAtDesc(
-    results,
-    (row) => row.original_url,
-    (row) => ({ code: row.code, kind: row.kind, shortUrl: formatShortUrl(row.code, row.kind), createdAt: row.created_at }),
-    "originalUrl",
-    "shortUrls"
-  );
-
-  return jsonResponse({ urls });
 }
 
 function normalizeReferrer(referer) {
@@ -1083,18 +1050,10 @@ async function createEmailRedirectRow(env, { alias, destination, createdBy }) {
   return { ok: true };
 }
 
-async function handleCreateEmailRedirect(request, env, session) {
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return jsonResponse({ error: "Invalid JSON body" }, 400);
-  }
-
+async function createEmailRedirect(email, body, env, session) {
   const aliasInput = typeof body.alias === "string" ? body.alias.trim().toLowerCase() : "";
-  const destinationInput = typeof body.destination === "string" ? body.destination.trim() : "";
 
-  const destinationValidation = validateDestinationEmail(destinationInput);
+  const destinationValidation = validateDestinationEmail(email);
   if (destinationValidation.error) {
     return jsonResponse({ error: destinationValidation.error }, 400);
   }
@@ -1142,7 +1101,7 @@ async function handleCreateEmailRedirect(request, env, session) {
     if (result.error === "conflict") {
       return jsonResponse({ error: `"${alias}@${EMAIL_DOMAIN}" is already taken, try another.` }, 409);
     }
-    return jsonResponse({ alias, destination, verified }, 201);
+    return redirectResponse(alias, "email", verified);
   }
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -1152,7 +1111,7 @@ async function handleCreateEmailRedirect(request, env, session) {
       return jsonResponse({ error: "Could not set up the redirect with Cloudflare, try again." }, 502);
     }
     if (!result.error) {
-      return jsonResponse({ alias: candidate, destination, verified }, 201);
+      return redirectResponse(candidate, "email", verified);
     }
     // alias collision, retry with a new random alias
   }
@@ -1160,14 +1119,41 @@ async function handleCreateEmailRedirect(request, env, session) {
   return jsonResponse({ error: "Could not generate a unique alias, try again" }, 500);
 }
 
-async function handleListEmailRedirects(env, session) {
+// POST /api/redirects - single entry point for creating either kind of
+// redirect. Kind is detected from `value` (URL vs e-mail address) rather
+// than a client-supplied field, mirroring the website's single auto-
+// detecting input.
+async function handleCreateRedirect(request, env, session) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
+  }
+
+  const value = typeof body.value === "string" ? body.value.trim() : "";
+  if (!value) {
+    return jsonResponse({ error: "Missing value" }, 400);
+  }
+
+  return EMAIL_ADDRESS_PATTERN.test(value)
+    ? createEmailRedirect(value, body, env, session)
+    : createUrlRedirect(value, body, env, session);
+}
+
+// GET /api/redirects - lists both kinds together, one row per alias, joined
+// with its destination and grouped the same way the two prior endpoints
+// each grouped their own kind. A destination's original_url is unambiguously
+// either a URL or an e-mail address, so every alias in a group shares one
+// kind family - the group is tagged with its first item's kind.
+async function handleListRedirects(env, session) {
   const identityId = await getIdentityId(env, session.email);
 
   const { results } = await env.DB.prepare(
-    `SELECT a.code AS alias, d.original_url AS destination, a.created_at
+    `SELECT a.code, a.kind, d.original_url, a.created_at
      FROM aliases a
      JOIN destinations d ON d.id = a.destination_id
-     WHERE a.created_by = ? AND a.kind = 'email'
+     WHERE a.created_by = ?
      ORDER BY a.created_at DESC`
   )
     .bind(identityId)
@@ -1182,18 +1168,24 @@ async function handleListEmailRedirects(env, session) {
     }
   }
 
-  const redirects = groupedByCreatedAtDesc(
+  const grouped = groupedByCreatedAtDesc(
     results,
-    (row) => row.destination,
+    (row) => row.original_url,
     (row) => ({
-      alias: row.alias,
-      address: `${row.alias}@${EMAIL_DOMAIN}`,
+      code: row.code,
+      kind: row.kind,
+      shortUrl: row.kind === "email" ? `${row.code}@${EMAIL_DOMAIN}` : formatShortUrl(row.code, row.kind),
+      verified: row.kind === "email" ? (verifiedDestinations ? verifiedDestinations.has(row.original_url) : null) : null,
       createdAt: row.created_at,
-      verified: verifiedDestinations ? verifiedDestinations.has(row.destination) : null,
     }),
     "destination",
-    "aliases"
+    "items"
   );
+
+  const redirects = grouped.map((group) => ({
+    ...group,
+    kind: group.items[0].kind === "email" ? "email" : "url",
+  }));
 
   return jsonResponse({ redirects });
 }
@@ -1402,18 +1394,16 @@ async function handleAuthCallback(url, request, env) {
 // share one shape. Pattern-based routes (redirects, deletes with a query
 // param) stay as explicit checks below since they need extra logic.
 const SIMPLE_ROUTES = new Map([
-  ["POST /api/urls", { auth: withAuthOrApiKey, run: (request, env, session) => handleShorten(request, env, session) }],
+  [
+    "POST /api/redirects",
+    { auth: withAuthOrApiKey, run: (request, env, session) => handleCreateRedirect(request, env, session) },
+  ],
+  ["GET /api/redirects", { auth: withAuthOrApiKey, run: (request, env, session) => handleListRedirects(env, session) }],
   ["GET /api/keys", { auth: withAuth, run: (request, env, session) => handleGetApiKey(env, session) }],
   ["POST /api/keys", { auth: withAuth, run: (request, env, session) => handleCreateApiKey(env, session) }],
-  ["GET /api/history", { auth: withAuth, run: (request, env, session) => handleHistory(env, session) }],
   ["GET /api/stats", { auth: withAuth, run: (request, env, session) => handleStats(env, session) }],
   ["GET /api/email-stats", { auth: withAuth, run: (request, env, session) => handleEmailStats(env, session) }],
-  [
-    "POST /api/emails",
-    { auth: withAuthOrApiKey, run: (request, env, session) => handleCreateEmailRedirect(request, env, session) },
-  ],
-  ["GET /api/emails", { auth: withAuth, run: (request, env, session) => handleListEmailRedirects(env, session) }],
-  ["GET /api/session", { auth: withAuth, run: (request, env, session) => handleGetSession(env, session) }],
+  ["GET /api/session", { auth: withAuthOrApiKey, run: (request, env, session) => handleGetSession(env, session) }],
   [
     "GET /api/admin/identities",
     { auth: withAdminAuth, run: (request, env, session) => handleListAdminIdentities(env) },
