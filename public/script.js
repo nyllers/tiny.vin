@@ -184,6 +184,25 @@ function createSubdomainInputRow(group, onCancel) {
   });
 }
 
+async function generatePathForGroup(group) {
+  try {
+    const response = await fetch("/api/urls", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: group.originalUrl }),
+    });
+
+    if (!response.ok) {
+      alert("Could not generate a path, try again.");
+      return;
+    }
+
+    loadHistory(codeFromLocation(response.headers.get("Location")));
+  } catch {
+    alert("Network error, try again.");
+  }
+}
+
 function createUrlCard(group, justCreatedCode) {
   const shouldFlash = group.shortUrls.some((shortUrlItem) => shortUrlItem.code === justCreatedCode);
 
@@ -203,16 +222,18 @@ function createUrlCard(group, justCreatedCode) {
 
   const actionsContainer = document.createElement("div");
   actionsContainer.className = "url-card-actions";
+  const generatePathBtn = createAddButton("Generate Path");
   const addPathBtn = createAddButton("Add Path");
   const addSubdomainBtn = createAddButton("Add Subdomain");
 
   function showActionButtons() {
     actionsContainer.textContent = "";
-    const separator = document.createElement("span");
-    separator.className = "url-card-actions-separator";
-    separator.textContent = "or";
-    actionsContainer.append(addPathBtn, separator, addSubdomainBtn);
+    actionsContainer.append(generatePathBtn, addPathBtn, addSubdomainBtn);
   }
+
+  generatePathBtn.addEventListener("click", () => {
+    generatePathForGroup(group);
+  });
 
   addPathBtn.addEventListener("click", () => {
     actionsContainer.textContent = "";
