@@ -199,11 +199,14 @@ async function deleteUrl(code, kind, shortUrl) {
   }
 }
 
-function createShortUrlRow(shortUrlItem) {
+function createShortUrlRow(shortUrlItem, justCreatedCode) {
   const shortCopyRow = document.createElement("div");
   shortCopyRow.className = "url-card-copy-row";
 
   const shortUrlGroup = createCopyableTextGroup(shortUrlItem.shortUrl);
+  if (shortUrlItem.code === justCreatedCode) {
+    shortUrlGroup.querySelector(".url-card-copy-text").classList.add("url-card-value--flash");
+  }
 
   const qrBtn = createQrIconButton();
   qrBtn.addEventListener("click", () => openQrModal(`https://${shortUrlItem.shortUrl}`));
@@ -259,21 +262,16 @@ async function generatePathForGroup(group) {
 }
 
 function createUrlCard(group, justCreatedCode) {
-  const shouldFlash = group.shortUrls.some((shortUrlItem) => shortUrlItem.code === justCreatedCode);
-
   const card = document.createElement("div");
   card.className = "url-card";
   card.dataset.kind = "url";
-  if (shouldFlash) {
-    card.classList.add("url-card--flash");
-  }
 
   const originalRow = createOriginalUrlRow(group.originalUrl);
 
   const shortRow = document.createElement("div");
   shortRow.className = "url-card-row url-card-row--tiny";
   for (const shortUrlItem of group.shortUrls) {
-    shortRow.append(createShortUrlRow(shortUrlItem));
+    shortRow.append(createShortUrlRow(shortUrlItem, justCreatedCode));
   }
 
   const actionsContainer = document.createElement("div");
@@ -361,10 +359,13 @@ async function deleteEmailRedirect(alias, address) {
   }
 }
 
-function createEmailAliasRow(item) {
+function createEmailAliasRow(item, justCreatedAlias) {
   const copyRow = document.createElement("div");
   copyRow.className = "url-card-copy-row";
   const addressGroup = createCopyableTextGroup(item.address);
+  if (item.alias === justCreatedAlias) {
+    addressGroup.querySelector(".url-card-copy-text").classList.add("url-card-value--flash");
+  }
 
   const qrBtn = createQrIconButton();
   qrBtn.addEventListener("click", () => openQrModal(`mailto:${item.address}`));
@@ -392,21 +393,16 @@ function createAliasInputRow(group, onCancel) {
 }
 
 function createEmailCard(group, justCreatedAlias) {
-  const shouldFlash = group.aliases.some((item) => item.alias === justCreatedAlias);
-
   const card = document.createElement("div");
   card.className = "url-card";
   card.dataset.kind = "email";
-  if (shouldFlash) {
-    card.classList.add("url-card--flash");
-  }
 
   const destinationRow = createOriginalUrlRow(group.destination);
 
   const row = document.createElement("div");
   row.className = "url-card-row url-card-row--tiny";
   for (const item of group.aliases) {
-    row.append(createEmailAliasRow(item));
+    row.append(createEmailAliasRow(item, justCreatedAlias));
   }
 
   const actionsContainer = document.createElement("div");

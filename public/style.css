@@ -430,6 +430,10 @@ footer {
   overflow: hidden;
 }
 
+.url-card[hidden] {
+  display: none;
+}
+
 .url-card-kind-watermark {
   position: absolute;
   top: 50%;
@@ -448,25 +452,25 @@ footer {
   z-index: 1;
 }
 
-.url-card--flash {
-  animation: card-flash 5s ease-in-out;
+.url-card-value--flash {
+  animation: value-flash 5s ease-in-out;
 }
 
-@keyframes card-flash {
+@keyframes value-flash {
   0% {
-    background-color: #ffffff;
+    color: var(--heading);
   }
   25% {
-    background-color: #eeffee;
+    color: #16a34a;
   }
   50% {
-    background-color: #ffffff;
+    color: var(--heading);
   }
   75% {
-    background-color: #eeffee;
+    color: #16a34a;
   }
   100% {
-    background-color: #eeffee;
+    color: #16a34a;
   }
 }
 
