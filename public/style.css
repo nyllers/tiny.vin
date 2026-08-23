@@ -86,8 +86,7 @@ h1 {
   margin: 0 1rem;
 }
 
-#url-input,
-#email-destination-input {
+#redirect-input {
   flex: 1;
   padding: 0.5rem;
   font-size: 1rem;
@@ -95,6 +94,22 @@ h1 {
   border: 1px solid var(--input-border);
   background: var(--surface-bg);
   color: var(--text);
+}
+
+.detected-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.5rem 1rem 0;
+  min-height: 1.1rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.detected-hint svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
 }
 
 #generate-btn {
@@ -131,12 +146,22 @@ h1 {
 }
 
 .email-status-badge {
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 0.2rem 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  padding: 0;
   border-radius: 999px;
-  white-space: nowrap;
   flex-shrink: 0;
+  cursor: default;
+}
+
+.email-status-badge svg {
+  display: block;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin: auto;
 }
 
 .email-status-badge--verified {
@@ -247,14 +272,125 @@ footer {
 }
 
 .section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
   margin: 2.5rem 0 1rem;
   font-size: 1rem;
   color: var(--muted);
-  text-align: center;
 }
 
 .url-cards + .section-heading {
   margin-top: 1.5rem;
+}
+
+.info-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  color: var(--muted);
+  background: var(--surface-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.info-btn:hover,
+.info-btn[aria-expanded="true"] {
+  color: #fff;
+  background: var(--heading);
+  border-color: var(--heading);
+}
+
+.info-popover {
+  position: absolute;
+  top: calc(100% + 0.65rem);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16rem;
+  max-width: 75vw;
+  padding: 0.75rem 0.9rem;
+  background: var(--surface-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  box-shadow: 0 0.5rem 1.5rem var(--panel-shadow);
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--muted);
+  z-index: 10;
+}
+
+.info-popover[hidden] {
+  display: none;
+}
+
+.info-popover::before,
+.info-popover::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-left: 0.4rem solid transparent;
+  border-right: 0.4rem solid transparent;
+}
+
+.info-popover::before {
+  transform: translateX(-50%);
+  border-bottom: 0.4rem solid var(--card-border);
+}
+
+.info-popover::after {
+  transform: translateX(-50%) translateY(1px);
+  border-bottom: 0.4rem solid var(--surface-bg);
+}
+
+.filter-row {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: -0.25rem 0 1.5rem;
+}
+
+.filter-btn {
+  padding: 0.3rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.filter-btn.active {
+  color: #fff;
+  background: var(--heading);
+  border-color: var(--heading);
+}
+
+.filter-btn:hover:not(.active) {
+  border-color: var(--heading);
+  color: var(--heading);
 }
 
 .url-cards {
@@ -286,10 +422,30 @@ footer {
 }
 
 .url-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
+  overflow: hidden;
+}
+
+.url-card-kind-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6.5rem;
+  height: 6.5rem;
+  color: var(--heading);
+  opacity: 0.07;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.url-card > :not(.url-card-kind-watermark) {
+  position: relative;
+  z-index: 1;
 }
 
 .url-card--flash {

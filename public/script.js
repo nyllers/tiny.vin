@@ -1,3 +1,25 @@
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const LINK_ICON = '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>';
+const MAIL_ICON = '<rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>';
+
+function isEmailInput(value) {
+  return EMAIL_PATTERN.test(value);
+}
+
+function createKindWatermark(kind) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "url-card-kind-watermark");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.5");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+  svg.innerHTML = kind === "email" ? MAIL_ICON : LINK_ICON;
+  return svg;
+}
+
 async function copyQrImageToClipboard(qr) {
   const cellSize = 8;
   const margin = cellSize * 2;
@@ -52,10 +74,10 @@ function codeFromLocation(location) {
   return url.hostname === "tiny.vin" ? url.pathname.slice(1) : url.hostname.replace(/\.tiny\.vin$/, "");
 }
 
-async function generateUrl() {
-  const input = document.getElementById("url-input");
+async function generateRedirect() {
+  const input = document.getElementById("redirect-input");
   const result = document.getElementById("result");
-  const url = input.value.trim();
+  const value = input.value.trim();
 
   function setError(message) {
     result.textContent = message;
@@ -67,8 +89,40 @@ async function generateUrl() {
     result.classList.remove("result-error");
   }
 
-  if (!url) {
-    setError("Enter a URL first.");
+  if (!value) {
+    setError("Enter a URL or e-mail address first.");
+    return;
+  }
+
+  if (isEmailInput(value)) {
+    setStatus("Creating redirect...");
+
+    try {
+      const response = await fetch("/api/emails", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ destination: value }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Something went wrong.");
+        return;
+      }
+
+      input.value = "";
+      setStatus(
+        data.verified === false
+          ? `Created. Cloudflare needs to verify ${value} before mail will actually forward there - check that inbox for a confirmation link.`
+          : ""
+      );
+      updateGenerateButtonState();
+      updateDetectedHint();
+      loadRedirects({ justCreatedAlias: data.alias });
+    } catch {
+      setError("Network error, try again.");
+    }
     return;
   }
 
@@ -78,7 +132,7 @@ async function generateUrl() {
     const response = await fetch("/api/urls", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url: value }),
     });
 
     if (!response.ok) {
@@ -90,7 +144,8 @@ async function generateUrl() {
     input.value = "";
     setStatus("");
     updateGenerateButtonState();
-    loadHistory(codeFromLocation(response.headers.get("Location")));
+    updateDetectedHint();
+    loadRedirects({ justCreatedCode: codeFromLocation(response.headers.get("Location")) });
   } catch {
     setError("Network error, try again.");
   }
@@ -138,7 +193,7 @@ async function deleteUrl(code, kind, shortUrl) {
       alert("Could not delete that URL, try again.");
       return;
     }
-    loadHistory();
+    loadRedirects();
   } catch {
     alert("Network error, try again.");
   }
@@ -167,7 +222,7 @@ function createSuffixInputRow(group, onCancel) {
     prefixText: "tiny.vin/",
     suffixText: null,
     placeholder: "Enter pathname",
-    onSuccess: (response) => loadHistory(codeFromLocation(response.headers.get("Location"))),
+    onSuccess: (response) => loadRedirects({ justCreatedCode: codeFromLocation(response.headers.get("Location")) }),
     onCancel,
   });
 }
@@ -179,7 +234,7 @@ function createSubdomainInputRow(group, onCancel) {
     prefixText: null,
     suffixText: ".tiny.vin",
     placeholder: "Enter subdomain name",
-    onSuccess: (response) => loadHistory(codeFromLocation(response.headers.get("Location"))),
+    onSuccess: (response) => loadRedirects({ justCreatedCode: codeFromLocation(response.headers.get("Location")) }),
     onCancel,
   });
 }
@@ -197,7 +252,7 @@ async function generatePathForGroup(group) {
       return;
     }
 
-    loadHistory(codeFromLocation(response.headers.get("Location")));
+    loadRedirects({ justCreatedCode: codeFromLocation(response.headers.get("Location")) });
   } catch {
     alert("Network error, try again.");
   }
@@ -208,6 +263,7 @@ function createUrlCard(group, justCreatedCode) {
 
   const card = document.createElement("div");
   card.className = "url-card";
+  card.dataset.kind = "url";
   if (shouldFlash) {
     card.classList.add("url-card--flash");
   }
@@ -251,39 +307,241 @@ function createUrlCard(group, justCreatedCode) {
 
   showActionButtons();
 
-  card.append(originalRow, shortRow, actionsContainer);
+  card.append(createKindWatermark("url"), originalRow, shortRow, actionsContainer);
   return card;
 }
 
-async function loadHistory(justCreatedCode) {
+function createDeleteEmailButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-btn delete-btn";
+  button.title = "Delete";
+  button.setAttribute("aria-label", "Delete this redirect");
+  button.innerHTML = `<span>Delete</span>`;
+  return button;
+}
+
+function createEmailStatusBadge(verified) {
+  const badge = document.createElement("span");
+  badge.className = "email-status-badge";
+
+  if (verified === true) {
+    badge.classList.add("email-status-badge--verified");
+    badge.title = "Verified";
+    badge.setAttribute("aria-label", "Verified");
+    badge.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+  } else if (verified === false) {
+    badge.classList.add("email-status-badge--pending");
+    badge.title = "Cloudflare e-mailed a confirmation link to this address - redirects won't deliver until it's confirmed.";
+    badge.setAttribute("aria-label", "Pending verification");
+    badge.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="12" x2="12" y2="6.5"></line></svg>`;
+  } else {
+    badge.classList.add("email-status-badge--unknown");
+    badge.title = "Status unknown";
+    badge.setAttribute("aria-label", "Status unknown");
+    badge.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="13"></line><circle cx="12" cy="16.5" r="0.75" fill="currentColor" stroke="none"></circle></svg>`;
+  }
+
+  return badge;
+}
+
+async function deleteEmailRedirect(alias, address) {
+  const confirmed = await confirmDelete(`This will delete the redirect for ${address}`);
+  if (!confirmed) return;
+
+  try {
+    const response = await fetch(`/api/emails/${alias}`, { method: "DELETE" });
+    if (!response.ok) {
+      alert("Could not delete that redirect, try again.");
+      return;
+    }
+    loadRedirects();
+  } catch {
+    alert("Network error, try again.");
+  }
+}
+
+function createEmailAliasRow(item) {
+  const copyRow = document.createElement("div");
+  copyRow.className = "url-card-copy-row";
+  const addressGroup = createCopyableTextGroup(item.address);
+
+  const qrBtn = createQrIconButton();
+  qrBtn.addEventListener("click", () => openQrModal(`mailto:${item.address}`));
+
+  const badge = createEmailStatusBadge(item.verified);
+  const deleteBtn = createDeleteEmailButton();
+  deleteBtn.addEventListener("click", () => deleteEmailRedirect(item.alias, item.address));
+  copyRow.append(qrBtn, addressGroup, badge, deleteBtn);
+  return copyRow;
+}
+
+function createAliasInputRow(group, onCancel) {
+  return createInlineCodeInputRow({
+    endpoint: "/api/emails",
+    buildBody: (value) => ({ destination: group.destination, alias: value }),
+    prefixText: null,
+    suffixText: "@tiny.vin",
+    placeholder: "Enter alias",
+    onSuccess: async (response) => {
+      const data = await response.json();
+      loadRedirects({ justCreatedAlias: data.alias });
+    },
+    onCancel,
+  });
+}
+
+function createEmailCard(group, justCreatedAlias) {
+  const shouldFlash = group.aliases.some((item) => item.alias === justCreatedAlias);
+
+  const card = document.createElement("div");
+  card.className = "url-card";
+  card.dataset.kind = "email";
+  if (shouldFlash) {
+    card.classList.add("url-card--flash");
+  }
+
+  const destinationRow = createOriginalUrlRow(group.destination);
+
+  const row = document.createElement("div");
+  row.className = "url-card-row url-card-row--tiny";
+  for (const item of group.aliases) {
+    row.append(createEmailAliasRow(item));
+  }
+
+  const actionsContainer = document.createElement("div");
+  actionsContainer.className = "url-card-actions";
+  const addAliasBtn = createAddButton("Add alias");
+
+  function showActionButton() {
+    actionsContainer.textContent = "";
+    actionsContainer.append(addAliasBtn);
+  }
+
+  addAliasBtn.addEventListener("click", () => {
+    actionsContainer.textContent = "";
+    const inputRow = createAliasInputRow(group, showActionButton);
+    actionsContainer.appendChild(inputRow);
+    inputRow.querySelector("input").focus();
+  });
+
+  showActionButton();
+
+  card.append(createKindWatermark("email"), destinationRow, row, actionsContainer);
+  return card;
+}
+
+function applyRedirectFilter() {
+  const activeBtn = document.querySelector(".filter-btn.active");
+  const filter = activeBtn ? activeBtn.dataset.filter : "all";
+  const grid = document.querySelector("#history-list .url-cards");
+  if (!grid) return;
+
+  grid.querySelectorAll(".url-card").forEach((card) => {
+    card.hidden = filter !== "all" && filter !== card.dataset.kind;
+  });
+  packMasonryRows(grid);
+}
+
+async function loadRedirects({ justCreatedCode, justCreatedAlias } = {}) {
   const panel = document.getElementById("history-panel");
   const container = document.getElementById("history-list");
 
-  const data = await fetchJsonOrNull("/api/history");
-  if (!data) return;
+  const [historyData, emailData] = await Promise.all([fetchJsonOrNull("/api/history"), fetchJsonOrNull("/api/emails")]);
+
+  const urlGroups = (historyData?.urls || []).map((group) => ({ ...group, kind: "url" }));
+  const emailGroups = (emailData?.redirects || []).map((group) => ({ ...group, kind: "email" }));
+  const allGroups = [...urlGroups, ...emailGroups].sort((a, b) => b.createdAt - a.createdAt);
 
   container.textContent = "";
 
-  if (data.urls.length === 0) {
+  if (allGroups.length === 0) {
     panel.hidden = true;
     return;
   }
 
   panel.hidden = false;
-  container.append(createCardsSection("CREATED URLS", data.urls, (group) => createUrlCard(group, justCreatedCode)));
+  const cardElements = allGroups.map((group) =>
+    group.kind === "url" ? createUrlCard(group, justCreatedCode) : createEmailCard(group, justCreatedAlias)
+  );
+  container.append(createCardsGrid(cardElements));
+  applyRedirectFilter();
 }
 
 function updateGenerateButtonState() {
-  const input = document.getElementById("url-input");
+  const input = document.getElementById("redirect-input");
   const generateBtn = document.getElementById("generate-btn");
   generateBtn.disabled = input.value.trim() === "";
 }
 
-document.getElementById("generate-btn").addEventListener("click", generateUrl);
-document.getElementById("url-input").addEventListener("input", updateGenerateButtonState);
+function updateDetectedHint() {
+  const input = document.getElementById("redirect-input");
+  const hint = document.getElementById("detected-hint");
+  const value = input.value.trim();
+
+  if (!value) {
+    hint.innerHTML = "";
+    return;
+  }
+
+  const isEmail = isEmailInput(value);
+  const icon = isEmail ? MAIL_ICON : LINK_ICON;
+  const label = isEmail
+    ? "Looks like an e-mail address - this will create an e-mail alias"
+    : "Looks like a URL - this will create a short link";
+  hint.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>${label}`;
+}
+
+function initFilterRow() {
+  document.querySelectorAll(".filter-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".filter-btn").forEach((b) => b.classList.toggle("active", b === btn));
+      applyRedirectFilter();
+    });
+  });
+}
+
+function initInfoPopovers() {
+  document.querySelectorAll(".info-btn").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const popover = document.getElementById(btn.getAttribute("data-info-target"));
+      const isOpen = !popover.hidden;
+      document.querySelectorAll(".info-popover").forEach((p) => {
+        p.hidden = true;
+      });
+      document.querySelectorAll(".info-btn").forEach((b) => {
+        b.setAttribute("aria-expanded", "false");
+      });
+      if (!isOpen) {
+        popover.hidden = false;
+        btn.setAttribute("aria-expanded", "true");
+      }
+    });
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".info-wrap")) {
+      document.querySelectorAll(".info-popover").forEach((p) => {
+        p.hidden = true;
+      });
+      document.querySelectorAll(".info-btn").forEach((b) => {
+        b.setAttribute("aria-expanded", "false");
+      });
+    }
+  });
+}
+
+document.getElementById("generate-btn").addEventListener("click", generateRedirect);
+document.getElementById("redirect-input").addEventListener("input", () => {
+  updateGenerateButtonState();
+  updateDetectedHint();
+});
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !document.getElementById("generate-btn").disabled) generateUrl();
+  if (event.key === "Enter" && !document.getElementById("generate-btn").disabled) generateRedirect();
 });
 
+initFilterRow();
+initInfoPopovers();
 updateGenerateButtonState();
-loadHistory();
+loadRedirects();

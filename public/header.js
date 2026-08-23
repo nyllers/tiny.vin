@@ -17,18 +17,13 @@
 const NAV_LINKS = [
   {
     href: "/",
-    label: "URL",
+    label: "Redirects",
     icon: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>',
   },
   {
     href: "/stats",
     label: "URL Statistics",
     icon: '<line x1="6" y1="20" x2="6" y2="14"></line><line x1="12" y1="20" x2="12" y2="10"></line><line x1="18" y1="20" x2="18" y2="4"></line>',
-  },
-  {
-    href: "/emails",
-    label: "E-Mail",
-    icon: '<rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>',
   },
   {
     href: "/email-stats",
