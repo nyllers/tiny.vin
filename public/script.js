@@ -69,11 +69,6 @@ function openQrModal(url) {
   openModal(overlay, closeBtn);
 }
 
-function codeFromLocation(location) {
-  const url = new URL(location);
-  return url.hostname === "tiny.vin" ? url.pathname.slice(1) : url.hostname.replace(/\.tiny\.vin$/, "");
-}
-
 async function generateRedirect() {
   const input = document.getElementById("redirect-input");
   const result = document.getElementById("result");
@@ -94,58 +89,31 @@ async function generateRedirect() {
     return;
   }
 
-  if (isEmailInput(value)) {
-    setStatus("Creating redirect...");
-
-    try {
-      const response = await fetch("/api/emails", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ destination: value }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || "Something went wrong.");
-        return;
-      }
-
-      input.value = "";
-      setStatus(
-        data.verified === false
-          ? `Created. Cloudflare needs to verify ${value} before mail will actually forward there - check that inbox for a confirmation link.`
-          : ""
-      );
-      updateGenerateButtonState();
-      updateDetectedHint();
-      loadRedirects({ justCreatedAlias: data.alias });
-    } catch {
-      setError("Network error, try again.");
-    }
-    return;
-  }
-
-  setStatus("Checking that page exists...");
+  setStatus(isEmailInput(value) ? "Creating redirect..." : "Checking that page exists...");
 
   try {
-    const response = await fetch("/api/urls", {
+    const response = await fetch("/api/redirects", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ url: value }),
+      body: JSON.stringify({ value }),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const data = await response.json();
       setError(data.error || "Something went wrong.");
       return;
     }
 
     input.value = "";
-    setStatus("");
+    setStatus(
+      data.verified === false
+        ? `Created. Cloudflare needs to verify ${value} before mail will actually forward there - check that inbox for a confirmation link.`
+        : ""
+    );
     updateGenerateButtonState();
     updateDetectedHint();
-    loadRedirects({ justCreatedCode: codeFromLocation(response.headers.get("Location")) });
+    loadRedirects(data.kind === "email" ? { justCreatedAlias: data.code } : { justCreatedCode: data.code });
   } catch {
     setError("Network error, try again.");
   }
@@ -220,34 +188,40 @@ function createShortUrlRow(shortUrlItem, justCreatedCode) {
 
 function createSuffixInputRow(group, onCancel) {
   return createInlineCodeInputRow({
-    endpoint: "/api/urls",
-    buildBody: (value) => ({ url: group.originalUrl, path: value }),
+    endpoint: "/api/redirects",
+    buildBody: (value) => ({ value: group.destination, path: value }),
     prefixText: "tiny.vin/",
     suffixText: null,
     placeholder: "Enter pathname",
-    onSuccess: (response) => loadRedirects({ justCreatedCode: codeFromLocation(response.headers.get("Location")) }),
+    onSuccess: async (response) => {
+      const data = await response.json();
+      loadRedirects({ justCreatedCode: data.code });
+    },
     onCancel,
   });
 }
 
 function createSubdomainInputRow(group, onCancel) {
   return createInlineCodeInputRow({
-    endpoint: "/api/urls",
-    buildBody: (value) => ({ url: group.originalUrl, subdomain: value }),
+    endpoint: "/api/redirects",
+    buildBody: (value) => ({ value: group.destination, subdomain: value }),
     prefixText: null,
     suffixText: ".tiny.vin",
     placeholder: "Enter subdomain name",
-    onSuccess: (response) => loadRedirects({ justCreatedCode: codeFromLocation(response.headers.get("Location")) }),
+    onSuccess: async (response) => {
+      const data = await response.json();
+      loadRedirects({ justCreatedCode: data.code });
+    },
     onCancel,
   });
 }
 
 async function generatePathForGroup(group) {
   try {
-    const response = await fetch("/api/urls", {
+    const response = await fetch("/api/redirects", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ url: group.originalUrl }),
+      body: JSON.stringify({ value: group.destination }),
     });
 
     if (!response.ok) {
@@ -255,7 +229,8 @@ async function generatePathForGroup(group) {
       return;
     }
 
-    loadRedirects({ justCreatedCode: codeFromLocation(response.headers.get("Location")) });
+    const data = await response.json();
+    loadRedirects({ justCreatedCode: data.code });
   } catch {
     alert("Network error, try again.");
   }
@@ -266,11 +241,11 @@ function createUrlCard(group, justCreatedCode) {
   card.className = "url-card";
   card.dataset.kind = "url";
 
-  const originalRow = createOriginalUrlRow(group.originalUrl);
+  const originalRow = createOriginalUrlRow(group.destination);
 
   const shortRow = document.createElement("div");
   shortRow.className = "url-card-row url-card-row--tiny";
-  for (const shortUrlItem of group.shortUrls) {
+  for (const shortUrlItem of group.items) {
     shortRow.append(createShortUrlRow(shortUrlItem, justCreatedCode));
   }
 
@@ -362,31 +337,31 @@ async function deleteEmailRedirect(alias, address) {
 function createEmailAliasRow(item, justCreatedAlias) {
   const copyRow = document.createElement("div");
   copyRow.className = "url-card-copy-row";
-  const addressGroup = createCopyableTextGroup(item.address);
-  if (item.alias === justCreatedAlias) {
+  const addressGroup = createCopyableTextGroup(item.shortUrl);
+  if (item.code === justCreatedAlias) {
     addressGroup.querySelector(".url-card-copy-text").classList.add("url-card-value--flash");
   }
 
   const qrBtn = createQrIconButton();
-  qrBtn.addEventListener("click", () => openQrModal(`mailto:${item.address}`));
+  qrBtn.addEventListener("click", () => openQrModal(`mailto:${item.shortUrl}`));
 
   const badge = createEmailStatusBadge(item.verified);
   const deleteBtn = createDeleteEmailButton();
-  deleteBtn.addEventListener("click", () => deleteEmailRedirect(item.alias, item.address));
+  deleteBtn.addEventListener("click", () => deleteEmailRedirect(item.code, item.shortUrl));
   copyRow.append(qrBtn, addressGroup, badge, deleteBtn);
   return copyRow;
 }
 
 function createAliasInputRow(group, onCancel) {
   return createInlineCodeInputRow({
-    endpoint: "/api/emails",
-    buildBody: (value) => ({ destination: group.destination, alias: value }),
+    endpoint: "/api/redirects",
+    buildBody: (value) => ({ value: group.destination, alias: value }),
     prefixText: null,
     suffixText: "@tiny.vin",
     placeholder: "Enter alias",
     onSuccess: async (response) => {
       const data = await response.json();
-      loadRedirects({ justCreatedAlias: data.alias });
+      loadRedirects({ justCreatedAlias: data.code });
     },
     onCancel,
   });
@@ -401,7 +376,7 @@ function createEmailCard(group, justCreatedAlias) {
 
   const row = document.createElement("div");
   row.className = "url-card-row url-card-row--tiny";
-  for (const item of group.aliases) {
+  for (const item of group.items) {
     row.append(createEmailAliasRow(item, justCreatedAlias));
   }
 
@@ -445,11 +420,8 @@ async function loadRedirects({ justCreatedCode, justCreatedAlias } = {}) {
   const panel = document.getElementById("history-panel");
   const container = document.getElementById("history-list");
 
-  const [historyData, emailData] = await Promise.all([fetchJsonOrNull("/api/history"), fetchJsonOrNull("/api/emails")]);
-
-  const urlGroups = (historyData?.urls || []).map((group) => ({ ...group, kind: "url" }));
-  const emailGroups = (emailData?.redirects || []).map((group) => ({ ...group, kind: "email" }));
-  const allGroups = [...urlGroups, ...emailGroups].sort((a, b) => b.createdAt - a.createdAt);
+  const data = await fetchJsonOrNull("/api/redirects");
+  const allGroups = data?.redirects || [];
 
   container.textContent = "";
 
