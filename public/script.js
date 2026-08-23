@@ -440,6 +440,8 @@ function applyRedirectFilter() {
 }
 
 async function loadRedirects({ justCreatedCode, justCreatedAlias } = {}) {
+  loadResourceUsage();
+
   const panel = document.getElementById("history-panel");
   const container = document.getElementById("history-list");
 
@@ -486,6 +488,27 @@ function updateDetectedHint() {
     ? "Looks like an e-mail address - this will create an e-mail alias"
     : "Looks like a URL - this will create a short link";
   hint.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>${label}`;
+}
+
+async function loadResourceUsage() {
+  const container = document.getElementById("resource-usage");
+  const text = document.getElementById("resource-usage-text");
+  const fill = document.getElementById("resource-usage-fill");
+
+  const data = await fetchJsonOrNull("/api/session");
+  if (!data || typeof data.maxResources !== "number") {
+    container.hidden = true;
+    return;
+  }
+
+  const used = data.resourceCount;
+  const max = data.maxResources;
+  const remaining = Math.max(0, max - used);
+  const percent = max > 0 ? Math.min(100, (used / max) * 100) : 0;
+
+  text.textContent = `${used} of ${max} redirects used — ${remaining} left`;
+  fill.style.width = `${percent}%`;
+  container.hidden = false;
 }
 
 function initFilterRow() {

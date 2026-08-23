@@ -618,7 +618,15 @@ async function handleCreateApiKey(env, session) {
 }
 
 async function handleGetSession(env, session) {
-  return jsonResponse({ email: session.email, admin: await isAdmin(env, session.email) });
+  const identity = await getOrCreateIdentity(env, session.email);
+  const resourceCount = await countUrlsAndEmails(env, identity.id);
+
+  return jsonResponse({
+    email: session.email,
+    admin: await isAdmin(env, session.email),
+    resourceCount,
+    maxResources: identity.max_resources,
+  });
 }
 
 async function handleListAdminIdentities(env) {
