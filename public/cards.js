@@ -38,16 +38,20 @@ window.addEventListener("resize", () => {
   }, 150);
 });
 
-function createCardsSectionFromElements(headingText, cardElements) {
-  const heading = document.createElement("h2");
-  heading.className = "section-heading";
-  heading.textContent = headingText;
+function createCardsGrid(cardElements) {
   const grid = document.createElement("div");
   grid.className = "url-cards";
   grid.append(...cardElements);
   requestAnimationFrame(() => packMasonryRows(grid));
+  return grid;
+}
+
+function createCardsSectionFromElements(headingText, cardElements) {
+  const heading = document.createElement("h2");
+  heading.className = "section-heading";
+  heading.textContent = headingText;
   const fragment = document.createDocumentFragment();
-  fragment.append(heading, grid);
+  fragment.append(heading, createCardsGrid(cardElements));
   return fragment;
 }
 

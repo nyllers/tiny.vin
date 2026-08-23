@@ -38,8 +38,6 @@ const PROTECTED_PAGES = new Set([
   "/stats.html",
   "/api",
   "/api.html",
-  "/emails",
-  "/emails.html",
   "/email-stats",
   "/email-stats.html",
   "/admin",
@@ -1441,6 +1439,12 @@ async function handleFetch(request, env, ctx) {
       status: 302,
       headers: { location: "/login", "set-cookie": clearSessionCookie() },
     });
+  }
+
+  // The E-Mail page merged into the home page's unified redirects list -
+  // send anyone with an old bookmark/link there instead of a 404.
+  if (url.pathname === "/emails" || url.pathname === "/emails.html") {
+    return Response.redirect(`${url.origin}/`, 301);
   }
 
   const authMatch = url.pathname.match(AUTH_PATTERN);

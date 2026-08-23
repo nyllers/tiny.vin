@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>tiny.vin</title>
-  <meta name="description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
+  <meta name="description" content="tiny.vin lets you create short URLs and e-mail alias redirects. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own redirects. No other data is requested, and anyone can follow a tiny URL without signing in.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://tiny.vin">
   <meta property="og:site_name" content="tiny.vin">
   <meta property="og:title" content="tiny.vin">
-  <meta property="og:description" content="tiny.vin is a simple URL-shortening tool. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own tiny URLs. No other data is requested, and anyone can follow a tiny URL without signing in.">
+  <meta property="og:description" content="tiny.vin lets you create short URLs and e-mail alias redirects. Signing in with Google lets us identify your account by your Google email address and name, so you can create, view, and delete your own redirects. No other data is requested, and anyone can follow a tiny URL without signing in.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <script src="theme-init.js"></script>
@@ -19,15 +19,38 @@
   <div class="theme-toggle" role="group" aria-label="Theme"></div>
   <div class="donate-nav"></div>
   <script src="header.js"></script>
-  <h2 class="section-heading">GENERATE URL</h2>
+  <h2 class="section-heading">
+    CREATE A REDIRECT
+    <span class="info-wrap">
+      <button type="button" class="info-btn" data-info-target="info-create" aria-expanded="false" aria-label="About this section">i</button>
+      <div class="info-popover" id="info-create" role="tooltip" hidden>
+        Paste a URL to get a short link, or an e-mail address to create an alias that forwards to it &mdash; the type is detected automatically as you type, so there's nothing to pick. Custom paths, subdomains, and chosen e-mail aliases are added afterward, from the cards below.
+      </div>
+    </span>
+  </h2>
   <main class="generate-section">
     <div class="controls">
-      <input type="text" id="url-input" placeholder="Paste or write a URL">
+      <input type="text" id="redirect-input" placeholder="Paste a URL or an e-mail address">
       <button id="generate-btn">Make it Tiny</button>
     </div>
+    <p class="detected-hint" id="detected-hint"></p>
     <p id="result"></p>
   </main>
   <section class="history-panel" id="history-panel">
+    <h2 class="section-heading">
+      YOUR REDIRECTS
+      <span class="info-wrap">
+        <button type="button" class="info-btn" data-info-target="info-list" aria-expanded="false" aria-label="About this section">i</button>
+        <div class="info-popover" id="info-list" role="tooltip" hidden>
+          Every redirect you've created, grouped one card per destination. The faint icon in the middle of each card shows whether it's a URL or an e-mail alias &mdash; use the filter below to show just one type. Each card's buttons attach another path, subdomain, or alias to that same destination.
+        </div>
+      </span>
+    </h2>
+    <div class="filter-row" role="group" aria-label="Filter">
+      <button type="button" class="filter-btn active" data-filter="all">All</button>
+      <button type="button" class="filter-btn" data-filter="url">URLs</button>
+      <button type="button" class="filter-btn" data-filter="email">E-Mail</button>
+    </div>
     <div id="history-list"></div>
   </section>
   <p class="legal-links"><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a></p>
