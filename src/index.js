@@ -697,13 +697,31 @@ async function handleAppAuthExchange(request, env) {
   return jsonResponse({ key });
 }
 
-function appAuthCallbackPage(url) {
+// Android's App Link auto-verification is unreliable on some real devices
+// (manufacturer skins in particular), so this page doesn't just tell the
+// user to go back to the app - it exchanges the token itself, right here,
+// and shows the key for manual copy-paste. getOrCreateApiKey is idempotent,
+// so it's harmless if the app *also* completes the exchange on its own.
+async function appAuthCallbackPage(url, env) {
   const error = url.searchParams.get("error");
+  const token = url.searchParams.get("token");
+
+  let key = null;
+  let tokenError = null;
+  if (token && !error) {
+    const payload = await verifyAppAuthToken(token, env.SESSION_SECRET);
+    if (payload) {
+      key = await getOrCreateApiKey(env, payload.email);
+    } else {
+      tokenError = "Your sign-in link expired. Please try again in the app.";
+    }
+  }
+
   const message = error
     ? LOGIN_ERRORS[error] || "Something went wrong signing in. Please try again in the app."
-    : url.searchParams.get("token")
-      ? "Signed in — return to the tiny.vin app to finish."
-      : "Nothing to do here — open the tiny.vin app to sign in.";
+    : key
+      ? "Signed in! The app should return automatically - if it doesn't, copy your key below and paste it in."
+      : (tokenError ?? (token ? null : "Nothing to do here — open the tiny.vin app to sign in."));
 
   return `<!doctype html>
 <html lang="en">
@@ -715,9 +733,28 @@ function appAuthCallbackPage(url) {
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <main>
+  <main class="panel">
     <h1>tiny.vin</h1>
     <p>${message}</p>
+    ${
+      key
+        ? `<div style="display:flex; flex-direction:column; align-items:center; gap:0.75rem; margin-top:1rem;">
+      <p style="font-family: monospace; font-size: 1rem; word-break: break-all; margin: 0; background: var(--bg); border: 1px solid var(--card-border); border-radius: 0.5rem; padding: 0.75rem; width: 100%; text-align: center;">${key}</p>
+      <button type="button" id="copy-key-btn" class="modal-btn modal-btn--primary">Copy key</button>
+    </div>
+    <script>
+      document.getElementById("copy-key-btn").addEventListener("click", async () => {
+        const btn = document.getElementById("copy-key-btn");
+        try {
+          await navigator.clipboard.writeText(${JSON.stringify(key)});
+          btn.textContent = "Copied!";
+        } catch {
+          btn.textContent = "Couldn't copy - select and copy manually";
+        }
+      });
+    </script>`
+        : ""
+    }
   </main>
 </body>
 </html>`;
@@ -1453,7 +1490,7 @@ async function handleFetch(request, env, ctx) {
   }
 
   if ((url.pathname === "/app/auth-callback" || url.pathname === "/app/share-callback") && request.method === "GET") {
-    return htmlResponse(appAuthCallbackPage(url));
+    return htmlResponse(await appAuthCallbackPage(url, env));
   }
 
   if (url.pathname === "/app/auth-exchange" && request.method === "POST") {
