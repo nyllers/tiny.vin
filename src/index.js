@@ -697,14 +697,23 @@ async function handleAppAuthExchange(request, env) {
   return jsonResponse({ key });
 }
 
-// Android's App Link auto-verification is unreliable on some real devices
-// (manufacturer skins in particular), so this page doesn't just tell the
-// user to go back to the app - it exchanges the token itself, right here,
-// and shows the key for manual copy-paste. getOrCreateApiKey is idempotent,
-// so it's harmless if the app *also* completes the exchange on its own.
+// Android's https App Link auto-verification is unreliable on some real
+// devices (manufacturer skins in particular) since it depends on Android
+// having successfully verified domain ownership at install time - so this
+// page doesn't wait for that. It offers a custom-scheme link instead: custom
+// schemes have no verification step, so Android hands off to the one app
+// that claims it deterministically. Chrome only allows that handoff from an
+// actual tap, not an automatic script redirect (abuse prevention), so this
+// is a real link the user taps rather than a fire-and-forget redirect - one
+// tap either way, just not fully automatic. If it's not tapped, or doesn't
+// do anything (app not installed, an unusual browser), the page has already
+// exchanged the token itself and shows the key for manual copy-paste.
+// getOrCreateApiKey is idempotent, so it's harmless if the app *also*
+// completes the exchange on its own.
 async function appAuthCallbackPage(url, env) {
   const error = url.searchParams.get("error");
   const token = url.searchParams.get("token");
+  const appHost = url.pathname === "/app/share-callback" ? "share-callback" : "auth-callback";
 
   let key = null;
   let tokenError = null;
@@ -720,8 +729,10 @@ async function appAuthCallbackPage(url, env) {
   const message = error
     ? LOGIN_ERRORS[error] || "Something went wrong signing in. Please try again in the app."
     : key
-      ? "Signed in! The app should return automatically - if it doesn't, copy your key below and paste it in."
+      ? "Signed in! Tap below to return to the app, or copy your key manually."
       : (tokenError ?? (token ? null : "Nothing to do here — open the tiny.vin app to sign in."));
+
+  const appDeepLink = key ? `vin.tiny.clipshort://${appHost}?token=${encodeURIComponent(token)}` : null;
 
   return `<!doctype html>
 <html lang="en">
@@ -739,8 +750,9 @@ async function appAuthCallbackPage(url, env) {
     ${
       key
         ? `<div style="display:flex; flex-direction:column; align-items:center; gap:0.75rem; margin-top:1rem;">
+      <a href="${appDeepLink}" class="modal-btn modal-btn--primary" style="text-decoration:none; text-align:center; width:100%;">Open tiny.vin app</a>
       <p style="font-family: monospace; font-size: 1rem; word-break: break-all; margin: 0; background: var(--bg); border: 1px solid var(--card-border); border-radius: 0.5rem; padding: 0.75rem; width: 100%; text-align: center;">${key}</p>
-      <button type="button" id="copy-key-btn" class="modal-btn modal-btn--primary">Copy key</button>
+      <button type="button" id="copy-key-btn" class="modal-btn modal-btn--cancel">Copy key</button>
     </div>
     <script>
       document.getElementById("copy-key-btn").addEventListener("click", async () => {
