@@ -526,6 +526,11 @@ footer {
   margin-top: calc(0.35rem - 6px);
 }
 
+.url-card-actions .theme-btn {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.7rem;
+}
+
 .icon-btn.copy-link-btn {
   color: var(--heading);
 }
