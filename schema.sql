@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS login_identities (
 CREATE TABLE IF NOT EXISTS destinations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   original_url TEXT NOT NULL,
+  title TEXT,
   created_at INTEGER NOT NULL,
   created_by INTEGER REFERENCES login_identities(id),
   UNIQUE (created_by, original_url)
@@ -135,6 +136,7 @@ CREATE TABLE IF NOT EXISTS destinations_history (
   history_id INTEGER PRIMARY KEY AUTOINCREMENT,
   id INTEGER,
   original_url TEXT,
+  title TEXT,
   created_at INTEGER,
   created_by INTEGER,
   history_created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -143,15 +145,15 @@ CREATE TABLE IF NOT EXISTS destinations_history (
 CREATE TRIGGER IF NOT EXISTS destinations_history_update
 AFTER UPDATE ON destinations
 BEGIN
-  INSERT INTO destinations_history (id, original_url, created_at, created_by)
-  VALUES (OLD.id, OLD.original_url, OLD.created_at, OLD.created_by);
+  INSERT INTO destinations_history (id, original_url, title, created_at, created_by)
+  VALUES (OLD.id, OLD.original_url, OLD.title, OLD.created_at, OLD.created_by);
 END;
 
 CREATE TRIGGER IF NOT EXISTS destinations_history_delete
 AFTER DELETE ON destinations
 BEGIN
-  INSERT INTO destinations_history (id, original_url, created_at, created_by)
-  VALUES (OLD.id, OLD.original_url, OLD.created_at, OLD.created_by);
+  INSERT INTO destinations_history (id, original_url, title, created_at, created_by)
+  VALUES (OLD.id, OLD.original_url, OLD.title, OLD.created_at, OLD.created_by);
 END;
 
 CREATE TABLE IF NOT EXISTS login_events_history (

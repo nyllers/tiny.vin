@@ -8,9 +8,17 @@ async function fetchJsonOrNull(url) {
   }
 }
 
-function createOriginalUrlRow(originalUrl) {
+function createOriginalUrlRow(originalUrl, title) {
   const row = document.createElement("div");
   row.className = "url-card-row";
+
+  if (title) {
+    const titleEl = document.createElement("span");
+    titleEl.className = "url-card-title";
+    titleEl.textContent = title;
+    row.append(titleEl);
+  }
+
   const value = document.createElement("span");
   value.className = "url-card-value url-card-value--original";
   value.title = originalUrl;
