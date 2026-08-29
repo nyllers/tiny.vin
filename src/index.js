@@ -366,6 +366,20 @@ async function findOrCreateDestination(env, { originalUrl, createdBy }) {
 const TITLE_PATTERN = /<title[^>]*>([\s\S]*?)<\/title>/i;
 const TITLE_FETCH_MAX_BYTES = 1048576;
 
+// Best-effort fallback when a page has no fetchable <title> - a direct
+// file download, an auth-gated page, a site blocking automated requests -
+// so a card never shows a completely bare original URL. Falls back to the
+// last non-empty path segment, ignoring the query string.
+function deriveFallbackTitle(url) {
+  try {
+    const segments = new URL(url).pathname.split("/").filter(Boolean);
+    if (segments.length === 0) return null;
+    return decodeURIComponent(segments[segments.length - 1]);
+  } catch {
+    return null;
+  }
+}
+
 function decodeHtmlEntities(text) {
   return text
     .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
@@ -497,7 +511,7 @@ async function createUrlRedirect(url, body, env, session) {
 
   const destination = await findOrCreateDestination(env, { originalUrl: validation.url, createdBy });
   if (destination.title === null) {
-    const title = await fetchPageTitle(validation.url);
+    const title = (await fetchPageTitle(validation.url)) || deriveFallbackTitle(validation.url);
     if (title) {
       await env.DB.prepare("UPDATE destinations SET title = ? WHERE id = ?").bind(title, destination.id).run();
     }
@@ -1159,6 +1173,9 @@ async function createEmailRedirectRow(env, { alias, destination, createdBy }) {
 
   try {
     const destinationResult = await findOrCreateDestination(env, { originalUrl: destination, createdBy });
+    if (destinationResult.title === null) {
+      await env.DB.prepare("UPDATE destinations SET title = ? WHERE id = ?").bind(destination, destinationResult.id).run();
+    }
     await insertAlias(env, { code: alias, kind: "email", destinationId: destinationResult.id, createdBy, cloudflareRuleId: ruleId });
   } catch {
     await deleteWorkerEmailRule(env, ruleId).catch(() => {});
@@ -1304,7 +1321,7 @@ async function handleListRedirects(env, session) {
 
   const redirects = grouped.map((group) => {
     const kind = group.items[0].kind === "email" ? "email" : "url";
-    return { ...group, kind, title: kind === "url" ? titleByDestination.get(group.destination) || null : null };
+    return { ...group, kind, title: titleByDestination.get(group.destination) || null };
   });
 
   return jsonResponse({ redirects });

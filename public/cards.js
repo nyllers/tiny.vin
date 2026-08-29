@@ -27,6 +27,16 @@ function createOriginalUrlRow(originalUrl, title) {
   return row;
 }
 
+function createTitleOnlyRow(title) {
+  const row = document.createElement("div");
+  row.className = "url-card-row";
+  const titleEl = document.createElement("span");
+  titleEl.className = "url-card-title";
+  titleEl.textContent = title;
+  row.append(titleEl);
+  return row;
+}
+
 function packMasonryRows(grid) {
   const style = window.getComputedStyle(grid);
   const rowHeight = parseFloat(style.gridAutoRows) || 1;
