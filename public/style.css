@@ -599,6 +599,14 @@ footer {
   text-align: center;
 }
 
+.url-card-title {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-align: center;
+  word-break: break-word;
+}
+
 .url-card-copy-row {
   display: flex;
   align-items: center;

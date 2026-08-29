@@ -335,10 +335,10 @@ async function insertAlias(env, { code, kind, destinationId, createdBy, cloudfla
 // Path", two open tabs) - on that failure, re-select and return the
 // winner's row instead of surfacing the raw constraint violation.
 async function findOrCreateDestination(env, { originalUrl, createdBy }) {
-  const existing = await env.DB.prepare("SELECT id FROM destinations WHERE original_url = ? AND created_by = ?")
+  const existing = await env.DB.prepare("SELECT id, title FROM destinations WHERE original_url = ? AND created_by = ?")
     .bind(originalUrl, createdBy)
     .first();
-  if (existing) return existing.id;
+  if (existing) return existing;
 
   try {
     const result = await env.DB.prepare(
@@ -346,13 +346,72 @@ async function findOrCreateDestination(env, { originalUrl, createdBy }) {
     )
       .bind(originalUrl, Date.now(), createdBy)
       .run();
-    return result.meta.last_row_id;
+    return { id: result.meta.last_row_id, title: null };
   } catch (err) {
-    const winner = await env.DB.prepare("SELECT id FROM destinations WHERE original_url = ? AND created_by = ?")
+    const winner = await env.DB.prepare("SELECT id, title FROM destinations WHERE original_url = ? AND created_by = ?")
       .bind(originalUrl, createdBy)
       .first();
-    if (winner) return winner.id;
+    if (winner) return winner;
     throw err;
+  }
+}
+
+// Reads just enough of the page to find <title> (always near the top of
+// <head>), rather than downloading the whole response - a page's size is
+// otherwise unbounded and this runs synchronously in the create-redirect
+// request. Best-effort: any failure (timeout, no title tag, non-HTML
+// response) yields null rather than blocking redirect creation.
+const TITLE_PATTERN = /<title[^>]*>([\s\S]*?)<\/title>/i;
+const TITLE_FETCH_MAX_BYTES = 65536;
+
+function decodeHtmlEntities(text) {
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, " ");
+}
+
+async function fetchPageTitle(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      redirect: "follow",
+      headers: { "user-agent": "Mozilla/5.0 (compatible; TinyVINBot/1.0; +https://tiny.vin)" },
+      signal: controller.signal,
+    });
+    if (!response.ok || !response.body) return null;
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let html = "";
+    let bytesRead = 0;
+    try {
+      while (bytesRead < TITLE_FETCH_MAX_BYTES) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytesRead += value.length;
+        html += decoder.decode(value, { stream: true });
+        if (TITLE_PATTERN.test(html)) break;
+      }
+    } finally {
+      reader.cancel().catch(() => {});
+    }
+
+    const match = html.match(TITLE_PATTERN);
+    if (!match) return null;
+
+    const title = decodeHtmlEntities(match[1]).replace(/\s+/g, " ").trim();
+    return title || null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -433,7 +492,14 @@ async function createUrlRedirect(url, body, env, session) {
     subdomainCode = subdomainValidation.code;
   }
 
-  const destinationId = await findOrCreateDestination(env, { originalUrl: validation.url, createdBy });
+  const destination = await findOrCreateDestination(env, { originalUrl: validation.url, createdBy });
+  if (destination.title === null) {
+    const title = await fetchPageTitle(validation.url);
+    if (title) {
+      await env.DB.prepare("UPDATE destinations SET title = ? WHERE id = ?").bind(title, destination.id).run();
+    }
+  }
+  const destinationId = destination.id;
 
   if (subdomainCode) {
     try {
@@ -1089,8 +1155,8 @@ async function createEmailRedirectRow(env, { alias, destination, createdBy }) {
   }
 
   try {
-    const destinationId = await findOrCreateDestination(env, { originalUrl: destination, createdBy });
-    await insertAlias(env, { code: alias, kind: "email", destinationId, createdBy, cloudflareRuleId: ruleId });
+    const destinationResult = await findOrCreateDestination(env, { originalUrl: destination, createdBy });
+    await insertAlias(env, { code: alias, kind: "email", destinationId: destinationResult.id, createdBy, cloudflareRuleId: ruleId });
   } catch {
     await deleteWorkerEmailRule(env, ruleId).catch(() => {});
     return { error: "conflict" };
@@ -1199,7 +1265,7 @@ async function handleListRedirects(env, session) {
   const identityId = await getIdentityId(env, session.email);
 
   const { results } = await env.DB.prepare(
-    `SELECT a.code, a.kind, d.original_url, a.created_at
+    `SELECT a.code, a.kind, d.original_url, d.title, a.created_at
      FROM aliases a
      JOIN destinations d ON d.id = a.destination_id
      WHERE a.created_by = ?
@@ -1207,6 +1273,8 @@ async function handleListRedirects(env, session) {
   )
     .bind(identityId)
     .all();
+
+  const titleByDestination = new Map(results.map((row) => [row.original_url, row.title]));
 
   let verifiedDestinations = null;
   if (hasCloudflareApiCredentials(env)) {
@@ -1231,10 +1299,10 @@ async function handleListRedirects(env, session) {
     "items"
   );
 
-  const redirects = grouped.map((group) => ({
-    ...group,
-    kind: group.items[0].kind === "email" ? "email" : "url",
-  }));
+  const redirects = grouped.map((group) => {
+    const kind = group.items[0].kind === "email" ? "email" : "url";
+    return { ...group, kind, title: kind === "url" ? titleByDestination.get(group.destination) || null : null };
+  });
 
   return jsonResponse({ redirects });
 }
