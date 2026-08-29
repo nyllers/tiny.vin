@@ -372,7 +372,7 @@ function createEmailCard(group, justCreatedAlias) {
   card.className = "url-card";
   card.dataset.kind = "email";
 
-  const destinationRow = createOriginalUrlRow(group.destination);
+  const destinationRow = createTitleOnlyRow(group.title || group.destination);
 
   const row = document.createElement("div");
   row.className = "url-card-row url-card-row--tiny";
