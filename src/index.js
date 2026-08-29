@@ -356,13 +356,15 @@ async function findOrCreateDestination(env, { originalUrl, createdBy }) {
   }
 }
 
-// Reads just enough of the page to find <title> (always near the top of
-// <head>), rather than downloading the whole response - a page's size is
-// otherwise unbounded and this runs synchronously in the create-redirect
-// request. Best-effort: any failure (timeout, no title tag, non-HTML
-// response) yields null rather than blocking redirect creation.
+// Reads just enough of the page to find <title>, rather than downloading
+// the whole response - a page's size is otherwise unbounded and this runs
+// synchronously in the create-redirect request. The read stops as soon as
+// <title> is matched, so the cap only matters for pages (e.g. YouTube)
+// that front-load <head> with large inline scripts before <title>.
+// Best-effort: any failure (timeout, no title tag, non-HTML response)
+// yields null rather than blocking redirect creation.
 const TITLE_PATTERN = /<title[^>]*>([\s\S]*?)<\/title>/i;
-const TITLE_FETCH_MAX_BYTES = 65536;
+const TITLE_FETCH_MAX_BYTES = 1048576;
 
 function decodeHtmlEntities(text) {
   return text
