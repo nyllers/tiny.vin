@@ -241,7 +241,7 @@ function createUrlCard(group, justCreatedCode) {
   card.className = "url-card";
   card.dataset.kind = "url";
 
-  const originalRow = createOriginalUrlRow(group.destination, group.title);
+  const originalRow = createOriginalUrlRow(group.destination, group.title, { editable: true });
 
   const shortRow = document.createElement("div");
   shortRow.className = "url-card-row url-card-row--tiny";
