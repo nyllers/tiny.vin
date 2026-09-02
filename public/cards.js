@@ -8,11 +8,72 @@ async function fetchJsonOrNull(url) {
   }
 }
 
-function createOriginalUrlRow(originalUrl, title) {
+function createEditTitleButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-btn edit-title-btn";
+  button.title = "Edit title";
+  button.setAttribute("aria-label", "Edit title");
+  button.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 20h9"/>
+    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+  </svg>`;
+  return button;
+}
+
+// Self-contained: fetches/persists the title itself (PATCH
+// /api/redirects/title) rather than bubbling a callback up to the caller,
+// since every caller wants the same behavior - update the title in place,
+// no full list reload needed.
+function createEditableTitleRow(originalUrl, initialTitle) {
+  const container = document.createElement("span");
+  container.className = "url-card-title-row";
+  let title = initialTitle;
+
+  function showDisplay() {
+    container.textContent = "";
+    const titleEl = document.createElement("span");
+    titleEl.className = title ? "url-card-title" : "url-card-title url-card-title--placeholder";
+    titleEl.textContent = title || "Add a title";
+    container.append(titleEl);
+
+    const editBtn = createEditTitleButton();
+    editBtn.addEventListener("click", showEditor);
+    container.append(editBtn);
+  }
+
+  function showEditor() {
+    container.textContent = "";
+    const inputRow = createInlineCodeInputRow({
+      endpoint: "/api/redirects/title",
+      method: "PATCH",
+      buildBody: (value) => ({ destination: originalUrl, title: value }),
+      prefixText: null,
+      suffixText: null,
+      placeholder: "Add a title",
+      initialValue: title || "",
+      onSuccess: async (response) => {
+        const data = await response.json();
+        title = data.title;
+        showDisplay();
+      },
+      onCancel: showDisplay,
+    });
+    container.append(inputRow);
+    inputRow.querySelector("input").focus();
+  }
+
+  showDisplay();
+  return container;
+}
+
+function createOriginalUrlRow(originalUrl, title, { editable = false } = {}) {
   const row = document.createElement("div");
   row.className = "url-card-row";
 
-  if (title) {
+  if (editable) {
+    row.append(createEditableTitleRow(originalUrl, title));
+  } else if (title) {
     const titleEl = document.createElement("span");
     titleEl.className = "url-card-title";
     titleEl.textContent = title;
@@ -220,7 +281,17 @@ function createSaveSuffixButton() {
   return button;
 }
 
-function createInlineCodeInputRow({ endpoint, buildBody, prefixText, suffixText, placeholder, onSuccess, onCancel }) {
+function createInlineCodeInputRow({
+  endpoint,
+  method = "POST",
+  buildBody,
+  prefixText,
+  suffixText,
+  placeholder,
+  initialValue = "",
+  onSuccess,
+  onCancel,
+}) {
   const wrapper = document.createElement("div");
   wrapper.className = "url-card-suffix-wrapper";
 
@@ -238,6 +309,7 @@ function createInlineCodeInputRow({ endpoint, buildBody, prefixText, suffixText,
   input.type = "text";
   input.className = "url-card-suffix-input";
   input.placeholder = placeholder;
+  input.value = initialValue;
   row.append(input);
 
   if (suffixText) {
@@ -273,7 +345,7 @@ function createInlineCodeInputRow({ endpoint, buildBody, prefixText, suffixText,
 
     try {
       const response = await fetch(endpoint, {
-        method: "POST",
+        method,
         headers: { "content-type": "application/json" },
         body: JSON.stringify(buildBody(value)),
       });

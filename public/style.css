@@ -607,6 +607,24 @@ footer {
   word-break: break-word;
 }
 
+.url-card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 100%;
+}
+
+.url-card-title--placeholder {
+  color: var(--muted);
+  font-weight: 400;
+  font-style: italic;
+}
+
+.icon-btn.edit-title-btn {
+  flex-shrink: 0;
+}
+
 .url-card-copy-row {
   display: flex;
   align-items: center;

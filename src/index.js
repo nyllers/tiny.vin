@@ -1327,6 +1327,49 @@ async function handleListRedirects(env, session) {
   return jsonResponse({ redirects });
 }
 
+const MAX_TITLE_LENGTH = 300;
+
+// Lets a signed-in account override a URL destination's title by hand -
+// e.g. when the auto-fetched <title> is wrong, stale, or the fallback
+// path-based title isn't meaningful. Scoped to URL destinations only (the
+// `a.kind != 'email'` check): an e-mail destination's title is always its
+// own address (see createEmailRedirectRow) and e-mail cards render only
+// that title with no separate address line beneath it, so letting this
+// endpoint touch an e-mail destination would make its real address
+// disappear from the card entirely. An empty title clears back to no
+// title rather than being rejected, mirroring how a failed auto-fetch
+// already leaves it NULL.
+async function handleUpdateRedirectTitle(request, env, session) {
+  const identityId = await getIdentityId(env, session.email);
+  if (!identityId) return jsonResponse({ error: "Redirect not found." }, 404);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid request body." }, 400);
+  }
+
+  const destination = typeof body.destination === "string" ? body.destination : "";
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  if (!destination) return jsonResponse({ error: "Missing destination." }, 400);
+  if (title.length > MAX_TITLE_LENGTH) {
+    return jsonResponse({ error: `Title must be ${MAX_TITLE_LENGTH} characters or fewer.` }, 400);
+  }
+
+  const result = await env.DB.prepare(
+    `UPDATE destinations SET title = ?
+     WHERE original_url = ? AND created_by = ?
+       AND EXISTS (SELECT 1 FROM aliases a WHERE a.destination_id = destinations.id AND a.kind != 'email')`
+  )
+    .bind(title || null, destination, identityId)
+    .run();
+
+  if (result.meta.changes === 0) return jsonResponse({ error: "Redirect not found." }, 404);
+
+  return jsonResponse({ title: title || null });
+}
+
 async function handleDeleteEmailRedirect(alias, env, session) {
   const identityId = await getIdentityId(env, session.email);
 
@@ -1536,6 +1579,10 @@ const SIMPLE_ROUTES = new Map([
     { auth: withAuthOrApiKey, run: (request, env, session) => handleCreateRedirect(request, env, session) },
   ],
   ["GET /api/redirects", { auth: withAuthOrApiKey, run: (request, env, session) => handleListRedirects(env, session) }],
+  [
+    "PATCH /api/redirects/title",
+    { auth: withAuthOrApiKey, run: (request, env, session) => handleUpdateRedirectTitle(request, env, session) },
+  ],
   ["GET /api/keys", { auth: withAuth, run: (request, env, session) => handleGetApiKey(env, session) }],
   ["POST /api/keys", { auth: withAuth, run: (request, env, session) => handleCreateApiKey(env, session) }],
   ["GET /api/stats", { auth: withAuth, run: (request, env, session) => handleStats(env, session) }],
@@ -1643,6 +1690,12 @@ async function handleFetch(request, env, ctx) {
 
   return env.ASSETS.fetch(request);
 }
+
+// Exported for unit tests only (test/index.test.js) - pure, network- and
+// D1-independent functions that have a track record of hiding real bugs
+// (see git history for the numeric-HTML-entity decoding fix and the
+// title-fetch byte cap). Not used by any other module.
+export { decodeHtmlEntities, deriveFallbackTitle, validateDestinationEmail, validateSubdomain, validateEmailAlias, formatShortUrl };
 
 export default {
   async fetch(request, env, ctx) {
