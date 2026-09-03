@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   decodeHtmlEntities,
   deriveFallbackTitle,
+  fetchPageTitle,
   validateDestinationEmail,
   validateSubdomain,
   validateEmailAlias,
@@ -62,6 +63,36 @@ test("deriveFallbackTitle", async (t) => {
 
   await t.test("returns null for an unparseable URL", () => {
     assert.equal(deriveFallbackTitle("not a url"), null);
+  });
+});
+
+test("fetchPageTitle", async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  await t.test("extracts and decodes the <title> tag", async () => {
+    globalThis.fetch = async () =>
+      new Response("<html><head><title>Caroline&#39;s Cooking</title></head></html>", { status: 200 });
+    assert.equal(await fetchPageTitle("https://example.com"), "Caroline's Cooking");
+  });
+
+  await t.test("returns null for a non-ok response", async () => {
+    globalThis.fetch = async () => new Response("", { status: 404 });
+    assert.equal(await fetchPageTitle("https://example.com"), null);
+  });
+
+  await t.test("returns null when no <title> tag is present", async () => {
+    globalThis.fetch = async () => new Response("<html><body>no title here</body></html>", { status: 200 });
+    assert.equal(await fetchPageTitle("https://example.com"), null);
+  });
+
+  await t.test("returns null when the fetch itself throws", async () => {
+    globalThis.fetch = async () => {
+      throw new Error("network down");
+    };
+    assert.equal(await fetchPageTitle("https://example.com"), null);
   });
 });
 

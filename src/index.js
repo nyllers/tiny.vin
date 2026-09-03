@@ -1324,7 +1324,7 @@ async function handleListRedirects(env, session) {
     return { ...group, kind, title: titleByDestination.get(group.destination) || null };
   });
 
-  return jsonResponse({ redirects });
+  return jsonResponse({ redirects, maxTitleLength: MAX_TITLE_LENGTH });
 }
 
 const MAX_TITLE_LENGTH = 300;
