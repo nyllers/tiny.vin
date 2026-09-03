@@ -21,6 +21,9 @@ function createEditTitleButton() {
   return button;
 }
 
+// Keep in sync with MAX_TITLE_LENGTH in src/index.js.
+const MAX_TITLE_LENGTH = 300;
+
 // Self-contained: fetches/persists the title itself (PATCH
 // /api/redirects/title) rather than bubbling a callback up to the caller,
 // since every caller wants the same behavior - update the title in place,
@@ -29,6 +32,15 @@ function createEditableTitleRow(originalUrl, initialTitle) {
   const container = document.createElement("span");
   container.className = "url-card-title-row";
   let title = initialTitle;
+
+  // Editing a title changes the row's height (a longer/shorter title, or
+  // swapping in the input row), which the masonry grid's cached
+  // grid-row-end span doesn't know about on its own - repack after every
+  // render so the card never overlaps its neighbors.
+  function repackGrid() {
+    const grid = container.closest(".url-cards");
+    if (grid) packMasonryRows(grid);
+  }
 
   function showDisplay() {
     container.textContent = "";
@@ -40,6 +52,7 @@ function createEditableTitleRow(originalUrl, initialTitle) {
     const editBtn = createEditTitleButton();
     editBtn.addEventListener("click", showEditor);
     container.append(editBtn);
+    repackGrid();
   }
 
   function showEditor() {
@@ -52,6 +65,8 @@ function createEditableTitleRow(originalUrl, initialTitle) {
       suffixText: null,
       placeholder: "Add a title",
       initialValue: title || "",
+      maxLength: MAX_TITLE_LENGTH,
+      allowEmptySubmit: true,
       onSuccess: async (response) => {
         const data = await response.json();
         title = data.title;
@@ -61,6 +76,7 @@ function createEditableTitleRow(originalUrl, initialTitle) {
     });
     container.append(inputRow);
     inputRow.querySelector("input").focus();
+    repackGrid();
   }
 
   showDisplay();
@@ -289,6 +305,8 @@ function createInlineCodeInputRow({
   suffixText,
   placeholder,
   initialValue = "",
+  maxLength,
+  allowEmptySubmit = false,
   onSuccess,
   onCancel,
 }) {
@@ -310,6 +328,7 @@ function createInlineCodeInputRow({
   input.className = "url-card-suffix-input";
   input.placeholder = placeholder;
   input.value = initialValue;
+  if (maxLength) input.maxLength = maxLength;
   row.append(input);
 
   if (suffixText) {
@@ -327,15 +346,15 @@ function createInlineCodeInputRow({
   error.className = "url-card-suffix-error";
 
   function updateSaveButtonLabel() {
-    const hasValue = Boolean(input.value.trim());
-    saveBtnLabel.textContent = hasValue ? "Save" : "Cancel";
-    saveBtn.classList.toggle("save-btn", hasValue);
-    saveBtn.classList.toggle("cancel-btn", !hasValue);
+    const showSave = Boolean(input.value.trim()) || allowEmptySubmit;
+    saveBtnLabel.textContent = showSave ? "Save" : "Cancel";
+    saveBtn.classList.toggle("save-btn", showSave);
+    saveBtn.classList.toggle("cancel-btn", !showSave);
   }
 
   async function submitValue() {
     const value = input.value.trim();
-    if (!value) {
+    if (!value && !allowEmptySubmit) {
       onCancel();
       return;
     }
