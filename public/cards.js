@@ -21,14 +21,13 @@ function createEditTitleButton() {
   return button;
 }
 
-// Keep in sync with MAX_TITLE_LENGTH in src/index.js.
-const MAX_TITLE_LENGTH = 300;
-
 // Self-contained: fetches/persists the title itself (PATCH
 // /api/redirects/title) rather than bubbling a callback up to the caller,
 // since every caller wants the same behavior - update the title in place,
-// no full list reload needed.
-function createEditableTitleRow(originalUrl, initialTitle) {
+// no full list reload needed. `maxTitleLength` comes from the server (see
+// loadRedirects in script.js) rather than being hardcoded here a second
+// time, with 300 as a fallback only if that field is ever missing.
+function createEditableTitleRow(originalUrl, initialTitle, maxTitleLength = 300) {
   const container = document.createElement("span");
   container.className = "url-card-title-row";
   let title = initialTitle;
@@ -36,10 +35,15 @@ function createEditableTitleRow(originalUrl, initialTitle) {
   // Editing a title changes the row's height (a longer/shorter title, or
   // swapping in the input row), which the masonry grid's cached
   // grid-row-end span doesn't know about on its own - repack after every
-  // render so the card never overlaps its neighbors.
+  // render so the card never overlaps its neighbors. Deferred a frame so it
+  // never fights a just-triggered focus scroll, and re-resolves the grid
+  // lazily in case the card was detached (e.g. by an unrelated full list
+  // reload) between scheduling and running.
   function repackGrid() {
-    const grid = container.closest(".url-cards");
-    if (grid) packMasonryRows(grid);
+    requestAnimationFrame(() => {
+      const grid = container.closest(".url-cards");
+      if (grid) packMasonryRows(grid);
+    });
   }
 
   function showDisplay() {
@@ -65,10 +69,15 @@ function createEditableTitleRow(originalUrl, initialTitle) {
       suffixText: null,
       placeholder: "Add a title",
       initialValue: title || "",
-      maxLength: MAX_TITLE_LENGTH,
+      maxLength: maxTitleLength,
       allowEmptySubmit: true,
       onSuccess: async (response) => {
         const data = await response.json();
+        // The card can have been torn down and rebuilt from scratch (e.g. a
+        // full loadRedirects() triggered by an unrelated action elsewhere on
+        // the page) while this request was in flight - skip mutating/
+        // repacking a copy the user can no longer see.
+        if (!container.isConnected) return;
         title = data.title;
         showDisplay();
       },
@@ -83,12 +92,12 @@ function createEditableTitleRow(originalUrl, initialTitle) {
   return container;
 }
 
-function createOriginalUrlRow(originalUrl, title, { editable = false } = {}) {
+function createOriginalUrlRow(originalUrl, title, { editable = false, maxTitleLength } = {}) {
   const row = document.createElement("div");
   row.className = "url-card-row";
 
   if (editable) {
-    row.append(createEditableTitleRow(originalUrl, title));
+    row.append(createEditableTitleRow(originalUrl, title, maxTitleLength));
   } else if (title) {
     const titleEl = document.createElement("span");
     titleEl.className = "url-card-title";
@@ -297,6 +306,29 @@ function createSaveSuffixButton() {
   return button;
 }
 
+// Only shown when allowEmptySubmit is set (see createInlineCodeInputRow):
+// once an empty field is a legitimate value to submit, the Save/Cancel
+// button can no longer double as a "back out" affordance for an empty
+// field, so this gives editing flows an explicit, always-visible way to
+// discard changes without saving.
+function createCancelEditButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-btn cancel-edit-btn";
+  button.title = "Cancel";
+  button.setAttribute("aria-label", "Cancel editing");
+  button.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+    <path d="M18 6 6 18"/>
+    <path d="M6 6l12 12"/>
+  </svg>`;
+  return button;
+}
+
+// Serves two jobs, distinguished by allowEmptySubmit: creating a brand-new
+// suffixed value (add path/subdomain/alias - default false, so an empty
+// field just cancels, nothing to create) and editing an existing free-text
+// value where empty is itself a meaningful, submittable choice (edit title
+// - true, since an empty title clears it back to none).
 function createInlineCodeInputRow({
   endpoint,
   method = "POST",
@@ -328,7 +360,14 @@ function createInlineCodeInputRow({
   input.className = "url-card-suffix-input";
   input.placeholder = placeholder;
   input.value = initialValue;
-  if (maxLength) input.maxLength = maxLength;
+  // maxLength alone doesn't retroactively trim a pre-filled value that's
+  // already longer than it (the DOM attribute only constrains future
+  // typing/pasting) - truncate up front so a value that predates this cap
+  // doesn't fail an untouched Save.
+  if (maxLength) {
+    input.maxLength = maxLength;
+    if (input.value.length > maxLength) input.value = input.value.slice(0, maxLength);
+  }
   row.append(input);
 
   if (suffixText) {
@@ -342,8 +381,33 @@ function createInlineCodeInputRow({
   const saveBtnLabel = saveBtn.querySelector("span");
   row.append(saveBtn);
 
+  if (allowEmptySubmit) {
+    const cancelBtn = createCancelEditButton();
+    cancelBtn.addEventListener("click", () => {
+      dismissed = true;
+      onCancel();
+    });
+    row.append(cancelBtn);
+  }
+
   const error = document.createElement("p");
   error.className = "url-card-suffix-error";
+
+  // A card can be replaced (a full loadRedirects() elsewhere) or explicitly
+  // cancelled while a submit is in flight - once true, the pending
+  // request's resolution is a no-op rather than reviving a dismissed edit.
+  let dismissed = false;
+
+  // Height changes here (the error message appearing/clearing) aren't
+  // covered by a caller-side repack the way title-editing's own
+  // display/editor swap is - repack locally so every user of this shared
+  // input row gets the same masonry fix.
+  function repackGrid() {
+    requestAnimationFrame(() => {
+      const grid = wrapper.closest(".url-cards");
+      if (grid) packMasonryRows(grid);
+    });
+  }
 
   function updateSaveButtonLabel() {
     const showSave = Boolean(input.value.trim()) || allowEmptySubmit;
@@ -355,12 +419,14 @@ function createInlineCodeInputRow({
   async function submitValue() {
     const value = input.value.trim();
     if (!value && !allowEmptySubmit) {
+      dismissed = true;
       onCancel();
       return;
     }
 
     saveBtn.disabled = true;
     error.textContent = "";
+    repackGrid();
 
     try {
       const response = await fetch(endpoint, {
@@ -369,17 +435,22 @@ function createInlineCodeInputRow({
         body: JSON.stringify(buildBody(value)),
       });
 
+      if (dismissed) return;
+
       if (!response.ok) {
         const data = await response.json();
         error.textContent = data.error || "Something went wrong.";
         saveBtn.disabled = false;
+        repackGrid();
         return;
       }
 
       await onSuccess(response);
     } catch {
+      if (dismissed) return;
       error.textContent = "Network error, try again.";
       saveBtn.disabled = false;
+      repackGrid();
     }
   }
 
@@ -387,7 +458,10 @@ function createInlineCodeInputRow({
   input.addEventListener("input", updateSaveButtonLabel);
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") submitValue();
-    if (event.key === "Escape") onCancel();
+    if (event.key === "Escape") {
+      dismissed = true;
+      onCancel();
+    }
   });
   updateSaveButtonLabel();
 

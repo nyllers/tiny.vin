@@ -236,12 +236,25 @@ async function generatePathForGroup(group) {
   }
 }
 
-function createUrlCard(group, justCreatedCode) {
+// Swapping a card's action buttons for an input row (and back) changes its
+// height without going through loadRedirects()'s full grid rebuild, so the
+// masonry grid's cached row span goes stale the same way an in-place title
+// edit does - repack after every such swap. Deferred a frame so it doesn't
+// fight a just-triggered focus scroll, and re-resolves the grid lazily in
+// case the card was detached in the meantime.
+function repackCardGrid(card) {
+  requestAnimationFrame(() => {
+    const grid = card.closest(".url-cards");
+    if (grid) packMasonryRows(grid);
+  });
+}
+
+function createUrlCard(group, justCreatedCode, maxTitleLength) {
   const card = document.createElement("div");
   card.className = "url-card";
   card.dataset.kind = "url";
 
-  const originalRow = createOriginalUrlRow(group.destination, group.title, { editable: true });
+  const originalRow = createOriginalUrlRow(group.destination, group.title, { editable: true, maxTitleLength });
 
   const shortRow = document.createElement("div");
   shortRow.className = "url-card-row url-card-row--tiny";
@@ -258,6 +271,7 @@ function createUrlCard(group, justCreatedCode) {
   function showActionButtons() {
     actionsContainer.textContent = "";
     actionsContainer.append(generatePathBtn, addPathBtn, addSubdomainBtn);
+    repackCardGrid(card);
   }
 
   generatePathBtn.addEventListener("click", () => {
@@ -269,6 +283,7 @@ function createUrlCard(group, justCreatedCode) {
     const inputRow = createSuffixInputRow(group, showActionButtons);
     actionsContainer.appendChild(inputRow);
     inputRow.querySelector("input").focus();
+    repackCardGrid(card);
   });
 
   addSubdomainBtn.addEventListener("click", () => {
@@ -276,6 +291,7 @@ function createUrlCard(group, justCreatedCode) {
     const inputRow = createSubdomainInputRow(group, showActionButtons);
     actionsContainer.appendChild(inputRow);
     inputRow.querySelector("input").focus();
+    repackCardGrid(card);
   });
 
   showActionButtons();
@@ -387,6 +403,7 @@ function createEmailCard(group, justCreatedAlias) {
   function showActionButton() {
     actionsContainer.textContent = "";
     actionsContainer.append(addAliasBtn);
+    repackCardGrid(card);
   }
 
   addAliasBtn.addEventListener("click", () => {
@@ -394,6 +411,7 @@ function createEmailCard(group, justCreatedAlias) {
     const inputRow = createAliasInputRow(group, showActionButton);
     actionsContainer.appendChild(inputRow);
     inputRow.querySelector("input").focus();
+    repackCardGrid(card);
   });
 
   showActionButton();
@@ -432,7 +450,9 @@ async function loadRedirects({ justCreatedCode, justCreatedAlias } = {}) {
 
   panel.hidden = false;
   const cardElements = allGroups.map((group) =>
-    group.kind === "url" ? createUrlCard(group, justCreatedCode) : createEmailCard(group, justCreatedAlias)
+    group.kind === "url"
+      ? createUrlCard(group, justCreatedCode, data.maxTitleLength)
+      : createEmailCard(group, justCreatedAlias)
   );
   container.append(createCardsGrid(cardElements));
   applyRedirectFilter();
