@@ -1341,7 +1341,6 @@ const MAX_TITLE_LENGTH = 300;
 // already leaves it NULL.
 async function handleUpdateRedirectTitle(request, env, session) {
   const identityId = await getIdentityId(env, session.email);
-  if (!identityId) return jsonResponse({ error: "Redirect not found." }, 404);
 
   let body;
   try {
@@ -1691,11 +1690,18 @@ async function handleFetch(request, env, ctx) {
   return env.ASSETS.fetch(request);
 }
 
-// Exported for unit tests only (test/index.test.js) - pure, network- and
-// D1-independent functions that have a track record of hiding real bugs
-// (see git history for the numeric-HTML-entity decoding fix and the
-// title-fetch byte cap). Not used by any other module.
-export { decodeHtmlEntities, deriveFallbackTitle, validateDestinationEmail, validateSubdomain, validateEmailAlias, formatShortUrl };
+// Exported for unit tests (test/index.test.js) and for scripts/backfill-titles.js
+// to import rather than re-implement - decodeHtmlEntities and fetchPageTitle's
+// byte cap have each already hidden a real bug once (see git history).
+export {
+  decodeHtmlEntities,
+  deriveFallbackTitle,
+  fetchPageTitle,
+  validateDestinationEmail,
+  validateSubdomain,
+  validateEmailAlias,
+  formatShortUrl,
+};
 
 export default {
   async fetch(request, env, ctx) {
