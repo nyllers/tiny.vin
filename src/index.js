@@ -13,7 +13,7 @@ const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 const UPPERCASE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const CODE_LENGTH = 8;
 const MAX_ATTEMPTS = 5;
-const CODE_PATTERN = /^\/([A-Za-z0-9]{1,32})$/;
+const CODE_PATTERN = /^\/([A-Za-z0-9-]{1,32})$/;
 const SUBDOMAIN_REDIRECT_PATTERN = /^\/subdomain\/([a-z0-9-]{1,63})$/;
 const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
 const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9-]+)$/;
@@ -109,6 +109,67 @@ function generateCode() {
     }
   }
   return code;
+}
+
+const TITLE_SLUG_MIN_LENGTH = 6;
+const TITLE_SLUG_MAX_LENGTH = 32;
+
+// Builds a readable short code from a page title, or returns null when the
+// title doesn't qualify (the caller then falls back to a random code):
+//   - the title must be pure ASCII and at least 6 characters long
+//   - words are whitespace-separated, with everything but letters, digits
+//     and hyphens stripped from each (repeated/edge hyphens collapsed) and
+//     the result lowercased, so "IANA-managed" stays "iana-managed"
+//   - first word >= 6 chars: just that word
+//   - else first two words joined with a hyphen, if that's >= 6 chars
+//   - else first three words joined with hyphens
+// Only one candidate is ever produced - if it turns out to be taken, the
+// caller goes straight to a random code rather than trying the next form.
+function deriveTitleSlug(title) {
+  if (typeof title !== "string") return null;
+
+  const trimmed = title.trim();
+  if (trimmed.length < TITLE_SLUG_MIN_LENGTH || !/^[\x00-\x7F]+$/.test(trimmed)) return null;
+
+  const [first, second, third] = trimmed
+    .split(/\s+/)
+    .map((word) =>
+      word
+        .replace(/[^A-Za-z0-9-]/g, "")
+        .replace(/-{2,}/g, "-")
+        .replace(/^-|-$/g, "")
+        .toLowerCase()
+    )
+    .filter(Boolean);
+  if (!first) return null;
+
+  let slug;
+  if (first.length >= TITLE_SLUG_MIN_LENGTH) {
+    slug = first;
+  } else if (second && `${first}-${second}`.length >= TITLE_SLUG_MIN_LENGTH) {
+    slug = `${first}-${second}`;
+  } else if (second && third) {
+    slug = `${first}-${second}-${third}`;
+  } else {
+    return null;
+  }
+
+  return slug.length <= TITLE_SLUG_MAX_LENGTH ? slug : null;
+}
+
+// A path code is taken if it's reserved or already used by either kind of
+// path alias. (code, kind) is only unique per kind, so a generated "github"
+// and a custom "github" could otherwise coexist and /github would resolve to
+// whichever row the lookup happens to return first.
+async function pathCodeIsTaken(env, code) {
+  if (RESERVED_CODES.has(code.toLowerCase())) return true;
+
+  const row = await env.DB.prepare(
+    "SELECT 1 AS taken FROM aliases WHERE code = ? AND kind IN ('generated-path', 'custom-path') LIMIT 1"
+  )
+    .bind(code)
+    .first();
+  return Boolean(row);
 }
 
 function generateEmailAlias() {
@@ -510,8 +571,9 @@ async function createUrlRedirect(url, body, env, session) {
   }
 
   const destination = await findOrCreateDestination(env, { originalUrl: validation.url, createdBy });
-  if (destination.title === null) {
-    const title = (await fetchPageTitle(validation.url)) || deriveFallbackTitle(validation.url);
+  let title = destination.title;
+  if (title === null) {
+    title = (await fetchPageTitle(validation.url)) || deriveFallbackTitle(validation.url);
     if (title) {
       await env.DB.prepare("UPDATE destinations SET title = ? WHERE id = ?").bind(title, destination.id).run();
     }
@@ -528,11 +590,29 @@ async function createUrlRedirect(url, body, env, session) {
   }
 
   if (customCode) {
+    // Also rules out a code already used as a (possibly title-based)
+    // generated path - the insert's UNIQUE(code, kind) only catches
+    // another custom path.
+    if (await pathCodeIsTaken(env, customCode)) {
+      return jsonResponse({ error: `"${customCode}" is already taken, try another.` }, 409);
+    }
     try {
       await insertAlias(env, { code: customCode, kind: "custom-path", destinationId, createdBy });
       return redirectResponse(customCode, "custom-path");
     } catch {
       return jsonResponse({ error: `"${customCode}" is already taken, try another.` }, 409);
+    }
+  }
+
+  // Prefer a readable code based on the page title; a single attempt only -
+  // if it doesn't qualify or is taken, fall through to a random one.
+  const titleCode = deriveTitleSlug(title);
+  if (titleCode && !(await pathCodeIsTaken(env, titleCode))) {
+    try {
+      await insertAlias(env, { code: titleCode, kind: "generated-path", destinationId, createdBy });
+      return redirectResponse(titleCode, "generated-path");
+    } catch {
+      // lost a race for this code - fall back to a random one
     }
   }
 
@@ -1696,6 +1776,7 @@ async function handleFetch(request, env, ctx) {
 export {
   decodeHtmlEntities,
   deriveFallbackTitle,
+  deriveTitleSlug,
   fetchPageTitle,
   validateDestinationEmail,
   validateSubdomain,

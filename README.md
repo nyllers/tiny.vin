@@ -47,7 +47,7 @@ If the database was created before this existed, apply `migrations/0012_add_logi
 
 If the database was created before this existed, apply `migrations/0015_add_login_identities_max_resources.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0015_add_login_identities_max_resources.sql --remote`) in addition to `schema.sql`. This migration backfills every existing `admin` account to 100, preserving the effective limit the old hardcoded constants gave them.
 
-`login_identities.min_custom_path_length` sets the minimum length accepted for a custom `path` or `subdomain` on `POST /api/urls`, and for an explicit `alias` on `POST /api/emails` — 5 by default for every new signup. Tune it per account the same way as `max_resources` above. It doesn't apply to auto-generated codes/aliases (always a fixed 8 characters, same as before this was configurable) — only to a value the caller chooses themselves.
+`login_identities.min_custom_path_length` sets the minimum length accepted for a custom `path` or `subdomain` on `POST /api/urls`, and for an explicit `alias` on `POST /api/emails` — 5 by default for every new signup. Tune it per account the same way as `max_resources` above. It doesn't apply to auto-generated codes/aliases (a random 8 characters, or a title-based code — see "Title-based short codes" below) — only to a value the caller chooses themselves.
 
 If the database was created before this existed, apply `migrations/0016_add_login_identities_min_custom_path_length.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0016_add_login_identities_min_custom_path_length.sql --remote`) in addition to `schema.sql`. This migration backfills every existing `admin` account to 1, preserving the effective minimum the old hardcoded constants gave them.
 
@@ -108,6 +108,17 @@ Since `aliases` now holds both URL and e-mail rows for the same account, every q
 If the database predates this, apply `migrations/0017_split_destinations_and_aliases.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0017_split_destinations_and_aliases.sql --remote`) in addition to `schema.sql`. This migration replaces `urls` and `email_redirects` (dropping both) and repoints `redirect_events`/`email_redirect_events` at `aliases` by `alias_id` instead of `(code, kind)`/`alias` — back up first if the data matters.
 
 `destinations.title` holds the target webpage's `<title>`, fetched once (`fetchPageTitle` in `src/index.js`) when a URL destination is first created and shown above the URL on its card. The response is streamed and reading stops as soon as `<title>` is matched (usually within the first few KB), capped at 1MB total to bound worst-case latency for pages that front-load `<head>` with large inline scripts before `<title>` (e.g. YouTube). If no `<title>` can be found at all (timeout, non-HTML response, no tag present), `deriveFallbackTitle` falls back to the last non-empty path segment of the URL (ignoring the query string) instead of leaving the card with no title. E-mail destinations have no webpage to fetch a title from, so the destination's own e-mail address is used as its title instead — set once, directly, no fetch involved. Either way, the title is never refetched automatically once a destination has one (including a fallback — there's no retry), though it can always be edited by hand afterward — see "Editing a title" below. If the database predates this, apply `migrations/0019_add_destination_title.sql` (`wrangler d1 execute tiny-vin-db --file=migrations/0019_add_destination_title.sql --remote`) in addition to `schema.sql`. `scripts/backfill-titles.js` is the one-time (and re-runnable) backfill for destinations that predate the title feature entirely — see the comment at the top of the file for usage.
+
+### Title-based short codes
+
+When a URL gets a generated path (no custom `path`/`subdomain` given — this includes the "Generate Path" button on an existing card), `deriveTitleSlug` in `src/index.js` first tries to build a readable code from the destination's title, falling back to the usual random 8-character code whenever it doesn't qualify:
+
+- The title must be pure ASCII and at least 6 characters long.
+- Words are whitespace-separated; anything but letters, digits and hyphens is stripped from each, and the result is lowercased (`IANA-managed` → `iana-managed`, `Caroline's` → `carolines`).
+- If the first word is 6+ characters, that word is the code (`Example Domain` → `example`). Otherwise the first two words joined with a hyphen, if that's 6+ characters (`Hello World` → `hello-world`). Otherwise the first three words joined with hyphens.
+- A code longer than 32 characters never qualifies.
+
+Only one candidate is ever tried: if it's reserved or already used by any generated or custom path (`pathCodeIsTaken`), the code is random — it doesn't fall through to the next, longer form. Because `(code, kind)` is only unique per kind, creating a custom path now also checks for a same-named generated path (and vice versa), so a title-based code can't end up sharing a name with a custom one. The title used is whatever the card shows, including a hand-edited one or the path-segment fallback described above. Codes can contain hyphens, which is why `CODE_PATTERN` allows them — before this, any hyphenated custom path would have been valid to create but unroutable.
 
 ### Editing a title
 

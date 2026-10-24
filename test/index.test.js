@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
+import worker, {
   decodeHtmlEntities,
   deriveFallbackTitle,
+  deriveTitleSlug,
   fetchPageTitle,
   validateDestinationEmail,
   validateSubdomain,
@@ -63,6 +64,91 @@ test("deriveFallbackTitle", async (t) => {
 
   await t.test("returns null for an unparseable URL", () => {
     assert.equal(deriveFallbackTitle("not a url"), null);
+  });
+});
+
+test("deriveTitleSlug", async (t) => {
+  await t.test("uses the lowercased first word when it is 6+ characters", () => {
+    assert.equal(deriveTitleSlug("Example Domain"), "example");
+    assert.equal(deriveTitleSlug("Flammkuchen (Flammekueche/tarte flambee from Alsace)"), "flammkuchen");
+  });
+
+  await t.test("strips punctuation inside a word but keeps its hyphens", () => {
+    assert.equal(deriveTitleSlug("Caroline's Cooking"), "carolines");
+    assert.equal(deriveTitleSlug("IANA-managed Reserved Domains"), "iana-managed");
+    assert.equal(deriveTitleSlug("--Wow-- Thing"), "wow-thing");
+  });
+
+  await t.test("joins the first two words when the first is short but the pair is 6+", () => {
+    assert.equal(deriveTitleSlug("Hello World"), "hello-world");
+    assert.equal(deriveTitleSlug("Go Run"), "go-run");
+  });
+
+  await t.test("falls back to three words when two are still under 6", () => {
+    assert.equal(deriveTitleSlug("A B C D E"), "a-b-c");
+  });
+
+  await t.test("ignores standalone punctuation tokens", () => {
+    assert.equal(deriveTitleSlug("Foo - Barbaz"), "foo-barbaz");
+  });
+
+  await t.test("returns null for a non-ASCII title", () => {
+    assert.equal(deriveTitleSlug("HC Z: Säsong 1 Avsnitt 1 - YouTube"), null);
+    assert.equal(deriveTitleSlug("Cornucopia? – Evig tillväxt"), null);
+  });
+
+  await t.test("returns null for a title shorter than 6 characters", () => {
+    assert.equal(deriveTitleSlug("Hello"), null);
+    assert.equal(deriveTitleSlug("  Hi  "), null);
+  });
+
+  await t.test("returns null when no qualifying word combination exists", () => {
+    assert.equal(deriveTitleSlug("A B!!!!!"), null);
+    assert.equal(deriveTitleSlug("!!!!!!!!"), null);
+  });
+
+  await t.test("returns null when the slug would exceed 32 characters", () => {
+    assert.equal(deriveTitleSlug("Supercalifragilisticexpialidocious Word"), null);
+  });
+
+  await t.test("returns null for a missing title", () => {
+    assert.equal(deriveTitleSlug(null), null);
+    assert.equal(deriveTitleSlug(undefined), null);
+  });
+});
+
+test("routing for hyphenated short codes", async (t) => {
+  function envReturning(row) {
+    const lookups = [];
+    return {
+      lookups,
+      env: {
+        DB: {
+          prepare: (sql) => ({
+            bind: (...args) => ({
+              first: async () => {
+                lookups.push({ sql, args });
+                return row;
+              },
+            }),
+          }),
+        },
+      },
+    };
+  }
+
+  await t.test("a code containing a hyphen reaches the redirect lookup", async () => {
+    const { env, lookups } = envReturning({ id: 1, kind: "generated-path", original_url: "https://example.com/" });
+    const response = await worker.fetch(new Request("https://tiny.vin/hello-world", { method: "HEAD" }), env, {});
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get("location"), "https://example.com/");
+    assert.equal(lookups[0].args[0], "hello-world");
+  });
+
+  await t.test("an unknown hyphenated code is a 404, not a fall-through to static assets", async () => {
+    const { env } = envReturning(null);
+    const response = await worker.fetch(new Request("https://tiny.vin/no-such-code", { method: "HEAD" }), env, {});
+    assert.equal(response.status, 404);
   });
 });
 
