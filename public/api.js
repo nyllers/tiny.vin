@@ -1,5 +1,5 @@
 const SHORTEN_EXAMPLES = [
-  { id: "generated-path", body: { url: "https://example.com" }, shortUrl: "tiny.vin/aZ3xQ72K" },
+  { id: "generated-path", body: { url: "https://example.com" }, shortUrl: "tiny.vin/example" },
   { id: "custom-path", body: { url: "https://example.com", path: "my-page" }, shortUrl: "tiny.vin/my-page" },
   { id: "subdomain", body: { url: "https://example.com", subdomain: "my-name" }, shortUrl: "my-name.tiny.vin" },
 ];
