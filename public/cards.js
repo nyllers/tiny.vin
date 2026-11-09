@@ -163,19 +163,29 @@ function createCardsSection(headingText, items, renderItem) {
   return createCardsSectionFromElements(headingText, items.map(renderItem));
 }
 
-async function copyTextToClipboard(text, displayEl) {
+// `restoreText` is what displayEl goes back to after the confirmation - it
+// differs from `text` when what's copied isn't exactly what's shown (see
+// withHttpScheme).
+async function copyTextToClipboard(text, displayEl, restoreText = text) {
   try {
     await navigator.clipboard.writeText(text);
     displayEl.textContent = "Copied to clipboard!";
     setTimeout(() => {
-      displayEl.textContent = text;
+      displayEl.textContent = restoreText;
     }, 1000);
   } catch {
     displayEl.textContent = "Could not copy to clipboard";
     setTimeout(() => {
-      displayEl.textContent = text;
+      displayEl.textContent = restoreText;
     }, 1000);
   }
+}
+
+// Short URLs are shown without a scheme (tiny.vin/abc) but copied with an
+// explicit http:// so a pasted link is always recognized as one. Replaces any
+// scheme already there rather than stacking a second one.
+function withHttpScheme(url) {
+  return `http://${url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")}`;
 }
 
 function createCopyIconButton() {
@@ -191,7 +201,10 @@ function createCopyIconButton() {
   return button;
 }
 
-function createCopyableTextGroup(text) {
+// `copyText` is what lands on the clipboard when it should differ from the
+// displayed `text` - only URLs opt in (e-mail aliases and the API key are
+// copied exactly as shown).
+function createCopyableTextGroup(text, { copyText = text } = {}) {
   const group = document.createElement("span");
   group.className = "url-card-copy-group";
   group.title = "Copy to clipboard";
@@ -199,7 +212,7 @@ function createCopyableTextGroup(text) {
   value.className = "url-card-value url-card-copy-text";
   value.textContent = text;
   const copyBtn = createCopyIconButton();
-  const copy = () => copyTextToClipboard(text, value);
+  const copy = () => copyTextToClipboard(copyText, value, text);
   value.addEventListener("click", copy);
   copyBtn.addEventListener("click", copy);
   group.addEventListener("click", copy);

@@ -63,8 +63,11 @@ function openQrModal(url) {
     }, 1000);
   };
 
+  // This modal is shared with e-mail aliases (a mailto: link), which aren't
+  // URLs to be rewritten - only http(s) links get the http:// treatment.
+  const isWebUrl = /^https?:\/\//i.test(url);
   urlEl.textContent = "";
-  urlEl.appendChild(createCopyableTextGroup(url));
+  urlEl.appendChild(createCopyableTextGroup(url, { copyText: isWebUrl ? withHttpScheme(url) : url }));
 
   openModal(overlay, closeBtn);
 }
@@ -171,7 +174,9 @@ function createShortUrlRow(shortUrlItem, justCreatedCode) {
   const shortCopyRow = document.createElement("div");
   shortCopyRow.className = "url-card-copy-row";
 
-  const shortUrlGroup = createCopyableTextGroup(shortUrlItem.shortUrl);
+  const shortUrlGroup = createCopyableTextGroup(shortUrlItem.shortUrl, {
+    copyText: withHttpScheme(shortUrlItem.shortUrl),
+  });
   if (shortUrlItem.code === justCreatedCode) {
     shortUrlGroup.querySelector(".url-card-copy-text").classList.add("url-card-value--flash");
   }
