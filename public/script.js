@@ -38,7 +38,10 @@ async function copyQrImageToClipboard(qr) {
   await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
 }
 
-function openQrModal(url) {
+// `copyText` is what the URL line in the modal copies when that should differ
+// from what it shows (URL cards pass the scheme-matched short URL; e-mail
+// aliases leave it off so their mailto: link is copied as-is).
+function openQrModal(url, copyText = url) {
   const overlay = document.getElementById("qr-modal-overlay");
   const imageEl = document.getElementById("qr-modal-image");
   const titleEl = document.getElementById("qr-modal-title");
@@ -63,11 +66,8 @@ function openQrModal(url) {
     }, 1000);
   };
 
-  // This modal is shared with e-mail aliases (a mailto: link), which aren't
-  // URLs to be rewritten - only http(s) links get the http:// treatment.
-  const isWebUrl = /^https?:\/\//i.test(url);
   urlEl.textContent = "";
-  urlEl.appendChild(createCopyableTextGroup(url, { copyText: isWebUrl ? withHttpScheme(url) : url }));
+  urlEl.appendChild(createCopyableTextGroup(url, { copyText }));
 
   openModal(overlay, closeBtn);
 }
@@ -170,19 +170,18 @@ async function deleteUrl(code, kind, shortUrl) {
   }
 }
 
-function createShortUrlRow(shortUrlItem, justCreatedCode) {
+function createShortUrlRow(shortUrlItem, justCreatedCode, destinationUrl) {
   const shortCopyRow = document.createElement("div");
   shortCopyRow.className = "url-card-copy-row";
 
-  const shortUrlGroup = createCopyableTextGroup(shortUrlItem.shortUrl, {
-    copyText: withHttpScheme(shortUrlItem.shortUrl),
-  });
+  const copyText = withSchemeOf(shortUrlItem.shortUrl, destinationUrl);
+  const shortUrlGroup = createCopyableTextGroup(shortUrlItem.shortUrl, { copyText });
   if (shortUrlItem.code === justCreatedCode) {
     shortUrlGroup.querySelector(".url-card-copy-text").classList.add("url-card-value--flash");
   }
 
   const qrBtn = createQrIconButton();
-  qrBtn.addEventListener("click", () => openQrModal(`https://${shortUrlItem.shortUrl}`));
+  qrBtn.addEventListener("click", () => openQrModal(`https://${shortUrlItem.shortUrl}`, copyText));
 
   const deleteBtn = createDeleteIconButton();
   deleteBtn.addEventListener("click", () => deleteUrl(shortUrlItem.code, shortUrlItem.kind, shortUrlItem.shortUrl));
@@ -264,7 +263,7 @@ function createUrlCard(group, justCreatedCode, maxTitleLength) {
   const shortRow = document.createElement("div");
   shortRow.className = "url-card-row url-card-row--tiny";
   for (const shortUrlItem of group.items) {
-    shortRow.append(createShortUrlRow(shortUrlItem, justCreatedCode));
+    shortRow.append(createShortUrlRow(shortUrlItem, justCreatedCode, group.destination));
   }
 
   const actionsContainer = document.createElement("div");
