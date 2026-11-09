@@ -212,10 +212,10 @@ function createCopyableTextGroup(text, { copyText = text } = {}) {
   value.className = "url-card-value url-card-copy-text";
   value.textContent = text;
   const copyBtn = createCopyIconButton();
-  const copy = () => copyTextToClipboard(copyText, value, text);
-  value.addEventListener("click", copy);
-  copyBtn.addEventListener("click", copy);
-  group.addEventListener("click", copy);
+  // One listener on the group only: clicks on the text or the icon (or a
+  // keyboard activation of the icon button) all bubble up to it. Listening
+  // on those children as well fired two overlapping clipboard writes per click.
+  group.addEventListener("click", () => copyTextToClipboard(copyText, value, text));
   group.append(value, copyBtn);
   return group;
 }
