@@ -38,10 +38,7 @@ async function copyQrImageToClipboard(qr) {
   await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
 }
 
-// `copyText` is what the URL line in the modal copies when that should differ
-// from what it shows (URL cards pass the scheme-matched short URL; e-mail
-// aliases leave it off so their mailto: link is copied as-is).
-function openQrModal(url, copyText = url) {
+function openQrModal(url) {
   const overlay = document.getElementById("qr-modal-overlay");
   const imageEl = document.getElementById("qr-modal-image");
   const titleEl = document.getElementById("qr-modal-title");
@@ -67,7 +64,7 @@ function openQrModal(url, copyText = url) {
   };
 
   urlEl.textContent = "";
-  urlEl.appendChild(createCopyableTextGroup(url, { copyText }));
+  urlEl.appendChild(createCopyableTextGroup(url));
 
   openModal(overlay, closeBtn);
 }
@@ -170,18 +167,19 @@ async function deleteUrl(code, kind, shortUrl) {
   }
 }
 
-function createShortUrlRow(shortUrlItem, justCreatedCode, destinationUrl) {
+function createShortUrlRow(shortUrlItem, justCreatedCode) {
   const shortCopyRow = document.createElement("div");
   shortCopyRow.className = "url-card-copy-row";
 
-  const copyText = withSchemeOf(shortUrlItem.shortUrl, destinationUrl);
-  const shortUrlGroup = createCopyableTextGroup(shortUrlItem.shortUrl, { copyText });
+  const shortUrlGroup = createCopyableTextGroup(shortUrlItem.shortUrl, {
+    copyText: withHttps(shortUrlItem.shortUrl),
+  });
   if (shortUrlItem.code === justCreatedCode) {
     shortUrlGroup.querySelector(".url-card-copy-text").classList.add("url-card-value--flash");
   }
 
   const qrBtn = createQrIconButton();
-  qrBtn.addEventListener("click", () => openQrModal(`https://${shortUrlItem.shortUrl}`, copyText));
+  qrBtn.addEventListener("click", () => openQrModal(`https://${shortUrlItem.shortUrl}`));
 
   const deleteBtn = createDeleteIconButton();
   deleteBtn.addEventListener("click", () => deleteUrl(shortUrlItem.code, shortUrlItem.kind, shortUrlItem.shortUrl));
@@ -263,7 +261,7 @@ function createUrlCard(group, justCreatedCode, maxTitleLength) {
   const shortRow = document.createElement("div");
   shortRow.className = "url-card-row url-card-row--tiny";
   for (const shortUrlItem of group.items) {
-    shortRow.append(createShortUrlRow(shortUrlItem, justCreatedCode, group.destination));
+    shortRow.append(createShortUrlRow(shortUrlItem, justCreatedCode));
   }
 
   const actionsContainer = document.createElement("div");

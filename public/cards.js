@@ -165,7 +165,7 @@ function createCardsSection(headingText, items, renderItem) {
 
 // `restoreText` is what displayEl goes back to after the confirmation - it
 // differs from `text` when what's copied isn't exactly what's shown (see
-// withSchemeOf).
+// withHttps).
 async function copyTextToClipboard(text, displayEl, restoreText = text) {
   try {
     await navigator.clipboard.writeText(text);
@@ -181,14 +181,11 @@ async function copyTextToClipboard(text, displayEl, restoreText = text) {
   }
 }
 
-// Short URLs are shown without a scheme (tiny.vin/abc) but copied with one so
-// a pasted link is always recognized as a link. The scheme is the one the
-// destination was added with (the stored URL always carries http:// or
-// https:// - when nothing was typed, the server stores whichever it found
-// responding). Replaces any scheme already on `url` rather than stacking one.
-function withSchemeOf(url, destinationUrl) {
-  const scheme = /^https:/i.test(destinationUrl) ? "https" : "http";
-  return `${scheme}://${url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")}`;
+// Short URLs are shown without a scheme (tiny.vin/abc) but copied with an
+// explicit https:// so a pasted link is always recognized as a link. Replaces
+// any scheme already on `url` rather than stacking a second one.
+function withHttps(url) {
+  return `https://${url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")}`;
 }
 
 function createCopyIconButton() {
