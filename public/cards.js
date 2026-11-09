@@ -163,19 +163,29 @@ function createCardsSection(headingText, items, renderItem) {
   return createCardsSectionFromElements(headingText, items.map(renderItem));
 }
 
-async function copyTextToClipboard(text, displayEl) {
+// `restoreText` is what displayEl goes back to after the confirmation - it
+// differs from `text` when what's copied isn't exactly what's shown (see
+// withHttps).
+async function copyTextToClipboard(text, displayEl, restoreText = text) {
   try {
     await navigator.clipboard.writeText(text);
     displayEl.textContent = "Copied to clipboard!";
     setTimeout(() => {
-      displayEl.textContent = text;
+      displayEl.textContent = restoreText;
     }, 1000);
   } catch {
     displayEl.textContent = "Could not copy to clipboard";
     setTimeout(() => {
-      displayEl.textContent = text;
+      displayEl.textContent = restoreText;
     }, 1000);
   }
+}
+
+// Short URLs are shown without a scheme (tiny.vin/abc) but copied with an
+// explicit https:// so a pasted link is always recognized as a link. Replaces
+// any scheme already on `url` rather than stacking a second one.
+function withHttps(url) {
+  return `https://${url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")}`;
 }
 
 function createCopyIconButton() {
@@ -191,7 +201,10 @@ function createCopyIconButton() {
   return button;
 }
 
-function createCopyableTextGroup(text) {
+// `copyText` is what lands on the clipboard when it should differ from the
+// displayed `text` - only URLs opt in (e-mail aliases and the API key are
+// copied exactly as shown).
+function createCopyableTextGroup(text, { copyText = text } = {}) {
   const group = document.createElement("span");
   group.className = "url-card-copy-group";
   group.title = "Copy to clipboard";
@@ -199,10 +212,10 @@ function createCopyableTextGroup(text) {
   value.className = "url-card-value url-card-copy-text";
   value.textContent = text;
   const copyBtn = createCopyIconButton();
-  const copy = () => copyTextToClipboard(text, value);
-  value.addEventListener("click", copy);
-  copyBtn.addEventListener("click", copy);
-  group.addEventListener("click", copy);
+  // One listener on the group only: clicks on the text or the icon (or a
+  // keyboard activation of the icon button) all bubble up to it. Listening
+  // on those children as well fired two overlapping clipboard writes per click.
+  group.addEventListener("click", () => copyTextToClipboard(copyText, value, text));
   group.append(value, copyBtn);
   return group;
 }

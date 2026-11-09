@@ -171,7 +171,9 @@ function createShortUrlRow(shortUrlItem, justCreatedCode) {
   const shortCopyRow = document.createElement("div");
   shortCopyRow.className = "url-card-copy-row";
 
-  const shortUrlGroup = createCopyableTextGroup(shortUrlItem.shortUrl);
+  const shortUrlGroup = createCopyableTextGroup(shortUrlItem.shortUrl, {
+    copyText: withHttps(shortUrlItem.shortUrl),
+  });
   if (shortUrlItem.code === justCreatedCode) {
     shortUrlGroup.querySelector(".url-card-copy-text").classList.add("url-card-value--flash");
   }
