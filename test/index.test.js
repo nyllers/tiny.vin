@@ -388,6 +388,81 @@ test("fetchPageTitle", async (t) => {
     };
     assert.equal(await fetchPageTitle("https://example.com"), null);
   });
+
+  await t.test("YouTube videos get their title from oEmbed, without reading the huge page", async () => {
+    const requested = [];
+    globalThis.fetch = async (url) => {
+      requested.push(String(url));
+      return new Response(JSON.stringify({ title: "Laserturken (Originalet) - Full version" }), { status: 200 });
+    };
+
+    const watch = "https://www.youtube.com/watch?v=esVuKP7k974";
+    assert.equal(await fetchPageTitle(watch), "Laserturken (Originalet) - Full version");
+    assert.deepEqual(requested, [
+      `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(watch)}`,
+    ]);
+
+    for (const url of [
+      "https://youtu.be/esVuKP7k974?si=abc&t=6m37s",
+      "https://www.youtube.com/shorts/esVuKP7k974",
+      "https://m.youtube.com/watch?v=esVuKP7k974",
+      "https://music.youtube.com/watch?v=esVuKP7k974",
+      "https://YouTube.com/watch?v=esVuKP7k974",
+    ]) {
+      requested.length = 0;
+      assert.equal(await fetchPageTitle(url), "Laserturken (Originalet) - Full version", url);
+      assert.equal(requested.length, 1, `only the oEmbed request for ${url}`);
+      assert.match(requested[0], /^https:\/\/www\.youtube\.com\/oembed\?/);
+    }
+  });
+
+  await t.test("a non-ASCII oEmbed title is kept as-is and whitespace is collapsed", async () => {
+    globalThis.fetch = async () => new Response(JSON.stringify({ title: "  HC Z:  Säsong 1\nAvsnitt 1 " }), { status: 200 });
+    assert.equal(await fetchPageTitle("https://youtu.be/bCZQ3PH3KXg"), "HC Z: Säsong 1 Avsnitt 1");
+  });
+
+  await t.test("falls back to reading the page when oEmbed has nothing (channels, removed videos, bad JSON)", async () => {
+    for (const oembed of [
+      () => new Response("Not Found", { status: 404 }),
+      () => new Response("Bad Request", { status: 400 }),
+      () => new Response("<html>not json</html>", { status: 200 }),
+      () => new Response(JSON.stringify({ author_name: "x" }), { status: 200 }),
+      () => new Response(JSON.stringify({ title: "   " }), { status: 200 }),
+    ]) {
+      globalThis.fetch = async (url) =>
+        String(url).startsWith("https://www.youtube.com/oembed")
+          ? oembed()
+          : new Response("<title>@YouTube - YouTube</title>", { status: 200 });
+      assert.equal(await fetchPageTitle("https://www.youtube.com/@YouTube"), "@YouTube - YouTube");
+    }
+  });
+
+  await t.test("falls back to reading the page when the oEmbed request itself fails", async () => {
+    globalThis.fetch = async (url) => {
+      if (String(url).startsWith("https://www.youtube.com/oembed")) throw new Error("network down");
+      return new Response("<title>Some video - YouTube</title>", { status: 200 });
+    };
+    assert.equal(await fetchPageTitle("https://www.youtube.com/watch?v=esVuKP7k974"), "Some video - YouTube");
+  });
+
+  await t.test("other sites, and lookalike hosts, never hit YouTube's oEmbed", async () => {
+    const requested = [];
+    globalThis.fetch = async (url) => {
+      requested.push(String(url));
+      return new Response("<title>Hello World</title>", { status: 200 });
+    };
+
+    for (const url of [
+      "https://example.com/watch?v=esVuKP7k974",
+      "https://notyoutube.com/watch?v=esVuKP7k974",
+      "https://youtube.com.evil.example/watch?v=esVuKP7k974",
+      "https://example.com/?next=https://www.youtube.com/watch?v=esVuKP7k974",
+    ]) {
+      requested.length = 0;
+      assert.equal(await fetchPageTitle(url), "Hello World", url);
+      assert.deepEqual(requested, [url], `${url} is fetched directly, once`);
+    }
+  });
 });
 
 test("validateDestinationEmail", async (t) => {
