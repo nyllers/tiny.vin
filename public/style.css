@@ -69,7 +69,8 @@ body {
     flex-direction: column;
   }
 
-  #generate-btn {
+  #generate-btn,
+  #qr-btn {
     width: 100%;
   }
 }
@@ -124,7 +125,8 @@ h1 {
   margin: 0 1rem;
 }
 
-#redirect-input {
+#redirect-input,
+#qr-input {
   flex: 1;
   padding: 0.5rem;
   font-size: 1rem;
@@ -150,7 +152,8 @@ h1 {
   flex-shrink: 0;
 }
 
-#generate-btn {
+#generate-btn,
+#qr-btn {
   padding: 0.5rem 1rem;
   font-size: 1rem;
   cursor: pointer;
@@ -160,11 +163,13 @@ h1 {
   border-radius: 0.375rem;
 }
 
-#generate-btn:hover {
+#generate-btn:hover,
+#qr-btn:hover {
   opacity: 0.75;
 }
 
-#generate-btn:disabled {
+#generate-btn:disabled,
+#qr-btn:disabled {
   opacity: 0.25;
   cursor: not-allowed;
 }
@@ -485,6 +490,13 @@ footer {
   z-index: 0;
 }
 
+/* The QR glyph is dense, so at the shared size it fills the whole card and
+   fights the text - keep it smaller than the link/e-mail watermarks. */
+.url-card-kind-watermark--qr {
+  width: 4rem;
+  height: 4rem;
+}
+
 .url-card > :not(.url-card-kind-watermark) {
   position: relative;
   z-index: 1;
@@ -544,6 +556,11 @@ footer {
   opacity: 0.75;
 }
 
+.qr-code-btn-label {
+  margin-left: 0.4rem;
+  font-size: 0.85rem;
+}
+
 .icon-btn.delete-btn,
 .icon-btn.cancel-btn,
 .icon-btn.save-btn {
@@ -586,6 +603,10 @@ footer {
 }
 
 .url-card-row--tiny {
+  padding-top: 0.5rem;
+}
+
+.qr-card-actions {
   padding-top: 0.5rem;
 }
 

@@ -481,3 +481,146 @@ function createInlineCodeInputRow({
   wrapper.append(row, error);
   return wrapper;
 }
+
+// ---- Shared by the Redirects and QR Codes pages ----
+
+const LINK_ICON = '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>';
+const MAIL_ICON = '<rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>';
+// Three finder squares plus a few data modules - used by the QR buttons and
+// as the QR card watermark.
+const QR_ICON = `
+    <rect x="2.5935183" y="2.8879271" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <rect x="4.5935183" y="4.8879271" width="3" height="3" fill="currentColor"/>
+    <rect x="14.125116" y="2.8581874" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <rect x="16.125116" y="4.8581872" width="3" height="3" fill="currentColor"/>
+    <rect x="2.6638107" y="13.88421" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <rect x="4.6638088" y="15.88421" width="3" height="3" fill="currentColor"/>
+    <rect x="11.981996" y="12.157454" width="2" height="2" fill="currentColor"/>
+    <rect x="14.82772" y="14.61657" width="2" height="2" fill="currentColor"/>
+    <rect x="18.327723" y="14.61657" width="2" height="2" fill="currentColor"/>
+    <rect x="14.82772" y="18.116564" width="2" height="2" fill="currentColor"/>
+    <rect x="18.327723" y="18.116564" width="2" height="2" fill="currentColor"/>
+  `;
+const KIND_WATERMARK_ICONS = { url: LINK_ICON, email: MAIL_ICON, qr: QR_ICON };
+
+function createKindWatermark(kind) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", `url-card-kind-watermark url-card-kind-watermark--${kind}`);
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.5");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+  svg.innerHTML = KIND_WATERMARK_ICONS[kind] ?? LINK_ICON;
+  return svg;
+}
+
+async function copyQrImageToClipboard(qr) {
+  const cellSize = 8;
+  const margin = cellSize * 2;
+  const size = qr.getModuleCount() * cellSize + margin * 2;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, size, size);
+  ctx.translate(margin, margin);
+  qr.renderTo2dContext(ctx, cellSize);
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+}
+
+// Needs the QR modal markup (#qr-modal-*) and qrcode-lib.js on the page.
+function openQrModal(url) {
+  const overlay = document.getElementById("qr-modal-overlay");
+  const imageEl = document.getElementById("qr-modal-image");
+  const titleEl = document.getElementById("qr-modal-title");
+  const urlEl = document.getElementById("qr-modal-url");
+  const closeBtn = document.getElementById("qr-modal-close");
+
+  const qr = qrcode(0, "M");
+  qr.addData(url);
+  qr.make();
+  imageEl.innerHTML = qr.createSvgTag({ scalable: true, alt: `QR code for ${url}` });
+
+  imageEl.onclick = async () => {
+    const originalTitle = titleEl.textContent;
+    try {
+      await copyQrImageToClipboard(qr);
+      titleEl.textContent = "Copied to clipboard!";
+    } catch {
+      titleEl.textContent = "Could not copy to clipboard";
+    }
+    setTimeout(() => {
+      titleEl.textContent = originalTitle;
+    }, 1000);
+  };
+
+  urlEl.textContent = "";
+  urlEl.appendChild(createCopyableTextGroup(url));
+
+  openModal(overlay, closeBtn);
+}
+
+// An icon-only button by default; pass `label` to add visible text next to it.
+function createQrIconButton({ label } = {}) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-btn qr-code-btn";
+  button.title = "Show QR code";
+  button.setAttribute("aria-label", "Show QR code");
+  button.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg">${QR_ICON}</svg>`;
+  if (label) {
+    const text = document.createElement("span");
+    text.className = "qr-code-btn-label";
+    text.textContent = label;
+    button.append(text);
+  }
+  return button;
+}
+
+function createDeleteIconButton(label = "Delete this URL") {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "icon-btn delete-btn";
+  button.title = "Delete";
+  button.setAttribute("aria-label", label);
+  button.innerHTML = `<span>Delete</span>`;
+  return button;
+}
+
+function initInfoPopovers() {
+  document.querySelectorAll(".info-btn").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const popover = document.getElementById(btn.getAttribute("data-info-target"));
+      const isOpen = !popover.hidden;
+      document.querySelectorAll(".info-popover").forEach((p) => {
+        p.hidden = true;
+      });
+      document.querySelectorAll(".info-btn").forEach((b) => {
+        b.setAttribute("aria-expanded", "false");
+      });
+      if (!isOpen) {
+        popover.hidden = false;
+        btn.setAttribute("aria-expanded", "true");
+      }
+    });
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".info-wrap")) {
+      document.querySelectorAll(".info-popover").forEach((p) => {
+        p.hidden = true;
+      });
+      document.querySelectorAll(".info-btn").forEach((b) => {
+        b.setAttribute("aria-expanded", "false");
+      });
+    }
+  });
+}

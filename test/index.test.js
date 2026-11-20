@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
+import { createSessionCookie } from "../src/session.js";
 import worker, {
+  normalizeQrUrl,
   decodeHtmlEntities,
   deriveFallbackTitle,
   deriveTitleSlug,
@@ -149,6 +153,210 @@ test("routing for hyphenated short codes", async (t) => {
     const { env } = envReturning(null);
     const response = await worker.fetch(new Request("https://tiny.vin/no-such-code", { method: "HEAD" }), env, {});
     assert.equal(response.status, 404);
+  });
+});
+
+test("normalizeQrUrl", async (t) => {
+  await t.test("keeps an http(s) URL exactly as typed", () => {
+    assert.deepEqual(normalizeQrUrl("https://example.com/a?b=1"), { url: "https://example.com/a?b=1", hostname: "example.com" });
+    assert.equal(normalizeQrUrl("http://example.com").url, "http://example.com");
+  });
+
+  await t.test("adds https:// when no scheme was typed", () => {
+    assert.equal(normalizeQrUrl("example.com/page").url, "https://example.com/page");
+  });
+
+  await t.test("doesn't reject short URLs (unlike redirect creation)", () => {
+    assert.equal(normalizeQrUrl("a.co").url, "https://a.co");
+  });
+
+  await t.test("rejects other schemes", () => {
+    assert.match(normalizeQrUrl("ftp://example.com").error, /only http:\/\/ and https:\/\//);
+  });
+
+  await t.test("rejects an e-mail address instead of turning it into a URL with credentials", () => {
+    assert.match(normalizeQrUrl("someone@example.com").error, /e-mail address/);
+    assert.match(normalizeQrUrl("mailto:someone@example.com").error, /e-mail address/);
+  });
+
+  await t.test("rejects whitespace, junk and hostless input", () => {
+    assert.ok(normalizeQrUrl("not a url").error);
+    assert.ok(normalizeQrUrl("javascript:alert(1)").error);
+    assert.ok(normalizeQrUrl("https://nodots").error);
+  });
+
+  await t.test("rejects a URL too long for a QR code", () => {
+    assert.match(normalizeQrUrl(`https://example.com/${"a".repeat(2000)}`).error, /too long/);
+  });
+});
+
+// A D1-shaped wrapper over an in-memory SQLite loaded with the real
+// schema.sql, so endpoint tests run the actual SQL, constraints and history
+// triggers rather than a hand-written fake.
+function createTestDb() {
+  const sqlite = new DatabaseSync(":memory:");
+  sqlite.exec(readFileSync(new URL("../schema.sql", import.meta.url), "utf8"));
+  return {
+    sqlite,
+    prepare(sql) {
+      return {
+        bind(...args) {
+          const statement = sqlite.prepare(sql);
+          return {
+            first: async () => statement.get(...args) ?? null,
+            all: async () => ({ results: statement.all(...args) }),
+            run: async () => {
+              const result = statement.run(...args);
+              return { meta: { changes: result.changes, last_row_id: Number(result.lastInsertRowid) } };
+            },
+          };
+        },
+      };
+    },
+  };
+}
+
+test("QR code endpoints", async (t) => {
+  const db = createTestDb();
+  const env = { SESSION_SECRET: "test-secret", DB: db };
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = async () => new Response("<title>Example Domain</title>", { status: 200 });
+
+  const cookieFor = async (email) =>
+    (await createSessionCookie({ email, name: email }, env.SESSION_SECRET)).split(";")[0];
+  const alice = await cookieFor("alice@example.com");
+  const bob = await cookieFor("bob@example.com");
+
+  const call = (method, path, { cookie, body } = {}) =>
+    worker.fetch(
+      new Request(`https://tiny.vin${path}`, {
+        method,
+        headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      }),
+      env,
+      {}
+    );
+  const create = (value, cookie = alice) => call("POST", "/api/qr-codes", { cookie, body: { value } });
+  const list = async (cookie) => (await (await call("GET", "/api/qr-codes", { cookie })).json()).qrCodes;
+  const count = (sql, ...args) => db.sqlite.prepare(sql).get(...args).n;
+  const identityId = (email) => db.sqlite.prepare("SELECT id FROM login_identities WHERE email = ?").get(email)?.id;
+
+  await t.test("POST saves a QR code for the normalized URL with its page title", async () => {
+    const response = await create("example.com");
+    assert.equal(response.status, 201);
+    const saved = await response.json();
+    assert.equal(saved.url, "https://example.com");
+    assert.equal(saved.title, "Example Domain");
+    assert.equal(typeof saved.id, "number");
+
+    const row = db.sqlite.prepare("SELECT * FROM qr_codes WHERE id = ?").get(saved.id);
+    assert.equal(row.created_by, identityId("alice@example.com"));
+    assert.equal(row.url, "https://example.com");
+  });
+
+  await t.test("the title falls back to the path, then the hostname", async () => {
+    globalThis.fetch = async () => new Response("", { status: 404 });
+    try {
+      assert.equal((await (await create("https://example.com/docs/guide.pdf")).json()).title, "guide.pdf");
+      assert.equal((await (await create("https://another.example.org")).json()).title, "another.example.org");
+    } finally {
+      globalThis.fetch = async () => new Response("<title>Example Domain</title>", { status: 200 });
+    }
+  });
+
+  await t.test("an invalid URL is a 400 and creates nothing, not even an identity", async () => {
+    const before = count("SELECT COUNT(*) AS n FROM qr_codes");
+    const response = await create("not a url", await cookieFor("dave@example.com"));
+    assert.equal(response.status, 400);
+    assert.ok((await response.json()).error);
+    assert.equal(count("SELECT COUNT(*) AS n FROM qr_codes"), before);
+    assert.equal(identityId("dave@example.com"), undefined);
+  });
+
+  await t.test("everything requires a signed-in session", async () => {
+    assert.equal((await call("GET", "/api/qr-codes")).status, 401);
+    assert.equal((await call("POST", "/api/qr-codes", { body: { value: "example.com" } })).status, 401);
+    assert.equal((await call("DELETE", "/api/qr-codes/1")).status, 401);
+  });
+
+  await t.test("adding a URL again refreshes the same row instead of duplicating it", async () => {
+    const first = await (await create("https://refresh.example.com")).json();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    globalThis.fetch = async () => new Response("<title>Renamed</title>", { status: 200 });
+
+    const response = await create("https://refresh.example.com");
+    assert.equal(response.status, 200);
+    const again = await response.json();
+    assert.equal(again.id, first.id);
+    assert.equal(again.title, "Renamed");
+    assert.ok(again.createdAt > first.createdAt);
+    assert.equal(count("SELECT COUNT(*) AS n FROM qr_codes WHERE url = ?", "https://refresh.example.com"), 1);
+    assert.equal(count("SELECT COUNT(*) AS n FROM qr_codes_history WHERE id = ?", first.id), 1);
+    globalThis.fetch = async () => new Response("<title>Example Domain</title>", { status: 200 });
+  });
+
+  await t.test("GET lists only the caller's QR codes, newest first", async () => {
+    const mine = await list(alice);
+    assert.ok(mine.length >= 3);
+    assert.deepEqual(
+      mine.map((item) => item.createdAt),
+      [...mine.map((item) => item.createdAt)].sort((a, b) => b - a)
+    );
+    assert.equal(mine[0].url, "https://refresh.example.com");
+    assert.deepEqual(Object.keys(mine[0]).sort(), ["createdAt", "id", "title", "url"]);
+
+    assert.deepEqual(await list(bob), []);
+    await create("example.com", bob);
+    assert.equal((await list(bob)).length, 1);
+    assert.equal((await list(alice)).filter((item) => item.url === "https://example.com").length, 1);
+  });
+
+  await t.test("DELETE removes your own QR code and keeps an audit row", async () => {
+    const target = (await list(alice)).find((item) => item.url === "https://example.com");
+    const response = await call("DELETE", `/api/qr-codes/${target.id}`, { cookie: alice });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true });
+    assert.equal(count("SELECT COUNT(*) AS n FROM qr_codes WHERE id = ?", target.id), 0);
+    assert.equal(count("SELECT COUNT(*) AS n FROM qr_codes_history WHERE id = ?", target.id), 1);
+  });
+
+  await t.test("DELETE can't touch someone else's QR code, or one that doesn't exist", async () => {
+    const bobs = (await list(bob))[0];
+    assert.equal((await call("DELETE", `/api/qr-codes/${bobs.id}`, { cookie: alice })).status, 404);
+    assert.equal(count("SELECT COUNT(*) AS n FROM qr_codes WHERE id = ?", bobs.id), 1);
+    assert.equal((await call("DELETE", "/api/qr-codes/999999", { cookie: alice })).status, 404);
+  });
+
+  await t.test("an account is capped at 100 QR codes, but re-adding an existing one still works", async () => {
+    const carol = await cookieFor("carol@example.com");
+    await create("https://first.example.com", carol);
+    const carolId = identityId("carol@example.com");
+    const insert = db.sqlite.prepare("INSERT INTO qr_codes (url, title, created_at, created_by) VALUES (?, ?, ?, ?)");
+    for (let i = 1; i < 100; i++) insert.run(`https://filler${i}.example.com`, "filler", Date.now(), carolId);
+    assert.equal(count("SELECT COUNT(*) AS n FROM qr_codes WHERE created_by = ?", carolId), 100);
+
+    const over = await create("https://one-too-many.example.com", carol);
+    assert.equal(over.status, 403);
+    assert.match((await over.json()).error, /maximum of 100/);
+    assert.equal(count("SELECT COUNT(*) AS n FROM qr_codes WHERE created_by = ?", carolId), 100);
+
+    assert.equal((await create("https://first.example.com", carol)).status, 200);
+  });
+});
+
+test("the /qr page", async (t) => {
+  // Signed out it gets the login page; it must never reach the redirect lookup
+  // (the DB mock fails the test if anything touches it).
+  const env = { SESSION_SECRET: "test-secret", DB: { prepare: () => assert.fail("no database access expected") } };
+
+  await t.test("/qr is a page, not a short code", async () => {
+    const response = await worker.fetch(new Request("https://tiny.vin/qr"), env, {});
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type"), /text\/html/);
   });
 });
 
