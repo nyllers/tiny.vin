@@ -98,7 +98,7 @@ async function loadTinyUrls() {
       group.items.map((item) =>
         createQrCard({
           kind: "tiny",
-          watermark: "url",
+          watermark: "qr",
           url: `https://${item.shortUrl}`,
           title: group.title || new URL(group.destination).hostname,
         })
