@@ -490,6 +490,13 @@ footer {
   z-index: 0;
 }
 
+/* The QR glyph is dense, so at the shared size it fills the whole card and
+   fights the text - keep it smaller than the link/e-mail watermarks. */
+.url-card-kind-watermark--qr {
+  width: 4rem;
+  height: 4rem;
+}
+
 .url-card > :not(.url-card-kind-watermark) {
   position: relative;
   z-index: 1;

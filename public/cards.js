@@ -505,7 +505,7 @@ const KIND_WATERMARK_ICONS = { url: LINK_ICON, email: MAIL_ICON, qr: QR_ICON };
 
 function createKindWatermark(kind) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("class", "url-card-kind-watermark");
+  svg.setAttribute("class", `url-card-kind-watermark url-card-kind-watermark--${kind}`);
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("fill", "none");
   svg.setAttribute("stroke", "currentColor");
