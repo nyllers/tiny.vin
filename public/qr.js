@@ -2,7 +2,8 @@
 // in a modal. No short link is created and nothing is stored on the server -
 // the server only looks up the title (POST /api/url-info). The list of cards
 // lives in this browser's localStorage, keyed by the signed-in account so
-// two people sharing a browser don't see each other's list.
+// two people sharing a browser don't see each other's list. Below it, a
+// read-only card for each short URL created on the Redirects page.
 
 const QR_STORAGE_PREFIX = "tinyvin.qrCodes:";
 
@@ -28,12 +29,14 @@ function saveQrCodes() {
   }
 }
 
-function createQrCard(item, { justAdded = false } = {}) {
+// Heading, URL and a "Show QR code" button; `onDelete` adds a Delete button
+// (omitted for cards that shouldn't be deletable from this page).
+function createQrCard({ kind, watermark, url, title, justAdded = false, onDelete }) {
   const card = document.createElement("div");
   card.className = "url-card";
-  card.dataset.kind = "qr";
+  card.dataset.kind = kind;
 
-  const originalRow = createOriginalUrlRow(item.url, item.title);
+  const originalRow = createOriginalUrlRow(url, title);
   if (justAdded) originalRow.querySelector(".url-card-value--original").classList.add("url-card-value--flash");
 
   const actionsRow = document.createElement("div");
@@ -42,15 +45,17 @@ function createQrCard(item, { justAdded = false } = {}) {
   copyRow.className = "url-card-copy-row";
 
   const qrBtn = createQrIconButton({ label: "Show QR code" });
-  qrBtn.addEventListener("click", () => openQrModal(item.url));
+  qrBtn.addEventListener("click", () => openQrModal(url));
+  copyRow.append(qrBtn);
 
-  const deleteBtn = createDeleteIconButton("Delete this QR code");
-  deleteBtn.addEventListener("click", () => deleteQrCode(item));
+  if (onDelete) {
+    const deleteBtn = createDeleteIconButton("Delete this QR code");
+    deleteBtn.addEventListener("click", onDelete);
+    copyRow.append(deleteBtn);
+  }
 
-  copyRow.append(qrBtn, deleteBtn);
   actionsRow.append(copyRow);
-
-  card.append(createKindWatermark("qr"), originalRow, actionsRow);
+  card.append(createKindWatermark(watermark), originalRow, actionsRow);
   return card;
 }
 
@@ -63,8 +68,46 @@ function renderQrCodes({ justAdded } = {}) {
   if (qrCodes.length === 0) return;
 
   container.append(
-    createCardsGrid(qrCodes.map((item) => createQrCard(item, { justAdded: item.url === justAdded })))
+    createCardsGrid(
+      qrCodes.map((item) =>
+        createQrCard({
+          kind: "qr",
+          watermark: "qr",
+          url: item.url,
+          title: item.title,
+          justAdded: item.url === justAdded,
+          onDelete: () => deleteQrCode(item),
+        })
+      )
+    )
   );
+}
+
+// One read-only card per short URL created on the Redirects page (generated
+// paths, custom paths and subdomains; e-mail aliases aren't URLs). There's no
+// Delete here on purpose - removing one would delete the redirect itself,
+// which is managed on the Redirects page.
+async function loadTinyUrls() {
+  const panel = document.getElementById("tiny-panel");
+  const container = document.getElementById("tiny-list");
+
+  const data = await fetchJsonOrNull("/api/redirects");
+  const cards = (data?.redirects ?? [])
+    .filter((group) => group.kind === "url")
+    .flatMap((group) =>
+      group.items.map((item) =>
+        createQrCard({
+          kind: "tiny",
+          watermark: "url",
+          url: `https://${item.shortUrl}`,
+          title: group.title || new URL(group.destination).hostname,
+        })
+      )
+    );
+
+  container.textContent = "";
+  panel.hidden = cards.length === 0;
+  if (cards.length > 0) container.append(createCardsGrid(cards));
 }
 
 async function deleteQrCode(item) {
@@ -131,6 +174,8 @@ async function addQrCode() {
 }
 
 async function initQrPage() {
+  loadTinyUrls();
+
   const session = await fetchJsonOrNull("/api/session");
   storageKey = QR_STORAGE_PREFIX + (session?.email ?? "");
   qrCodes = loadQrCodes();
