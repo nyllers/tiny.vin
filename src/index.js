@@ -18,6 +18,7 @@ const SUBDOMAIN_REDIRECT_PATTERN = /^\/subdomain\/([a-z0-9-]{1,63})$/;
 const AUTH_PATTERN = /^\/auth\/google\/(start|callback)$/;
 const DELETE_URL_PATTERN = /^\/api\/urls\/([A-Za-z0-9-]+)$/;
 const DELETE_EMAIL_PATTERN = /^\/api\/emails\/([a-z0-9-]+)$/;
+const DELETE_QR_PATTERN = /^\/api\/qr-codes\/(\d+)$/;
 const ADMIN_IDENTITY_PATTERN = /^\/api\/admin\/identities\/(\d+)$/;
 const RESERVED_CODES = new Set([
   "login",
@@ -1493,11 +1494,31 @@ async function handleUpdateRedirectTitle(request, env, session) {
   return jsonResponse({ title: title || null });
 }
 
-// POST /api/url-info - backs the QR Codes page: normalizes a typed URL and
-// looks up its page title, nothing more. Nothing is created or stored here
-// (the page keeps its list in the browser), which is why it isn't tied to an
-// identity's resource limit the way creating a redirect is.
-async function handleUrlInfo(request) {
+// Most QR codes one account can keep on the QR Codes page. They're only rows
+// in a small table, but an account shouldn't be able to grow it without bound.
+// Deliberately separate from max_resources: a QR code isn't a redirect.
+const MAX_QR_CODES = 100;
+
+// GET /api/qr-codes - the signed-in account's QR codes, newest first.
+async function handleListQrCodes(env, session) {
+  const identityId = await getIdentityId(env, session.email);
+
+  const { results } = await env.DB.prepare(
+    "SELECT id, url, title, created_at FROM qr_codes WHERE created_by = ? ORDER BY created_at DESC, id DESC"
+  )
+    .bind(identityId)
+    .all();
+
+  return jsonResponse({
+    qrCodes: results.map((row) => ({ id: row.id, url: row.url, title: row.title, createdAt: row.created_at })),
+  });
+}
+
+// POST /api/qr-codes - saves a QR code for a URL without creating a short
+// link. Adding a URL the account already has refreshes that row (new title,
+// back to the top of the list) instead of duplicating it - 200 rather than
+// 201 - and doesn't count toward the limit.
+async function handleCreateQrCode(request, env, session) {
   let body;
   try {
     body = await request.json();
@@ -1511,8 +1532,54 @@ async function handleUrlInfo(request) {
   const normalized = normalizeQrUrl(value);
   if (normalized.error) return jsonResponse({ error: normalized.error }, 400);
 
-  const title = (await fetchPageTitle(normalized.url)) || deriveFallbackTitle(normalized.url) || normalized.hostname;
-  return jsonResponse({ url: normalized.url, title: title.slice(0, MAX_TITLE_LENGTH) });
+  const identity = await getOrCreateIdentity(env, session.email);
+
+  const existing = await env.DB.prepare("SELECT id FROM qr_codes WHERE created_by = ? AND url = ?")
+    .bind(identity.id, normalized.url)
+    .first();
+
+  if (!existing) {
+    const { count } = await env.DB.prepare("SELECT COUNT(*) AS count FROM qr_codes WHERE created_by = ?")
+      .bind(identity.id)
+      .first();
+    if (count >= MAX_QR_CODES) {
+      return jsonResponse(
+        { error: `You've reached the maximum of ${MAX_QR_CODES} QR codes. Delete one before adding another.` },
+        403
+      );
+    }
+  }
+
+  const title = (
+    (await fetchPageTitle(normalized.url)) ||
+    deriveFallbackTitle(normalized.url) ||
+    normalized.hostname
+  ).slice(0, MAX_TITLE_LENGTH);
+  const createdAt = Date.now();
+
+  // ON CONFLICT also covers two simultaneous adds of the same URL.
+  const row = await env.DB.prepare(
+    `INSERT INTO qr_codes (url, title, created_at, created_by) VALUES (?, ?, ?, ?)
+     ON CONFLICT (created_by, url) DO UPDATE SET title = excluded.title, created_at = excluded.created_at
+     RETURNING id`
+  )
+    .bind(normalized.url, title, createdAt, identity.id)
+    .first();
+
+  return jsonResponse({ id: row.id, url: normalized.url, title, createdAt }, existing ? 200 : 201);
+}
+
+// DELETE /api/qr-codes/:id - only ever the signed-in account's own row.
+async function handleDeleteQrCode(id, env, session) {
+  const identityId = await getIdentityId(env, session.email);
+
+  const result = await env.DB.prepare("DELETE FROM qr_codes WHERE id = ? AND created_by = ?")
+    .bind(id, identityId)
+    .run();
+
+  if (result.meta.changes === 0) return jsonResponse({ error: "QR code not found." }, 404);
+
+  return jsonResponse({ ok: true });
 }
 
 async function handleDeleteEmailRedirect(alias, env, session) {
@@ -1728,7 +1795,8 @@ const SIMPLE_ROUTES = new Map([
     "PATCH /api/redirects/title",
     { auth: withAuthOrApiKey, run: (request, env, session) => handleUpdateRedirectTitle(request, env, session) },
   ],
-  ["POST /api/url-info", { auth: withAuth, run: (request) => handleUrlInfo(request) }],
+  ["GET /api/qr-codes", { auth: withAuth, run: (request, env, session) => handleListQrCodes(env, session) }],
+  ["POST /api/qr-codes", { auth: withAuth, run: (request, env, session) => handleCreateQrCode(request, env, session) }],
   ["GET /api/keys", { auth: withAuth, run: (request, env, session) => handleGetApiKey(env, session) }],
   ["POST /api/keys", { auth: withAuth, run: (request, env, session) => handleCreateApiKey(env, session) }],
   ["GET /api/stats", { auth: withAuth, run: (request, env, session) => handleStats(env, session) }],
@@ -1817,6 +1885,11 @@ async function handleFetch(request, env, ctx) {
   const deleteEmailMatch = url.pathname.match(DELETE_EMAIL_PATTERN);
   if (request.method === "DELETE" && deleteEmailMatch) {
     return withAuth(request, env, (session) => handleDeleteEmailRedirect(deleteEmailMatch[1], env, session));
+  }
+
+  const deleteQrMatch = url.pathname.match(DELETE_QR_PATTERN);
+  if (request.method === "DELETE" && deleteQrMatch) {
+    return withAuth(request, env, (session) => handleDeleteQrCode(Number(deleteQrMatch[1]), env, session));
   }
 
   const adminIdentityMatch = url.pathname.match(ADMIN_IDENTITY_PATTERN);

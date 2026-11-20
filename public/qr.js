@@ -1,32 +1,15 @@
 // QR Codes page: enter a URL, get a card with the page's title and a QR code
-// in a modal. No short link is created and nothing is stored on the server -
-// the server only looks up the title (POST /api/url-info). The list of cards
-// lives in this browser's localStorage, keyed by the signed-in account so
-// two people sharing a browser don't see each other's list. Below it, a
+// in a modal. No short link is created - the QR code points straight at the
+// URL - but the card is saved to the signed-in account (GET/POST/DELETE
+// /api/qr-codes), so the list follows you across devices. Below it, a
 // read-only card for each short URL created on the Redirects page.
 
-const QR_STORAGE_PREFIX = "tinyvin.qrCodes:";
-
-let storageKey = QR_STORAGE_PREFIX;
 let qrCodes = [];
 
-function loadQrCodes() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(storageKey) || "[]");
-    if (!Array.isArray(stored)) return [];
-    return stored.filter((item) => item && typeof item.url === "string" && typeof item.title === "string");
-  } catch {
-    return [];
-  }
-}
-
-function saveQrCodes() {
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(qrCodes));
-  } catch {
-    // Storage unavailable or full (e.g. a private window) - the list still
-    // works for this visit, it just won't be there next time.
-  }
+async function loadQrCodes() {
+  const data = await fetchJsonOrNull("/api/qr-codes");
+  qrCodes = data?.qrCodes ?? [];
+  renderQrCodes();
 }
 
 // Heading, URL and a "Show QR code" button; `onDelete` adds a Delete button
@@ -75,7 +58,7 @@ function renderQrCodes({ justAdded } = {}) {
           watermark: "qr",
           url: item.url,
           title: item.title,
-          justAdded: item.url === justAdded,
+          justAdded: item.id === justAdded,
           onDelete: () => deleteQrCode(item),
         })
       )
@@ -114,8 +97,18 @@ async function deleteQrCode(item) {
   const confirmed = await confirmDelete(`This will delete the QR code for ${item.url}`);
   if (!confirmed) return;
 
-  qrCodes = qrCodes.filter((other) => other.url !== item.url);
-  saveQrCodes();
+  try {
+    const response = await fetch(`/api/qr-codes/${item.id}`, { method: "DELETE" });
+    if (!response.ok) {
+      alert("Could not delete that QR code, try again.");
+      return;
+    }
+  } catch {
+    alert("Network error, try again.");
+    return;
+  }
+
+  qrCodes = qrCodes.filter((other) => other.id !== item.id);
   renderQrCodes();
 }
 
@@ -148,7 +141,7 @@ async function addQrCode() {
   button.disabled = true;
 
   try {
-    const response = await fetch("/api/url-info", {
+    const response = await fetch("/api/qr-codes", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ value }),
@@ -160,12 +153,12 @@ async function addQrCode() {
       return;
     }
 
-    // One card per URL: adding one that's already there moves it to the top.
-    qrCodes = [{ url: data.url, title: data.title, createdAt: Date.now() }, ...qrCodes.filter((item) => item.url !== data.url)];
-    saveQrCodes();
+    // One card per URL: adding one that's already saved refreshes it and moves
+    // it to the top (the server answers with the same id).
+    qrCodes = [data, ...qrCodes.filter((item) => item.id !== data.id)];
     input.value = "";
     setStatus("");
-    renderQrCodes({ justAdded: data.url });
+    renderQrCodes({ justAdded: data.id });
   } catch {
     setError("Network error, try again.");
   } finally {
@@ -173,13 +166,9 @@ async function addQrCode() {
   }
 }
 
-async function initQrPage() {
+function initQrPage() {
+  loadQrCodes();
   loadTinyUrls();
-
-  const session = await fetchJsonOrNull("/api/session");
-  storageKey = QR_STORAGE_PREFIX + (session?.email ?? "");
-  qrCodes = loadQrCodes();
-  renderQrCodes();
 }
 
 document.getElementById("qr-btn").addEventListener("click", addQrCode);

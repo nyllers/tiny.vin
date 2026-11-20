@@ -26,6 +26,15 @@ CREATE TABLE IF NOT EXISTS aliases (
   UNIQUE (code, kind)
 );
 
+CREATE TABLE IF NOT EXISTS qr_codes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  url TEXT NOT NULL,
+  title TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  created_by INTEGER NOT NULL REFERENCES login_identities(id),
+  UNIQUE (created_by, url)
+);
+
 CREATE TABLE IF NOT EXISTS login_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   identity_id INTEGER NOT NULL REFERENCES login_identities(id),
@@ -267,4 +276,28 @@ BEGIN
     (id, alias_id, destination, from_address, subject, message_id, size, forwarded, reject_reason, headers, requested_at)
   VALUES
     (OLD.id, OLD.alias_id, OLD.destination, OLD.from_address, OLD.subject, OLD.message_id, OLD.size, OLD.forwarded, OLD.reject_reason, OLD.headers, OLD.requested_at);
+END;
+
+CREATE TABLE IF NOT EXISTS qr_codes_history (
+  history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER,
+  url TEXT,
+  title TEXT,
+  created_at INTEGER,
+  created_by INTEGER,
+  history_created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TRIGGER IF NOT EXISTS qr_codes_history_update
+AFTER UPDATE ON qr_codes
+BEGIN
+  INSERT INTO qr_codes_history (id, url, title, created_at, created_by)
+  VALUES (OLD.id, OLD.url, OLD.title, OLD.created_at, OLD.created_by);
+END;
+
+CREATE TRIGGER IF NOT EXISTS qr_codes_history_delete
+AFTER DELETE ON qr_codes
+BEGIN
+  INSERT INTO qr_codes_history (id, url, title, created_at, created_by)
+  VALUES (OLD.id, OLD.url, OLD.title, OLD.created_at, OLD.created_by);
 END;
