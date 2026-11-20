@@ -29,11 +29,14 @@ const RESERVED_CODES = new Set([
   "api",
   "emails",
   "email-stats",
+  "qr",
   "app",
   "admin",
 ]);
 const PROTECTED_PAGES = new Set([
   "/",
+  "/qr",
+  "/qr.html",
   "/stats",
   "/stats.html",
   "/api",
@@ -331,6 +334,47 @@ async function validateUrl(input) {
   }
 
   return { url: input };
+}
+
+// Longest URL we'll turn into a QR code - the QR format tops out around 2.9KB
+// at the error-correction level the page uses, so leave headroom.
+const MAX_QR_URL_LENGTH = 2000;
+
+// Turns what someone typed on the QR Codes page into an absolute http(s) URL
+// (adding https:// when no scheme was typed). Unlike validateUrl this doesn't
+// check that the page exists or reject short URLs - a QR code for a page
+// that's down, or for an already-short link, is still a perfectly good QR
+// code.
+function normalizeQrUrl(input) {
+  if (/\s/.test(input)) {
+    return { error: "That doesn't look like a URL. Try a format like: https://example.com" };
+  }
+  if (EMAIL_ADDRESS_PATTERN.test(input)) {
+    return { error: "That looks like an e-mail address, not a URL. Try a format like: https://example.com" };
+  }
+
+  const url = input.includes("://") ? input : `https://${input}`;
+  const scheme = url.slice(0, url.indexOf("://")).toLowerCase();
+  if (scheme !== "http" && scheme !== "https") {
+    return { error: `"${scheme}://" URLs aren't supported, only http:// and https://. Try: https://example.com` };
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { error: "That doesn't look like a valid URL. Try a format like: https://example.com/page" };
+  }
+
+  if (!isValidHostname(parsed.hostname)) {
+    return { error: `"${parsed.hostname}" doesn't look like a real domain. Try a format like: https://example.com` };
+  }
+
+  if (url.length > MAX_QR_URL_LENGTH) {
+    return { error: `That URL is too long for a QR code (the limit is ${MAX_QR_URL_LENGTH} characters).` };
+  }
+
+  return { url, hostname: parsed.hostname };
 }
 
 // Shared by custom paths (letters+digits+hyphen) and subdomains
@@ -1449,6 +1493,28 @@ async function handleUpdateRedirectTitle(request, env, session) {
   return jsonResponse({ title: title || null });
 }
 
+// POST /api/url-info - backs the QR Codes page: normalizes a typed URL and
+// looks up its page title, nothing more. Nothing is created or stored here
+// (the page keeps its list in the browser), which is why it isn't tied to an
+// identity's resource limit the way creating a redirect is.
+async function handleUrlInfo(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid request body." }, 400);
+  }
+
+  const value = typeof body?.value === "string" ? body.value.trim() : "";
+  if (!value) return jsonResponse({ error: "Enter a URL first." }, 400);
+
+  const normalized = normalizeQrUrl(value);
+  if (normalized.error) return jsonResponse({ error: normalized.error }, 400);
+
+  const title = (await fetchPageTitle(normalized.url)) || deriveFallbackTitle(normalized.url) || normalized.hostname;
+  return jsonResponse({ url: normalized.url, title: title.slice(0, MAX_TITLE_LENGTH) });
+}
+
 async function handleDeleteEmailRedirect(alias, env, session) {
   const identityId = await getIdentityId(env, session.email);
 
@@ -1662,6 +1728,7 @@ const SIMPLE_ROUTES = new Map([
     "PATCH /api/redirects/title",
     { auth: withAuthOrApiKey, run: (request, env, session) => handleUpdateRedirectTitle(request, env, session) },
   ],
+  ["POST /api/url-info", { auth: withAuth, run: (request) => handleUrlInfo(request) }],
   ["GET /api/keys", { auth: withAuth, run: (request, env, session) => handleGetApiKey(env, session) }],
   ["POST /api/keys", { auth: withAuth, run: (request, env, session) => handleCreateApiKey(env, session) }],
   ["GET /api/stats", { auth: withAuth, run: (request, env, session) => handleStats(env, session) }],
@@ -1778,6 +1845,7 @@ export {
   deriveFallbackTitle,
   deriveTitleSlug,
   fetchPageTitle,
+  normalizeQrUrl,
   validateDestinationEmail,
   validateSubdomain,
   validateEmailAlias,

@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createSessionCookie } from "../src/session.js";
 import worker, {
+  normalizeQrUrl,
   decodeHtmlEntities,
   deriveFallbackTitle,
   deriveTitleSlug,
@@ -149,6 +151,92 @@ test("routing for hyphenated short codes", async (t) => {
     const { env } = envReturning(null);
     const response = await worker.fetch(new Request("https://tiny.vin/no-such-code", { method: "HEAD" }), env, {});
     assert.equal(response.status, 404);
+  });
+});
+
+test("normalizeQrUrl", async (t) => {
+  await t.test("keeps an http(s) URL exactly as typed", () => {
+    assert.deepEqual(normalizeQrUrl("https://example.com/a?b=1"), { url: "https://example.com/a?b=1", hostname: "example.com" });
+    assert.equal(normalizeQrUrl("http://example.com").url, "http://example.com");
+  });
+
+  await t.test("adds https:// when no scheme was typed", () => {
+    assert.equal(normalizeQrUrl("example.com/page").url, "https://example.com/page");
+  });
+
+  await t.test("doesn't reject short URLs (unlike redirect creation)", () => {
+    assert.equal(normalizeQrUrl("a.co").url, "https://a.co");
+  });
+
+  await t.test("rejects other schemes", () => {
+    assert.match(normalizeQrUrl("ftp://example.com").error, /only http:\/\/ and https:\/\//);
+  });
+
+  await t.test("rejects an e-mail address instead of turning it into a URL with credentials", () => {
+    assert.match(normalizeQrUrl("someone@example.com").error, /e-mail address/);
+    assert.match(normalizeQrUrl("mailto:someone@example.com").error, /e-mail address/);
+  });
+
+  await t.test("rejects whitespace, junk and hostless input", () => {
+    assert.ok(normalizeQrUrl("not a url").error);
+    assert.ok(normalizeQrUrl("javascript:alert(1)").error);
+    assert.ok(normalizeQrUrl("https://nodots").error);
+  });
+
+  await t.test("rejects a URL too long for a QR code", () => {
+    assert.match(normalizeQrUrl(`https://example.com/${"a".repeat(2000)}`).error, /too long/);
+  });
+});
+
+test("POST /api/url-info and the /qr page", async (t) => {
+  const env = { SESSION_SECRET: "test-secret", DB: { prepare: () => assert.fail("no database access expected") } };
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const cookie = (await createSessionCookie({ email: "me@example.com", name: "Me" }, env.SESSION_SECRET)).split(";")[0];
+  const post = (value, headers = { cookie }) =>
+    worker.fetch(
+      new Request("https://tiny.vin/api/url-info", {
+        method: "POST",
+        headers: { "content-type": "application/json", ...headers },
+        body: JSON.stringify({ value }),
+      }),
+      env,
+      {}
+    );
+
+  await t.test("returns the normalized URL and page title", async () => {
+    globalThis.fetch = async () => new Response("<title>Example Domain</title>", { status: 200 });
+    const response = await post("example.com");
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { url: "https://example.com", title: "Example Domain" });
+  });
+
+  await t.test("falls back to the path, then the hostname, when there's no title", async () => {
+    globalThis.fetch = async () => new Response("", { status: 404 });
+    assert.equal((await (await post("https://example.com/docs/guide.pdf")).json()).title, "guide.pdf");
+    assert.equal((await (await post("https://example.com")).json()).title, "example.com");
+  });
+
+  await t.test("rejects an invalid URL with a 400", async () => {
+    const response = await post("not a url");
+    assert.equal(response.status, 400);
+    assert.ok((await response.json()).error);
+  });
+
+  await t.test("requires a signed-in session", async () => {
+    const response = await post("example.com", {});
+    assert.equal(response.status, 401);
+  });
+
+  await t.test("/qr is a page, not a short code", async () => {
+    // Signed out it gets the login page; it must never reach the redirect lookup
+    // (the DB mock above fails the test if anything touches it).
+    const response = await worker.fetch(new Request("https://tiny.vin/qr"), env, {});
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type"), /text\/html/);
   });
 });
 

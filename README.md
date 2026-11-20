@@ -171,6 +171,15 @@ If the database was created before this existed, apply `migrations/0007_add_hist
 
 Each short URL in the "Created URLs" list has a QR-code icon next to its copy-link icon. Clicking it opens a modal with a large QR code encoding `https://<shortUrl>` (the scheme is added since the stored/displayed short URL never includes one). QR generation is entirely client-side and offline — `public/qrcode-lib.js` vendors [kazuhikoarase/qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT license, unmodified) rather than calling a third-party image API, so the destination URL never leaves the browser.
 
+### QR Codes page
+
+`/qr` (`public/qr.html` + `public/qr.js`, "QR Codes" in the nav) makes a QR code for any URL **without creating a short link**. It mirrors the Redirects page: type a URL, and a card appears with the page's title as its heading, the URL, and a "Show QR code" button that opens the same modal as above (here the code encodes the URL exactly as entered, not a tiny.vin link).
+
+- The server's only involvement is `POST /api/url-info` (session auth): `normalizeQrUrl` turns the input into an absolute http(s) URL (adding `https://` when no scheme was typed) and the title is looked up with the same `fetchPageTitle` / `deriveFallbackTitle` logic redirects use, falling back to the hostname so a card always has a heading. Unlike redirect creation it doesn't require the page to exist or reject already-short URLs, rejects e-mail addresses rather than turning them into `user@host` URLs, and caps the URL at 2000 characters (what fits in a QR code). Nothing is written to D1 and it doesn't count toward `max_resources`.
+- The list of cards is **not stored on the server**. It lives in the browser's `localStorage`, under a key that includes the account's e-mail so people sharing a browser don't see each other's list, which also means it doesn't follow you to other devices. Adding a URL that's already listed moves it to the top rather than duplicating it.
+- `qr` is in `RESERVED_CODES` and `/qr` is in `PROTECTED_PAGES`, like the other signed-in pages.
+- The QR modal, QR/delete icon buttons, kind watermark and info popovers are shared with the Redirects page and live in `public/cards.js`.
+
 ## Response hardening
 
 `withSecurityHeaders` in `src/index.js` wraps every response (pages, the API, static assets, and redirects alike) with `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Strict-Transport-Security` — uniform header hygiene across the whole origin, which some automated site-categorization/reputation scanners factor into how they score a domain. `Content-Security-Policy` is deliberately not included: the PayPal donate SDK's inline `onload` handler and other third-party resources would need a careful per-page audit first, and adding it in without one would break the donate button.
