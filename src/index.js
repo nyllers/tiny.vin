@@ -498,14 +498,56 @@ function decodeHtmlEntities(text) {
     .replace(/&nbsp;/g, " ");
 }
 
+const TITLE_FETCH_USER_AGENT = "Mozilla/5.0 (compatible; TinyVINBot/1.0; +https://tiny.vin)";
+
+function isYouTubeUrl(url) {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname === "youtu.be" || hostname === "youtube.com" || hostname.endsWith(".youtube.com");
+  } catch {
+    return false;
+  }
+}
+
+// YouTube pages are huge (1.3MB+) and put <title> far down - around byte
+// 850,000, so close to TITLE_FETCH_MAX_BYTES that it falls off the end or
+// times out depending on region and consent state. Its oEmbed endpoint
+// returns just the video's title as a tiny JSON document instead, and works
+// for watch, youtu.be, Shorts, mobile and playlist URLs. Anything it doesn't
+// cover (channels, private or removed videos, embedding disabled) answers with
+// an error status, and the caller falls back to reading the page.
+async function fetchYouTubeTitle(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`, {
+      headers: { "user-agent": TITLE_FETCH_USER_AGENT },
+      signal: controller.signal,
+    });
+    if (!response.ok) return null;
+
+    const { title } = await response.json();
+    return typeof title === "string" ? title.replace(/\s+/g, " ").trim() || null : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function fetchPageTitle(url) {
+  if (isYouTubeUrl(url)) {
+    const youTubeTitle = await fetchYouTubeTitle(url);
+    if (youTubeTitle) return youTubeTitle;
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
   try {
     const response = await fetch(url, {
       method: "GET",
       redirect: "follow",
-      headers: { "user-agent": "Mozilla/5.0 (compatible; TinyVINBot/1.0; +https://tiny.vin)" },
+      headers: { "user-agent": TITLE_FETCH_USER_AGENT },
       signal: controller.signal,
     });
     if (!response.ok || !response.body) return null;
